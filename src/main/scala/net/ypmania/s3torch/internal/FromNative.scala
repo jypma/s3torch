@@ -13,12 +13,12 @@ trait FromNative[V] {
 object FromNative {
   given FromNative[Double] with {
     type OutputShape = Scalar
-    override def apply[T <: DType](value: Double, t: T) = {
+    override def apply[T <: DType](value: Double, t: T): Tensor[Scalar, T] = {
       val tensor = torch.scalar_tensor(
         NativeConverters.toScalar(value),
         NativeConverters.tensorOptions(t, Layout.Sparse, Device.CPU, false)
       )
-      new Tensor[Scalar, T](tensor)
+      new Tensor(tensor)
     }
   }
 }

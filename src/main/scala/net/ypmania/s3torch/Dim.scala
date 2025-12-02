@@ -18,7 +18,9 @@ object Dim extends DimLowPriorityGivens {
   }
 
   /** A dimension not known until runtime */
-  case class Dynamic(size: Long) extends Dim
+  class Dynamic(_size: Long) extends Dim {
+    override def size = _size
+  }
 
   // The "+ 0L" hack here is needed, since scala 3.7.4 otherwise will allow Long variables to match here, even though
   // their compile-time value is unknown.

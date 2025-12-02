@@ -13,5 +13,6 @@ libraryDependencies ++= Seq(
   "org.bytedeco" % "pytorch" % "2.7.1-1.5.12",
   "org.bytedeco" % "pytorch" % "2.7.1-1.5.12" classifier "linux-x86_64",
   "org.bytedeco" % "openblas" % "0.3.30-1.5.12" classifier "linux-x86_64",
+  "org.scalatest" %% "scalatest" % "3.2.19" % "test"
 )
 

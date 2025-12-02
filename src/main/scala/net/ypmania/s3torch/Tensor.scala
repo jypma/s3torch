@@ -9,9 +9,13 @@ import java.nio.DoubleBuffer
 
 import internal.ZerosApply
 import internal.FromNative
+import scala.collection.immutable.ArraySeq
 
-class Tensor[S <: Tuple, T <: DType](delegate: pytorch.Tensor) {
+class Tensor[S <: Tuple, T <: DType](native: pytorch.Tensor) {
   import Tensor.*
+
+  // TODO add sizeOf[Dim]
+  def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
   def maxBy[D](using rm: RemoveDim[S, D]): Tensor[rm.OutputShape, T] = {
     ???
@@ -163,7 +167,7 @@ object Tensor {
   def apply[V, T <: DType](value: V)(using fromNative: FromNative[V], t: DefaultV2.DType[T]): Tensor[fromNative.OutputShape, T] =
     fromNative.apply(value, t.value)
 
-  def zeros[T <: DType](using dtype: Default[T]) = new ZerosApply[T]
+  def zeros[T <: DType](using dtype: DefaultV2.DType[T]) = new ZerosApply(dtype.value)
 
   trait Squeeze[S <: Tuple] {
     type OutputShape <: Tuple
@@ -230,7 +234,7 @@ object Tensor {
   }
 
   // Test code (unnamed dimensions) --------------------------
-  val scalar = Tensor(5.0)
+  //val scalar = Tensor(5.0)
 
   //val staticZeros1d = zeros.of[10L]
   //val staticZeros1dA = zeros.of[Static[10L]]
@@ -238,11 +242,12 @@ object Tensor {
 
   //val mixedZeros1ds = zeros(staticDim[10L])
 
-  val mixedZeros1ds1 = zeros(11L)
-  val dynamicSize = 10L
-  val mixedZeros1dd = zeros(dynamicSize)
-  val mixedZeros2d = zeros(10L, Dim.Dynamic(10L))
+  //val mixedZeros1ds1 = zeros(11L)
+  //val dynamicSize = 10L
+  //val mixedZeros1dd = zeros(dynamicSize)
+  //val mixedZeros2d = zeros(10L, Dim.Dynamic(10L))
 
+  /*
   val of1 = zeros(1L)
   val of1Sq: Double = of1.squeeze.item // scalar
   val of1Max: Double = of1.maxBy[0].item // scalar
@@ -256,9 +261,11 @@ object Tensor {
   val of10x1 = zeros(10L, 1L)
   val of10x1sq = of10x1.squeeze
 
-  val of10x10 = zeros(10L, 10L)
+   val of10x10 = zeros(10L, 10L)
+   */
   // of10x10.squeeze // compile error
 
+  /*
   // Test code (named dimensions)
   case object BatchSize extends Dim.Static[10L]
 
@@ -272,7 +279,7 @@ object Tensor {
   case class SomeUnkownDim(size: Long) extends Dim
   val of1xBb = zeros(1L, SomeUnkownDim(24))
   val new1c = of1xBb.maxBy[SomeUnkownDim]
-
+   */
 }
 
 /*
