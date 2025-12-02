@@ -17,7 +17,7 @@ class ZerosApply[T <: DType](dtype: T) {
   private def zeros[S <: Tuple](size: Seq[Long]): Tensor[S,T] = new Tensor(
     torch.torch_zeros(
       size.toArray,
-      NativeConverters.tensorOptions(dtype, Layout.Sparse, Device.CPU, false)
+      Torch.tensorOptions(dtype)
     )
   )
 }

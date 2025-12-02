@@ -3,7 +3,6 @@ package net.ypmania.s3torch
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
 
-import internal.NativeConverters
 import org.bytedeco.javacpp.DoublePointer
 import java.nio.DoubleBuffer
 

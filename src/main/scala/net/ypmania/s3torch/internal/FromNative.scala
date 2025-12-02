@@ -18,8 +18,8 @@ object FromNative {
     type OutputShape = Scalar
     override def apply[T <: DType](value: N, t: T): Tensor[Scalar, T] = {
       val tensor = torch.scalar_tensor(
-        NativeConverters.toScalar(value),
-        NativeConverters.tensorOptions(t, Layout.Sparse, Device.CPU, false)
+        toScalar(value),
+        Torch.tensorOptions(t)
       )
       new Tensor(tensor)
     }
