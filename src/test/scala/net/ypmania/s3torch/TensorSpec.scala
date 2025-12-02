@@ -16,6 +16,26 @@ class TensorSpec extends UnitSpec {
         val tType: Tensor[EmptyTuple.type, Float32] = t
         assert(t.size == Seq[Long]())
       }
+
+      it("can create an Int scalar and change defaults") {
+        val t = Tensor(5, int8)
+        val tType: Tensor[EmptyTuple.type, Int8] = t
+        assert(t.size == Seq[Long]())
+      }
+
+      it("can create various int scalars") {
+        Tensor(5, int8)
+        Tensor(5, uint8)
+        Tensor(5, int16)
+        Tensor(5, int32)
+        Tensor(5, int64)
+      }
+
+      it("can create various float scalars") {
+        Tensor(5.0, float16)
+        Tensor(5.0, float32)
+        Tensor(5.0, float64)
+      }
     }
 
     describe("zeros") {

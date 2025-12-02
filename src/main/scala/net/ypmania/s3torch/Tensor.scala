@@ -166,6 +166,8 @@ object Tensor {
   // predictable types here... that might need to be verified, though.
   def apply[V, T <: DType](value: V)(using fromNative: FromNative[V], t: DefaultV2.DType[T]): Tensor[fromNative.OutputShape, T] =
     fromNative.apply(value, t.value)
+  def apply[V, T <: DType](value: V, dtype: T)(using fromNative: FromNative[V]): Tensor[fromNative.OutputShape, T] =
+    fromNative.apply(value, dtype)
 
   def zeros[T <: DType](using dtype: DefaultV2.DType[T]) = new ZerosApply(dtype.value)
 

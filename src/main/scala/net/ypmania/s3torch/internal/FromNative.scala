@@ -3,6 +3,7 @@ package net.ypmania.s3torch.internal
 import net.ypmania.s3torch.*
 import net.ypmania.s3torch.Tensor.*
 
+import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
 
 trait FromNative[V] {
@@ -11,14 +12,26 @@ trait FromNative[V] {
 }
 
 object FromNative {
-  given FromNative[Double] with {
+  type ScalarLike = Boolean | Byte | Short | Int | Long | Float | Double
+
+  given [N <: ScalarLike]: FromNative[N] with {
     type OutputShape = Scalar
-    override def apply[T <: DType](value: Double, t: T): Tensor[Scalar, T] = {
+    override def apply[T <: DType](value: N, t: T): Tensor[Scalar, T] = {
       val tensor = torch.scalar_tensor(
         NativeConverters.toScalar(value),
         NativeConverters.tensorOptions(t, Layout.Sparse, Device.CPU, false)
       )
       new Tensor(tensor)
     }
+  }
+
+  private def toScalar[N <: ScalarLike](x: N): pytorch.Scalar = x match {
+    case x: Boolean => pytorch.AbstractTensor.create(x).item()
+    case x: Byte    => pytorch.Scalar(x)
+    case x: Short   => pytorch.Scalar(x)
+    case x: Int     => pytorch.Scalar(x)
+    case x: Long    => pytorch.Scalar(x)
+    case x: Float   => pytorch.Scalar(x)
+    case x: Double  => pytorch.Scalar(x)
   }
 }
