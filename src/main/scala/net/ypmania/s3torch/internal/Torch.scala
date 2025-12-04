@@ -8,6 +8,7 @@ import net.ypmania.s3torch.Layout
 import net.ypmania.s3torch.Device
 
 object Torch {
+  // TODO make CreationOptions case class, which can create itself from DefaultV2
   def tensorOptions(
       dtype: DType,
   ): pytorch.TensorOptions =

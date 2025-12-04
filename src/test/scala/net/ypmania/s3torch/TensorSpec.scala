@@ -13,7 +13,7 @@ class TensorSpec extends UnitSpec {
     describe("apply") {
       it("can create a Double scalar") {
         val t = Tensor(5.0)
-        val tType: Tensor[EmptyTuple.type, Float32] = t
+        val tType: Tensor[EmptyTuple.type, Float64] = t
         assert(t.size == Seq[Long]())
       }
 
@@ -21,6 +21,18 @@ class TensorSpec extends UnitSpec {
         val t = Tensor(5, int8)
         val tType: Tensor[EmptyTuple.type, Int8] = t
         assert(t.size == Seq[Long]())
+      }
+
+      it("can create a byte vector") {
+        val t = Tensor(Seq[Byte](1, 2, 3))
+        val tType: Tensor[Tuple1[scala.Dynamic], Int8] = t
+        assert(t.size == Seq(3L))
+      }
+
+      it("can create a doublevector") {
+        val t = Tensor(Seq(1.0, 2.0, 3.0))
+        val tType: Tensor[Tuple1[scala.Dynamic], Float64] = t
+        assert(t.size == Seq(3L))
       }
 
       it("can create various int scalars") {

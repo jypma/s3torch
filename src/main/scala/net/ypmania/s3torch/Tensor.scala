@@ -161,10 +161,8 @@ object Tensor {
 
   type Scalar = EmptyTuple
 
-  // The default here is explicitly the global default, not depending on V. It's assumed that consistent tensors is more important than
-  // predictable types here... that might need to be verified, though.
-  def apply[V, T <: DType](value: V)(using fromNative: FromNative[V], t: DefaultV2.DType[T]): Tensor[fromNative.OutputShape, T] =
-    fromNative.apply(value, t.value)
+  def apply[V](value: V)(using fromNative: FromNative[V]): Tensor[fromNative.OutputShape, fromNative.DefaultDType] =
+    fromNative.apply(value, fromNative.defaultDType)
   def apply[V, T <: DType](value: V, dtype: T)(using fromNative: FromNative[V]): Tensor[fromNative.OutputShape, T] =
     fromNative.apply(value, dtype)
 

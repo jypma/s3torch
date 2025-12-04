@@ -1,37 +1,129 @@
 package net.ypmania.s3torch.internal
 
+import java.nio.ByteBuffer
+
 import net.ypmania.s3torch.*
 import net.ypmania.s3torch.Tensor.*
 
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
+import org.bytedeco.javacpp.Pointer
+import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.BoolPointer
+import org.bytedeco.javacpp.DoublePointer
+import java.nio.DoubleBuffer
 
 trait FromNative[V] {
   type OutputShape <: Tuple
+  type DefaultDType <: DType
   def apply[T <: DType](value: V, t: T): Tensor[OutputShape, T]
+  def defaultDType: DefaultDType
 }
 
 object FromNative {
-  type ScalarLike = Boolean | Byte | Short | Int | Long | Float | Double
+  type SupportedType = Boolean | Byte | Short | Int | Long | Float | Double
 
-  given [N <: ScalarLike]: FromNative[N] with {
+  trait FromScalar[V] extends FromNative[V] {
     type OutputShape = Scalar
-    override def apply[T <: DType](value: N, t: T): Tensor[Scalar, T] = {
+
+    override def apply[T <: DType](value: V, dtype: T): Tensor[Scalar, T] = {
       val tensor = torch.scalar_tensor(
         toScalar(value),
-        Torch.tensorOptions(t)
+        Torch.tensorOptions(dtype)
       )
       new Tensor(tensor)
     }
+
+    def toScalar(value: V): pytorch.Scalar
   }
 
-  private def toScalar[N <: ScalarLike](x: N): pytorch.Scalar = x match {
-    case x: Boolean => pytorch.AbstractTensor.create(x).item()
-    case x: Byte    => pytorch.Scalar(x)
-    case x: Short   => pytorch.Scalar(x)
-    case x: Int     => pytorch.Scalar(x)
-    case x: Long    => pytorch.Scalar(x)
-    case x: Float   => pytorch.Scalar(x)
-    case x: Double  => pytorch.Scalar(x)
+  trait FromSeq[V] extends FromNative[Seq[V]] {
+    type OutputShape = Tuple1[Dynamic]
+
+    override def apply[T <: DType](value: Seq[V], dtype: T): Tensor[Tuple1[Dynamic], T] = {
+      val tensor = torch.from_blob(toPointer(value), Array(value.length.toLong), Torch.tensorOptions(dtype))
+      new Tensor(tensor)
+    }
+
+    def toPointer(value: Seq[V]): Pointer
   }
+
+  trait ToBool {
+    type DefaultDType = Bool
+    def defaultDType = bool
+  }
+
+  trait ToInt8 {
+    type DefaultDType = Int8
+    def defaultDType = int8
+  }
+
+  trait ToInt16 {
+    type DefaultDType = Int16
+    def defaultDType = int16
+  }
+
+  trait ToInt32 {
+    type DefaultDType = Int32
+    def defaultDType = int32
+  }
+
+  trait ToInt64 {
+    type DefaultDType = Int64
+    def defaultDType = int64
+  }
+
+  trait ToFloat32 {
+    type DefaultDType = Float32
+    def defaultDType = float32
+  }
+
+  trait ToFloat64 {
+    type DefaultDType = Float64
+    def defaultDType = float64
+  }
+
+  given FromScalar[Boolean] with ToBool with {
+    override def toScalar(value: Boolean) = pytorch.AbstractTensor.create(value).item()
+  }
+  given FromSeq[Boolean] with ToBool with {
+    override def toPointer(value: Seq[Boolean]) = {
+      val p = new BoolPointer(value.length)
+      for (idx <- 0.until(value.length)) {
+        p.put(idx, value(idx))
+      }
+      p
+    }
+  }
+
+  given FromScalar[Byte] with ToInt8 with {
+    override def toScalar(value: Byte) = pytorch.Scalar(value)
+  }
+  given FromSeq[Byte] with ToInt8 with {
+    override def toPointer(value: Seq[Byte]) = new BytePointer(ByteBuffer.wrap(value.toArray))
+  }
+
+  given FromScalar[Short] with ToInt16 with {
+    override def toScalar(value: Short) = pytorch.Scalar(value)
+  }
+
+  given FromScalar[Int] with ToInt32 with {
+    override def toScalar(value: Int) = pytorch.Scalar(value)
+  }
+
+  given FromScalar[Long] with ToInt64 with {
+    override def toScalar(value: Long) = pytorch.Scalar(value)
+  }
+
+  given FromScalar[Float] with ToFloat32 with {
+    override def toScalar(value: Float) = pytorch.Scalar(value)
+  }
+
+  given FromScalar[Double] with ToFloat64 with {
+    override def toScalar(value: Double) = pytorch.Scalar(value)
+  }
+  given FromSeq[Double] with ToFloat64 with {
+    override def toPointer(value: Seq[Double]) = new DoublePointer(DoubleBuffer.wrap(value.toArray))
+  }
+
 }
