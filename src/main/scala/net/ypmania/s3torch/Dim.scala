@@ -12,7 +12,7 @@ trait DimLowPriorityGivens {
 }
 object Dim extends DimLowPriorityGivens {
   /** A dimension known at compile time */
-  abstract class Static[S <: Singleton & Long](using ValueOf[S]) extends Dim {
+  abstract class Static[S <: Long](using ValueOf[S]) extends Dim {
     type Size = S
     def size = valueOf[S]
   }

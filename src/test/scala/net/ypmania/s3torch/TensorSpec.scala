@@ -29,9 +29,21 @@ class TensorSpec extends UnitSpec {
         assert(t.size == Seq(3L))
       }
 
-      it("can create a doublevector") {
+      it("can create a dynamic double vector") {
         val t = Tensor(Seq(1.0, 2.0, 3.0))
         val tType: Tensor[Tuple1[scala.Dynamic], Float64] = t
+        assert(t.size == Seq(3L))
+      }
+
+      it("can create a static double vector") {
+        val t = Tensor((1.0, 2.0, 3.0))
+        val tType: Tensor[Tuple1[Static[3L]], Float64] = t
+        assert(t.size == Seq(3L))
+      }
+
+      it("can create a static byte vector") {
+        val t = Tensor((1.toByte, 2.toByte, 3.toByte))
+        val tType: Tensor[Tuple1[Static[3L]], Int8] = t
         assert(t.size == Seq(3L))
       }
 
@@ -69,6 +81,47 @@ class TensorSpec extends UnitSpec {
         val of10x42 = Tensor.zeros(10L, 42L)
         val of10x42Type: Tensor[(Static[10L], Static[42L]), Float32] = of10x42
         assert(of10x42.size == Seq(10L, 42L))
+      }
+    }
+
+    describe("expr") {
+      it("works") {
+        import scala.compiletime.ops.int.*
+
+        type S = Double & Singleton
+
+        type SizeOf[T <: Tuple] = T match {
+          case Double *: tail => SizeOf[tail] + 1
+          case EmptyTuple => 0
+        }
+
+        //val size: SizeOf[(4.0, 2.0)] = 2
+
+        trait ToSeq[T] {
+          def toSeq(t: T): Seq[Double]
+        }
+
+        object ToSeq {
+          def toSeq[T](t: T)(using conv: ToSeq[T]): Seq[Double] = conv.toSeq(t)
+        }
+
+        given ToSeq[EmptyTuple] with {
+          override def toSeq(empty: EmptyTuple) = Seq.empty
+        }
+
+        /*
+         given [H: ToSeq, T <: Tuple: ToSeq]: ToSeq[H *: T] with {
+         override def toSeq(tuple: H *: T) = ToSeq.toSeq(tuple.head) ++ ToSeq.toSeq(tuple.tail)
+         }
+         */
+        given [T <: Tuple: ToSeq]: ToSeq[Double *: T] with {
+          override def toSeq(tuple: Double *: T) = tuple.head +: ToSeq.toSeq(tuple.tail)
+        }
+
+        val test = ToSeq.toSeq((4.0, 2.0))
+        val size: Tuple.Size[(4.0, 2.0)] = 2
+
+        assert(test == Seq(4.0, 2.0))
       }
     }
   }

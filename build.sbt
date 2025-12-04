@@ -4,6 +4,7 @@ version := "0.0.1-SNAPSHOT"
 
 scalacOptions ++= Seq(
   "-explain",
+  "-explain-cyclic",
   "-feature",
   "-language:implicitConversions"
 

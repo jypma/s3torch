@@ -8,9 +8,10 @@ import java.nio.DoubleBuffer
 
 import internal.ZerosApply
 import internal.FromNative
+
 import scala.collection.immutable.ArraySeq
 
-class Tensor[S <: Tuple, T <: DType](native: pytorch.Tensor) {
+class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   import Tensor.*
 
   // TODO add sizeOf[Dim]

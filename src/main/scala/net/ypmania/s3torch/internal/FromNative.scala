@@ -13,6 +13,8 @@ import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.DoublePointer
 import java.nio.DoubleBuffer
 
+import StaticApply.ToSeq
+
 trait FromNative[V] {
   type OutputShape <: Tuple
   type DefaultDType <: DType
@@ -126,4 +128,22 @@ object FromNative {
     override def toPointer(value: Seq[Double]) = new DoublePointer(DoubleBuffer.wrap(value.toArray))
   }
 
+  trait FromTupleOps[V <: Tuple, E] {
+    def toTensor[T <: DType](value: V, dtype: T): pytorch.Tensor
+  }
+
+  given [V <: Tuple, E](using toSeq: ToSeq[V, E], fromNative: FromNative[Seq[E]]): FromTupleOps[V, E] with {
+    def toTensor[T <: DType](value: V, dtype: T) = fromNative.apply(toSeq.toSeq(value), dtype).native
+  }
+
+  abstract class FromTupleBase[V <: Tuple, E](using ops:FromTupleOps[V, E]) extends FromNative[V] {
+    import compiletime.ops.int.ToLong
+    type OutputShape = Tuple1[Dim.Static[ToLong[Tuple.Size[V]]]]
+    def apply[T <: DType](value: V, t: T) = new Tensor(ops.toTensor(value, t))
+  }
+
+  given [V <: Tuple](using ops:FromTupleOps[V, Double]): FromTupleBase[V, Double] with ToFloat64 with {}
+  given [V <: Tuple](using ops:FromTupleOps[V, Byte]): FromTupleBase[V, Byte] with ToInt8 with {}
+  given [V <: Tuple](using ops:FromTupleOps[V, Short]): FromTupleBase[V, Short] with ToInt16 with {}
+  // TODO more types, and shorten the other types above by using abstract class instead of a trait.
 }
