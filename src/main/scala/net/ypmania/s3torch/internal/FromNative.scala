@@ -1,6 +1,11 @@
 package net.ypmania.s3torch.internal
 
 import java.nio.ByteBuffer
+import java.nio.ShortBuffer
+import java.nio.IntBuffer
+import java.nio.LongBuffer
+import java.nio.FloatBuffer
+import java.nio.DoubleBuffer
 
 import net.ypmania.s3torch.*
 import net.ypmania.s3torch.Tensor.*
@@ -9,9 +14,12 @@ import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.ShortPointer
+import org.bytedeco.javacpp.IntPointer
+import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.BoolPointer
+import org.bytedeco.javacpp.FloatPointer
 import org.bytedeco.javacpp.DoublePointer
-import java.nio.DoubleBuffer
 
 import StaticApply.ToSeq
 
@@ -23,33 +31,6 @@ trait FromNative[V] {
 }
 
 object FromNative {
-  type SupportedType = Boolean | Byte | Short | Int | Long | Float | Double
-
-  trait FromScalar[V] extends FromNative[V] {
-    type OutputShape = Scalar
-
-    override def apply[T <: DType](value: V, dtype: T): Tensor[Scalar, T] = {
-      val tensor = torch.scalar_tensor(
-        toScalar(value),
-        Torch.tensorOptions(dtype)
-      )
-      new Tensor(tensor)
-    }
-
-    def toScalar(value: V): pytorch.Scalar
-  }
-
-  trait FromSeq[V] extends FromNative[Seq[V]] {
-    type OutputShape = Tuple1[Dynamic]
-
-    override def apply[T <: DType](value: Seq[V], dtype: T): Tensor[Tuple1[Dynamic], T] = {
-      val tensor = torch.from_blob(toPointer(value), Array(value.length.toLong), Torch.tensorOptions(dtype))
-      new Tensor(tensor)
-    }
-
-    def toPointer(value: Seq[V]): Pointer
-  }
-
   trait ToBool {
     type DefaultDType = Bool
     def defaultDType = bool
@@ -85,48 +66,48 @@ object FromNative {
     def defaultDType = float64
   }
 
-  given FromScalar[Boolean] with ToBool with {
-    override def toScalar(value: Boolean) = pytorch.AbstractTensor.create(value).item()
-  }
-  given FromSeq[Boolean] with ToBool with {
-    override def toPointer(value: Seq[Boolean]) = {
-      val p = new BoolPointer(value.length)
-      for (idx <- 0.until(value.length)) {
-        p.put(idx, value(idx))
-      }
-      p
+  abstract class FromScalar[V](toScalar: V => pytorch.Scalar) extends FromNative[V] {
+    type OutputShape = Scalar
+
+    override def apply[T <: DType](value: V, dtype: T): Tensor[Scalar, T] = {
+      val tensor = torch.scalar_tensor(
+        toScalar(value),
+        Torch.tensorOptions(dtype)
+      )
+      new Tensor(tensor)
     }
   }
 
-  given FromScalar[Byte] with ToInt8 with {
-    override def toScalar(value: Byte) = pytorch.Scalar(value)
-  }
-  given FromSeq[Byte] with ToInt8 with {
-    override def toPointer(value: Seq[Byte]) = new BytePointer(ByteBuffer.wrap(value.toArray))
+  given FromScalar[Byte](pytorch.Scalar(_)) with ToInt8 with {}
+  given FromScalar[Short](pytorch.Scalar(_)) with ToInt16 with {}
+  given FromScalar[Int](pytorch.Scalar(_)) with ToInt32 with {}
+  given FromScalar[Long](pytorch.Scalar(_)) with ToInt64 with {}
+  given FromScalar[Float](pytorch.Scalar(_)) with ToFloat32 with {}
+  given FromScalar[Double](pytorch.Scalar(_)) with ToFloat64 with {}
+  given FromScalar[Boolean](value => pytorch.AbstractTensor.create(value).item()) with ToBool with {}
+
+  abstract class FromSeq[V](toPointer: Seq[V] => Pointer) extends FromNative[Seq[V]] {
+    type OutputShape = Tuple1[Dynamic]
+
+    override def apply[T <: DType](value: Seq[V], dtype: T): Tensor[Tuple1[Dynamic], T] = {
+      val tensor = torch.from_blob(toPointer(value), Array(value.length.toLong), Torch.tensorOptions(dtype))
+      new Tensor(tensor)
+    }
   }
 
-  given FromScalar[Short] with ToInt16 with {
-    override def toScalar(value: Short) = pytorch.Scalar(value)
-  }
-
-  given FromScalar[Int] with ToInt32 with {
-    override def toScalar(value: Int) = pytorch.Scalar(value)
-  }
-
-  given FromScalar[Long] with ToInt64 with {
-    override def toScalar(value: Long) = pytorch.Scalar(value)
-  }
-
-  given FromScalar[Float] with ToFloat32 with {
-    override def toScalar(value: Float) = pytorch.Scalar(value)
-  }
-
-  given FromScalar[Double] with ToFloat64 with {
-    override def toScalar(value: Double) = pytorch.Scalar(value)
-  }
-  given FromSeq[Double] with ToFloat64 with {
-    override def toPointer(value: Seq[Double]) = new DoublePointer(DoubleBuffer.wrap(value.toArray))
-  }
+  given FromSeq[Byte](v => new BytePointer(ByteBuffer.wrap(v.toArray))) with ToInt8 with {}
+  given FromSeq[Short](v => new ShortPointer(ShortBuffer.wrap(v.toArray))) with ToInt16 with {}
+  given FromSeq[Int](v => new IntPointer(IntBuffer.wrap(v.toArray))) with ToInt32 with {}
+  given FromSeq[Long](v => new LongPointer(LongBuffer.wrap(v.toArray))) with ToInt64 with {}
+  given FromSeq[Float](v => new FloatPointer(FloatBuffer.wrap(v.toArray))) with ToFloat32 with {}
+  given FromSeq[Double](v => new DoublePointer(DoubleBuffer.wrap(v.toArray))) with ToFloat64 with {}
+  given FromSeq[Boolean](value => {
+    val p = new BoolPointer(value.length)
+    for (idx <- 0.until(value.length)) {
+      p.put(idx, value(idx))
+    }
+    p
+  }) with ToBool with {}
 
   trait FromTupleOps[V <: Tuple, E] {
     def toTensor[T <: DType](value: V, dtype: T): pytorch.Tensor
@@ -142,8 +123,10 @@ object FromNative {
     def apply[T <: DType](value: V, t: T) = new Tensor(ops.toTensor(value, t))
   }
 
-  given [V <: Tuple](using ops:FromTupleOps[V, Double]): FromTupleBase[V, Double] with ToFloat64 with {}
   given [V <: Tuple](using ops:FromTupleOps[V, Byte]): FromTupleBase[V, Byte] with ToInt8 with {}
   given [V <: Tuple](using ops:FromTupleOps[V, Short]): FromTupleBase[V, Short] with ToInt16 with {}
-  // TODO more types, and shorten the other types above by using abstract class instead of a trait.
+  given [V <: Tuple](using ops:FromTupleOps[V, Int]): FromTupleBase[V, Int] with ToInt32 with {}
+  given [V <: Tuple](using ops:FromTupleOps[V, Long]): FromTupleBase[V, Long] with ToInt64 with {}
+  given [V <: Tuple](using ops:FromTupleOps[V, Float]): FromTupleBase[V, Float] with ToFloat32 with {}
+  given [V <: Tuple](using ops:FromTupleOps[V, Double]): FromTupleBase[V, Double] with ToFloat64 with {}
 }
