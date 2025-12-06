@@ -23,14 +23,14 @@ import org.bytedeco.javacpp.DoublePointer
 
 import StaticApply.ToSeq
 
-trait FromNative[V] {
+trait FromScala[V] {
   type OutputShape <: Tuple
   type DefaultDType <: DType
   def apply[T <: DType](value: V, t: T): Tensor[OutputShape, T]
   def defaultDType: DefaultDType
 }
 
-object FromNative {
+object FromScala {
   trait ToBool {
     type DefaultDType = Bool
     def defaultDType = bool
@@ -66,7 +66,7 @@ object FromNative {
     def defaultDType = float64
   }
 
-  abstract class FromScalar[V](toScalar: V => pytorch.Scalar) extends FromNative[V] {
+  abstract class FromScalar[V](toScalar: V => pytorch.Scalar) extends FromScala[V] {
     type OutputShape = Scalar
 
     override def apply[T <: DType](value: V, dtype: T): Tensor[Scalar, T] = {
@@ -86,7 +86,7 @@ object FromNative {
   given FromScalar[Double](pytorch.Scalar(_)) with ToFloat64 with {}
   given FromScalar[Boolean](value => pytorch.AbstractTensor.create(value).item()) with ToBool with {}
 
-  abstract class FromSeq[V](toPointer: Seq[V] => Pointer) extends FromNative[Seq[V]] {
+  abstract class FromSeq[V](toPointer: Seq[V] => Pointer) extends FromScala[Seq[V]] {
     type OutputShape = Tuple1[Dynamic]
 
     override def apply[T <: DType](value: Seq[V], dtype: T): Tensor[Tuple1[Dynamic], T] = {
@@ -113,11 +113,11 @@ object FromNative {
     def toTensor[T <: DType](value: V, dtype: T): pytorch.Tensor
   }
 
-  given [V <: Tuple, E](using toSeq: ToSeq[V, E], fromNative: FromNative[Seq[E]]): FromTupleOps[V, E] with {
-    def toTensor[T <: DType](value: V, dtype: T) = fromNative.apply(toSeq.toSeq(value), dtype).native
+  given [V <: Tuple, E](using toSeq: ToSeq[V, E], fromScala: FromScala[Seq[E]]): FromTupleOps[V, E] with {
+    def toTensor[T <: DType](value: V, dtype: T) = fromScala(toSeq.toSeq(value), dtype).native
   }
 
-  abstract class FromTupleBase[V <: Tuple, E](using ops:FromTupleOps[V, E]) extends FromNative[V] {
+  abstract class FromTupleBase[V <: Tuple, E](using ops:FromTupleOps[V, E]) extends FromScala[V] {
     import compiletime.ops.int.ToLong
     type OutputShape = Tuple1[Dim.Static[ToLong[Tuple.Size[V]]]]
     def apply[T <: DType](value: V, t: T) = new Tensor(ops.toTensor(value, t))

@@ -7,7 +7,7 @@ import org.bytedeco.javacpp.DoublePointer
 import java.nio.DoubleBuffer
 
 import internal.ZerosApply
-import internal.FromNative
+import internal.FromScala
 
 import scala.collection.immutable.ArraySeq
 
@@ -162,10 +162,10 @@ object Tensor {
 
   type Scalar = EmptyTuple
 
-  def apply[V](value: V)(using fromNative: FromNative[V]): Tensor[fromNative.OutputShape, fromNative.DefaultDType] =
-    fromNative.apply(value, fromNative.defaultDType)
-  def apply[V, T <: DType](value: V, dtype: T)(using fromNative: FromNative[V]): Tensor[fromNative.OutputShape, T] =
-    fromNative.apply(value, dtype)
+  def apply[V](value: V)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, fromScala.DefaultDType] =
+    fromScala(value, fromScala.defaultDType)
+  def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
+    fromScala(value, dtype)
 
   def zeros[T <: DType](using dtype: DefaultV2.DType[T]) = new ZerosApply(dtype.value)
 
