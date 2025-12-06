@@ -87,9 +87,9 @@ object FromScala {
   given FromScalar[Boolean](value => pytorch.AbstractTensor.create(value).item()) with ToBool with {}
 
   abstract class FromSeq[V](toPointer: Seq[V] => Pointer) extends FromScala[Seq[V]] {
-    type OutputShape = Tuple1[Dynamic]
+    type OutputShape = Tuple1[Dim.Dynamic]
 
-    override def apply[T <: DType](value: Seq[V], dtype: T): Tensor[Tuple1[Dynamic], T] = {
+    override def apply[T <: DType](value: Seq[V], dtype: T): Tensor[Tuple1[Dim.Dynamic], T] = {
       val tensor = torch.from_blob(toPointer(value), Array(value.length.toLong), Torch.tensorOptions(dtype))
       new Tensor(tensor)
     }

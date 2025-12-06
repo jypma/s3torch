@@ -8,6 +8,7 @@ import java.nio.DoubleBuffer
 
 import internal.ZerosApply
 import internal.FromScala
+import internal.ToScala
 
 import scala.collection.immutable.ArraySeq
 
@@ -16,6 +17,8 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   // TODO add sizeOf[Dim]
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
+
+  def value(using toScala: ToScala[S, T]) = toScala(native)
 
   def maxBy[D](using rm: RemoveDim[S, D]): Tensor[rm.OutputShape, T] = {
     ???
@@ -194,14 +197,6 @@ object Tensor {
       ???
     }
   }
-
-  // Get the item of a scalar
-  extension [T <: DType](t: Tensor[Scalar, T]) {
-    def item: DTypeToScala[T] = {
-      ???
-    }
-  }
-
 
   // Target one dimension and remove it (used by max[dim=N, keepdim=false], squeeze[dims=...], etc.)
 
