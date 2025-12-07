@@ -6,6 +6,7 @@ scalacOptions ++= Seq(
   "-explain",
   "-explain-cyclic",
   "-feature",
+  "-deprecation",
   "-language:implicitConversions"
 
 )

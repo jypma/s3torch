@@ -23,6 +23,8 @@ import org.bytedeco.javacpp.DoublePointer
 
 import StaticApply.ToSeq
 
+import compiletime.ops.int.ToLong
+
 trait FromScala[V] {
   type OutputShape <: Tuple
   type DefaultDType <: DType
@@ -117,9 +119,26 @@ object FromScala {
     def toTensor[T <: DType](value: V, dtype: T) = fromScala(toSeq.toSeq(value), dtype).native
   }
 
+  given t2[V <: Tuple, E1 <: Tuple, E](using toSeq: ToSeq[V, E1], toSeq2: ToSeq[E1, E], fromScala: FromScala[Seq[E]]): FromTupleOps[V, E] with {
+    def toTensor[T <: DType](value: V, dtype: T) = {
+      val seqs1 = toSeq.toSeq(value)
+      val seq = seqs1.map(s => toSeq2.toSeq(s)).flatten
+      fromScala(seq, dtype).native.view(seqs1.size, seq.length / seqs1.size)
+    }
+  }
+
+  type ToDim[V] <: Dim = V match {
+    case Tuple => Dim.Static[ToLong[Tuple.Size[V]]]
+    case _ => Dim.Dynamic
+  }
+
+  type ToShape[V] <: Tuple = V match {
+    case Tuple => ToDim[V] *: ToShape[Tuple.Union[V]]
+    case _ => EmptyTuple
+  }
+
   abstract class FromTupleBase[V <: Tuple, E](using ops:FromTupleOps[V, E]) extends FromScala[V] {
-    import compiletime.ops.int.ToLong
-    type OutputShape = Tuple1[Dim.Static[ToLong[Tuple.Size[V]]]]
+    type OutputShape = ToShape[V]
     def apply[T <: DType](value: V, t: T) = new Tensor(ops.toTensor(value, t))
   }
 

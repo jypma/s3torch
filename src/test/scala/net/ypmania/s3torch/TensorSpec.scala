@@ -4,6 +4,7 @@ import org.scalatest.Assertions._
 
 import Dim.Static
 import Dim.Dynamic
+import scala.reflect.ClassTag
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -54,6 +55,24 @@ class TensorSpec extends UnitSpec {
         assert(t.value.toSeq == Seq(1, 2, 3))
       }
 
+      it("can create a static matrix") {
+        val t = Tensor((
+          ((1,2,3)),
+          ((4,5,6))
+        ))
+        val tType: Tensor[(Static[2L], Static[3L]), Int32] = t
+        assert(t.size == Seq(2L, 3L))
+        assert(t.value == Seq(Seq(1,2,3), Seq(4,5,6)))
+      }
+
+      it("can create a dynamic matrix") {
+
+      }
+
+      it("can create a mixed matrix") {
+
+      }
+
       it("can create various int scalars") {
         Tensor(5, int8)
         Tensor(5, uint8)
@@ -88,6 +107,15 @@ class TensorSpec extends UnitSpec {
         val of10x42 = Tensor.zeros(10L, 42L)
         val of10x42Type: Tensor[(Static[10L], Static[42L]), Float32] = of10x42
         assert(of10x42.size == Seq(10L, 42L))
+      }
+    }
+
+    describe("flatten") {
+      it("can flatten a 1D tensor") {
+        val t = Tensor((1, 2, 3))
+        val r = t.flatten
+        val rType: Tensor[Tuple1[Static[3L]], Int32] = r
+        assert(r.value.toSeq == Seq(1, 2, 3))
       }
     }
   }
