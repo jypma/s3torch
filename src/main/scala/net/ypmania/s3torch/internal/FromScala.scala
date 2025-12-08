@@ -117,7 +117,7 @@ object FromScala {
     p
    }) with ToBool with {}
 
-  abstract class FromSeqSeq[S1, S2, V](using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, V], fromScala: FromScala[Seq[V]]) extends FromScala[S1] {
+  abstract class FromSeq2D[S1, S2, V](using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, V], fromScala: FromScala[Seq[V]]) extends FromScala[S1] {
     type OutputShape = ToShape[S1]
 
     override def apply[T <: DType](value: S1, dtype: T): Tensor[OutputShape, T] = {
@@ -127,10 +127,30 @@ object FromScala {
     }
   }
 
-  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Byte]): FromSeqSeq[S1, S2, Byte] with ToInt8 with {}
-  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Short]): FromSeqSeq[S1, S2, Short] with ToInt16 with {}
-  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Int]): FromSeqSeq[S1, S2, Int] with ToInt32 with {}
-  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Long]): FromSeqSeq[S1, S2, Long] with ToInt64 with {}
-  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Float]): FromSeqSeq[S1, S2, Float] with ToFloat32 with {}
-  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Double]): FromSeqSeq[S1, S2, Double] with ToFloat64 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Byte]): FromSeq2D[S1, S2, Byte] with ToInt8 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Short]): FromSeq2D[S1, S2, Short] with ToInt16 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Int]): FromSeq2D[S1, S2, Int] with ToInt32 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Long]): FromSeq2D[S1, S2, Long] with ToInt64 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Float]): FromSeq2D[S1, S2, Float] with ToFloat32 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Double]): FromSeq2D[S1, S2, Double] with ToFloat64 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Boolean]): FromSeq2D[S1, S2, Boolean] with ToBool with {}
+
+  // TODO rewrite this recursively against >3 dimensions
+  abstract class FromSeq3D[S1, S2, S3, V](using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, S3], toSeq3: ToSeq[S3, V], fromScala: FromScala[Seq[V]]) extends FromScala[S1] {
+    type OutputShape = ToShape[S1]
+
+    override def apply[T <: DType](value: S1, dtype: T): Tensor[OutputShape, T] = {
+      val seq = toSeq1(value).map(s2 => toSeq2(s2).map(s3 => toSeq3(s3)))
+      new Tensor(fromScala(seq.flatten.flatten, dtype).native.view(seq.size, seq.head.size, seq.head.head.size))
+    }
+  }
+
+  given [S1, S2, S3](using ToSeq[S1, S2], ToSeq[S2, S3], ToSeq[S3, Byte]): FromSeq3D[S1, S2, S3,Byte] with ToInt8 with {}
+  given [S1, S2, S3](using ToSeq[S1, S2], ToSeq[S2, S3], ToSeq[S3, Short]): FromSeq3D[S1, S2, S3, Short] with ToInt16 with {}
+  given [S1, S2, S3](using ToSeq[S1, S2], ToSeq[S2, S3], ToSeq[S3, Int]): FromSeq3D[S1, S2, S3, Int] with ToInt32 with {}
+  given [S1, S2, S3](using ToSeq[S1, S2], ToSeq[S2, S3], ToSeq[S3, Long]): FromSeq3D[S1, S2, S3, Long] with ToInt64 with {}
+  given [S1, S2, S3](using ToSeq[S1, S2], ToSeq[S2, S3], ToSeq[S3, Float]): FromSeq3D[S1, S2, S3, Float] with ToFloat32 with {}
+  given [S1, S2, S3](using ToSeq[S1, S2], ToSeq[S2, S3], ToSeq[S3, Double]): FromSeq3D[S1, S2, S3, Double] with ToFloat64 with {}
+  given [S1, S2, S3](using ToSeq[S1, S2], ToSeq[S2, S3], ToSeq[S3, Boolean]): FromSeq3D[S1, S2, S3, Boolean] with ToBool with {}
+
 }

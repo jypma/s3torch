@@ -32,7 +32,7 @@ object ToScala {
 
   abstract class ContiguousToArray[V: ClassTag](get: (pytorch.Tensor, Array[V]) => Unit) {
     type OutputType = Array[V]
-    def apply(native: pytorch.Tensor) = {
+    def apply(native: pytorch.Tensor): Array[V] = {
       // FIXME: Need to move to CPU, and to Strided format, if not already.
       val size = native.numel()
       if (size > Int.MaxValue) {
@@ -75,14 +75,30 @@ object ToScala {
   given [D1 <: Dim, D2 <: Dim, V: ClassTag](using toArray: ContiguousToArray[V]): ToMultiDimSeq[(D1, D2), V] with {
     def apply(native: pytorch.Tensor) = {
       val size = native.sizes.vec.get
-      val a = toArray(native).toSeq
-      val step = size(1).toInt
+      val a = ArraySeq.unsafeWrapArray(toArray(native))
+      val step = size(1).toInt // Last dim
       a.sliding(step, step).toSeq
     }
   }
 
-  given [D1 <: Dim, D2 <: Dim](using toSeq: ToMultiDimSeq[(D1, D2), Int]): ToScala[(D1, D2), Int32] with {
-    type OutputType = MkOutputType[(D1, D2), Int]
+  // TODO rewrite this recursively against >3 dimensions
+  given [D1 <: Dim, D2 <: Dim, D3 <: Dim, V: ClassTag](using toArray: ContiguousToArray[V]): ToMultiDimSeq[(D1, D2, D3), V] with {
+    def apply(native: pytorch.Tensor) = {
+      val size = native.sizes.vec.get
+      val a = ArraySeq.unsafeWrapArray(toArray(native))
+      val step = size(2).toInt // Last dim
+      a.sliding(step, step).grouped(size(1).toInt).toSeq
+    }
+  }
+
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Int]): ToScala[S, Int32] with {
+    type OutputType = MkOutputType[S, Int]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
+
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Double]): ToScala[S, Float64] with {
+    type OutputType = MkOutputType[S, Double]
+    def apply(native: pytorch.Tensor) = toSeq(native)
+  }
+
 }

@@ -85,6 +85,18 @@ class TensorSpec extends UnitSpec {
         assert(t.value == Seq(Seq(1,2,3), Seq(4,5,6)))
       }
 
+      it("can create a 3D tensor") {
+        val t = Tensor(Seq(
+          Seq(
+            Seq(1,2,3),
+            Seq(4,5,6)
+          )
+        ))
+        val tType: Tensor[(Dynamic, Dynamic, Dynamic), Int32] = t
+        assert(t.size == Seq(1L, 2L, 3L))
+        assert(t.value == Seq(Seq(Seq(1,2,3), Seq(4,5,6))))
+      }
+
       it("can create various int scalars") {
         Tensor(5, int8)
         Tensor(5, uint8)
