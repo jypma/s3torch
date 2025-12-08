@@ -21,8 +21,6 @@ import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.FloatPointer
 import org.bytedeco.javacpp.DoublePointer
 
-import StaticApply.ToSeq
-
 import compiletime.ops.int.ToLong
 
 trait FromScala[V] {
@@ -33,6 +31,7 @@ trait FromScala[V] {
 }
 
 object FromScala {
+  // We need to explicitly extend these traits directly for each given. If we pull them in using givens, the types don't resolve.
   trait ToBool {
     type DefaultDType = Bool
     def defaultDType = bool
@@ -98,7 +97,7 @@ object FromScala {
     type OutputShape = ToShape[S]
 
     override def apply[T <: DType](value: S, dtype: T): Tensor[OutputShape, T] = {
-      val seq = toSeq.toSeq(value)
+      val seq = toSeq(value)
       val tensor = torch.from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(dtype))
       new Tensor(tensor)
     }
@@ -122,8 +121,8 @@ object FromScala {
     type OutputShape = ToShape[S1]
 
     override def apply[T <: DType](value: S1, dtype: T): Tensor[OutputShape, T] = {
-      val seqs1 = toSeq1.toSeq(value)
-      val seq = seqs1.map(s => toSeq2.toSeq(s)).flatten
+      val seqs1 = toSeq1(value)
+      val seq = seqs1.map(s => toSeq2(s)).flatten
       new Tensor(fromScala(seq, dtype).native.view(seqs1.size, seq.length / seqs1.size))
     }
   }
