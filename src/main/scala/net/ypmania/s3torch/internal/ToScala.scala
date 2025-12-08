@@ -12,7 +12,7 @@ import java.nio.Buffer
 import scala.reflect.ClassTag
 import scala.collection.immutable.ArraySeq
 
-trait ToScala[S <: Tuple, T <: DType] {
+trait ToScala[-S <: Tuple, +T <: DType] {
   type OutputType
   def apply(native: pytorch.Tensor): OutputType
 }
@@ -93,6 +93,11 @@ object ToScala {
 
   given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Int]): ToScala[S, Int32] with {
     type OutputType = MkOutputType[S, Int]
+    def apply(native: pytorch.Tensor) = toSeq(native)
+  }
+
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Float]): ToScala[S, Float32] with {
+    type OutputType = MkOutputType[S, Float]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 

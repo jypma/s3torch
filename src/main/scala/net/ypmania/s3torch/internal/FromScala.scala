@@ -9,6 +9,7 @@ import java.nio.DoubleBuffer
 
 import net.ypmania.s3torch.*
 import net.ypmania.s3torch.Tensor.*
+import net.ypmania.s3torch.Shape.*
 
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch

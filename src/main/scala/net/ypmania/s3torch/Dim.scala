@@ -32,5 +32,4 @@ object Dim extends DimLowPriorityGivens {
 
   /** A dimension known to be 1 at compile time */
   type One = Static[1L]
-
 }

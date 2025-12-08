@@ -136,12 +136,10 @@ class TensorSpec extends UnitSpec {
 
     describe("flatten") {
       it("can flatten a 1D tensor") {
-        /*
         val t = Tensor((1, 2, 3))
         val r = t.flatten
         val rType: Tensor[Tuple1[Static[3L]], Int32] = r
-         assert(r.value.toSeq == Seq(1, 2, 3))
-         */
+        assert(r.value.toSeq == Seq(1, 2, 3))
       }
     }
   }

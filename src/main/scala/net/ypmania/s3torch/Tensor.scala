@@ -13,10 +13,13 @@ import internal.Flatten
 
 import scala.collection.immutable.ArraySeq
 
+import Shape.Scalar
+
 class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   import Tensor.*
 
-  // TODO add sizeOf[Dim]
+  def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
+
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
   def value(using toScala: ToScala[S, T]) = toScala(native)
@@ -29,13 +32,9 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     ???
   }
 
-  def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
 }
 
 object Tensor {
-
-  type Scalar = EmptyTuple
-
   def apply[V](value: V)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, fromScala.DefaultDType] =
     fromScala(value, fromScala.defaultDType)
   def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
@@ -63,6 +62,11 @@ object Tensor {
     type OutputShape = Tuple1[D1]
   }
 
+  // Operations that only exist on scalars
+  extension[T <: DType](t: Tensor[Scalar, T]) {
+    def backward(): Unit = t.native.backward()
+  }
+
   extension [S <: Tuple, T <: DType](t: Tensor[S, T])(using sq:Squeeze[S]) {
     def squeeze: Tensor[sq.OutputShape, T] = {
       ???
@@ -71,7 +75,7 @@ object Tensor {
 
   // Target one dimension and remove it (used by max[dim=N, keepdim=false], squeeze[dims=...], etc.)
 
-  trait RemoveDim[S <: Tuple, D] {
+  trait RemoveDim[-S <: Tuple, D] {
     type OutputShape <: Tuple
   }
 
