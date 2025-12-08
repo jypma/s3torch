@@ -88,64 +88,50 @@ object FromScala {
   given FromScalar[Double](pytorch.Scalar(_)) with ToFloat64 with {}
   given FromScalar[Boolean](value => pytorch.AbstractTensor.create(value).item()) with ToBool with {}
 
-  abstract class FromSeq[V](toPointer: Seq[V] => Pointer) extends FromScala[Seq[V]] {
-    type OutputShape = Tuple1[Dim.Dynamic]
+  type ToShape[V] <: Tuple = V match {
+    case Seq[elem] => Dim.Dynamic *: ToShape[elem]
+    case Tuple => Dim.Static[ToLong[Tuple.Size[V]]] *: ToShape[Tuple.Union[V]]
+    case _ => EmptyTuple
+  }
 
-    override def apply[T <: DType](value: Seq[V], dtype: T): Tensor[Tuple1[Dim.Dynamic], T] = {
-      val tensor = torch.from_blob(toPointer(value), Array(value.length.toLong), Torch.tensorOptions(dtype))
+  abstract class FromSeq[S, V](toPointer: Seq[V] => Pointer)(using toSeq: ToSeq[S, V]) extends FromScala[S] {
+    type OutputShape = ToShape[S]
+
+    override def apply[T <: DType](value: S, dtype: T): Tensor[OutputShape, T] = {
+      val seq = toSeq.toSeq(value)
+      val tensor = torch.from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(dtype))
       new Tensor(tensor)
     }
   }
 
-  given FromSeq[Byte](v => new BytePointer(ByteBuffer.wrap(v.toArray))) with ToInt8 with {}
-  given FromSeq[Short](v => new ShortPointer(ShortBuffer.wrap(v.toArray))) with ToInt16 with {}
-  given FromSeq[Int](v => new IntPointer(IntBuffer.wrap(v.toArray))) with ToInt32 with {}
-  given FromSeq[Long](v => new LongPointer(LongBuffer.wrap(v.toArray))) with ToInt64 with {}
-  given FromSeq[Float](v => new FloatPointer(FloatBuffer.wrap(v.toArray))) with ToFloat32 with {}
-  given FromSeq[Double](v => new DoublePointer(DoubleBuffer.wrap(v.toArray))) with ToFloat64 with {}
-  given FromSeq[Boolean](value => {
+  given [S](using ToSeq[S, Byte]): FromSeq[S, Byte](v => new BytePointer(ByteBuffer.wrap(v.toArray))) with ToInt8 with {}
+  given [S](using ToSeq[S, Short]): FromSeq[S, Short](v => new ShortPointer(ShortBuffer.wrap(v.toArray))) with ToInt16 with {}
+  given [S](using ToSeq[S, Int]): FromSeq[S, Int](v => new IntPointer(IntBuffer.wrap(v.toArray))) with ToInt32 with {}
+  given [S](using ToSeq[S, Long]): FromSeq[S, Long](v => new LongPointer(LongBuffer.wrap(v.toArray))) with ToInt64 with {}
+  given [S](using ToSeq[S, Float]): FromSeq[S, Float](v => new FloatPointer(FloatBuffer.wrap(v.toArray))) with ToFloat32 with {}
+  given [S](using ToSeq[S, Double]): FromSeq[S, Double](v => new DoublePointer(DoubleBuffer.wrap(v.toArray))) with ToFloat64 with {}
+  given [S](using ToSeq[S, Boolean]): FromSeq[S, Boolean](value => {
     val p = new BoolPointer(value.length)
     for (idx <- 0.until(value.length)) {
       p.put(idx, value(idx))
     }
     p
-  }) with ToBool with {}
+   }) with ToBool with {}
 
-  trait FromTupleOps[V <: Tuple, E] {
-    def toTensor[T <: DType](value: V, dtype: T): pytorch.Tensor
-  }
+  abstract class FromSeqSeq[S1, S2, V](using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, V], fromScala: FromScala[Seq[V]]) extends FromScala[S1] {
+    type OutputShape = ToShape[S1]
 
-  given [V <: Tuple, E](using toSeq: ToSeq[V, E], fromScala: FromScala[Seq[E]]): FromTupleOps[V, E] with {
-    def toTensor[T <: DType](value: V, dtype: T) = fromScala(toSeq.toSeq(value), dtype).native
-  }
-
-  given t2[V <: Tuple, E1 <: Tuple, E](using toSeq: ToSeq[V, E1], toSeq2: ToSeq[E1, E], fromScala: FromScala[Seq[E]]): FromTupleOps[V, E] with {
-    def toTensor[T <: DType](value: V, dtype: T) = {
-      val seqs1 = toSeq.toSeq(value)
+    override def apply[T <: DType](value: S1, dtype: T): Tensor[OutputShape, T] = {
+      val seqs1 = toSeq1.toSeq(value)
       val seq = seqs1.map(s => toSeq2.toSeq(s)).flatten
-      fromScala(seq, dtype).native.view(seqs1.size, seq.length / seqs1.size)
+      new Tensor(fromScala(seq, dtype).native.view(seqs1.size, seq.length / seqs1.size))
     }
   }
 
-  type ToDim[V] <: Dim = V match {
-    case Tuple => Dim.Static[ToLong[Tuple.Size[V]]]
-    case _ => Dim.Dynamic
-  }
-
-  type ToShape[V] <: Tuple = V match {
-    case Tuple => ToDim[V] *: ToShape[Tuple.Union[V]]
-    case _ => EmptyTuple
-  }
-
-  abstract class FromTupleBase[V <: Tuple, E](using ops:FromTupleOps[V, E]) extends FromScala[V] {
-    type OutputShape = ToShape[V]
-    def apply[T <: DType](value: V, t: T) = new Tensor(ops.toTensor(value, t))
-  }
-
-  given [V <: Tuple](using ops:FromTupleOps[V, Byte]): FromTupleBase[V, Byte] with ToInt8 with {}
-  given [V <: Tuple](using ops:FromTupleOps[V, Short]): FromTupleBase[V, Short] with ToInt16 with {}
-  given [V <: Tuple](using ops:FromTupleOps[V, Int]): FromTupleBase[V, Int] with ToInt32 with {}
-  given [V <: Tuple](using ops:FromTupleOps[V, Long]): FromTupleBase[V, Long] with ToInt64 with {}
-  given [V <: Tuple](using ops:FromTupleOps[V, Float]): FromTupleBase[V, Float] with ToFloat32 with {}
-  given [V <: Tuple](using ops:FromTupleOps[V, Double]): FromTupleBase[V, Double] with ToFloat64 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Byte]): FromSeqSeq[S1, S2, Byte] with ToInt8 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Short]): FromSeqSeq[S1, S2, Short] with ToInt16 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Int]): FromSeqSeq[S1, S2, Int] with ToInt32 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Long]): FromSeqSeq[S1, S2, Long] with ToInt64 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Float]): FromSeqSeq[S1, S2, Float] with ToFloat32 with {}
+  given [S1, S2](using ToSeq[S1, S2], ToSeq[S2, Double]): FromSeqSeq[S1, S2, Double] with ToFloat64 with {}
 }

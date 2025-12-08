@@ -3,7 +3,7 @@ package net.ypmania.s3torch.internal
 import scala.compiletime.ops.long.*
 
 object StaticApply {
-  trait ToSeq[T, A] {
+  trait ToSeq[-T, +A] {
     def toSeq(t: T): Seq[A]
   }
 
@@ -19,4 +19,7 @@ object StaticApply {
     override def toSeq(tuple: A *: T) = tuple.head +: ToSeq.toSeq(tuple.tail)
   }
 
+  given id[T]: ToSeq[Seq[T], T] with {
+    def toSeq(t: Seq[T]) = t
+  }
 }
