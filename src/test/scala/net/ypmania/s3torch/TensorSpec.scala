@@ -12,7 +12,7 @@ class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
   case object ExampleDynamic extends Dynamic(42)
 
-  describe("Tensor") {
+  describe("Tensor construction") {
     describe("apply") {
       it("can create a Double scalar") {
         val t = Tensor(5.0)
@@ -166,7 +166,9 @@ class TensorSpec extends UnitSpec {
         assert(of10x42.size == Seq(10L, 42L))
       }
     }
+  }
 
+  describe("Tensor") {
     describe("flatten") {
       it("can flatten a 1D tensor") {
         val t = Tensor((1, 2, 3))
@@ -224,5 +226,40 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("unsqueeze") {
+      case object DimA extends Static[2L]
+      case object DimB extends Static[3L]
+      val vector = Tensor.zeros(DimA)
+      val matrix = Tensor.zeros(DimA, DimB)
+
+      it("can unsqueeze after last") {
+        val r = vector.unsqueezeAfterLast
+        val rType: Tensor[(DimA.type, Static[1L]), Float32] = r
+        assert(r.size == Seq(2L, 1L))
+        assert(r.value.toSeq == Seq(Seq(0), Seq(0)))
+      }
+
+      it("can unsqueeze after the last dim of a matrix") {
+        val r = matrix.unsqueezeAfter(DimB)
+        val rType: Tensor[(DimA.type, Static[1L], DimB.type), Float32] = r
+        assert(r.size == Seq(2L, 1L, 3L))
+        assert(r.value.toSeq == Seq(
+          Seq(Seq(0,0,0)),
+          Seq(Seq(0,0,0))
+        ))
+      }
+
+      it("can unsqueeze after the first dim of a matrix") {
+        val r = matrix.unsqueezeAfter(DimA)
+        val rType: Tensor[(Static[1L], DimA.type, DimB.type), Float32] = r
+        assert(r.size == Seq(1L, 2L, 3L))
+        assert(r.value.toSeq == Seq(
+          Seq(
+            Seq(0,0,0),
+            Seq(0,0,0)
+          ),
+        ))
+      }
+    }
   }
 }
