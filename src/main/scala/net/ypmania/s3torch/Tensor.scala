@@ -10,12 +10,16 @@ import internal.ZerosApply
 import internal.FromScala
 import internal.ToScala
 import internal.Flatten
+import internal.Broadcast
 
 import scala.collection.immutable.ArraySeq
 
 import Shape.Scalar
 
 class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
+  type Shape = S
+  type DType = T
+
   import Tensor.*
 
   def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
@@ -32,6 +36,10 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     ???
   }
 
+  def +[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.add(tensor.native))
+  def -[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.sub(tensor.native))
+  def *[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.mul(tensor.native))
+  def /[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.div(tensor.native))
 }
 
 object Tensor {
@@ -41,6 +49,14 @@ object Tensor {
     fromScala(value, dtype)
 
   def zeros[T <: DType](using dtype: DefaultV2.DType[T]) = new ZerosApply(dtype.value)
+
+  // Primitive addition are extension methods as to not overlap with +-/* with "Tensor" as argument
+  extension[S <: Tuple, T <: DType](t: Tensor[S, T]) {
+    def +[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(t.native.add(toScalar(value)))
+    def -[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(t.native.sub(toScalar(value)))
+    def *[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(t.native.mul(toScalar(value)))
+    def /[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(t.native.div(toScalar(value)))
+  }
 
   trait Squeeze[S <: Tuple] {
     type OutputShape <: Tuple

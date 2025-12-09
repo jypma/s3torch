@@ -68,7 +68,16 @@ object FromScala {
     def defaultDType = float64
   }
 
-  abstract class FromScalar[V](toScalar: V => pytorch.Scalar) extends FromScala[V] {
+  trait ToScalar[V] extends (V => pytorch.Scalar)
+  given ToScalar[Byte] with { def apply(v:Byte) = pytorch.Scalar(v) }
+  given ToScalar[Short] with { def apply(v:Short) = pytorch.Scalar(v) }
+  given ToScalar[Int] with { def apply(v:Int) = pytorch.Scalar(v) }
+  given ToScalar[Long] with { def apply(v:Long) = pytorch.Scalar(v) }
+  given ToScalar[Float] with { def apply(v:Float) = pytorch.Scalar(v) }
+  given ToScalar[Double] with { def apply(v:Double) = pytorch.Scalar(v) }
+  given ToScalar[Boolean] with { def apply(v:Boolean) = pytorch.AbstractTensor.create(v).item() }
+
+  abstract class FromPrimitive[V](using toScalar: ToScalar[V]) extends FromScala[V] {
     type OutputShape = Scalar
 
     override def apply[T <: DType](value: V, dtype: T): Tensor[Scalar, T] = {
@@ -80,13 +89,13 @@ object FromScala {
     }
   }
 
-  given FromScalar[Byte](pytorch.Scalar(_)) with ToInt8 with {}
-  given FromScalar[Short](pytorch.Scalar(_)) with ToInt16 with {}
-  given FromScalar[Int](pytorch.Scalar(_)) with ToInt32 with {}
-  given FromScalar[Long](pytorch.Scalar(_)) with ToInt64 with {}
-  given FromScalar[Float](pytorch.Scalar(_)) with ToFloat32 with {}
-  given FromScalar[Double](pytorch.Scalar(_)) with ToFloat64 with {}
-  given FromScalar[Boolean](value => pytorch.AbstractTensor.create(value).item()) with ToBool with {}
+  given FromPrimitive[Byte] with ToInt8 with {}
+  given FromPrimitive[Short] with ToInt16 with {}
+  given FromPrimitive[Int] with ToInt32 with {}
+  given FromPrimitive[Long] with ToInt64 with {}
+  given FromPrimitive[Float] with ToFloat32 with {}
+  given FromPrimitive[Double] with ToFloat64 with {}
+  given FromPrimitive[Boolean] with ToBool with {}
 
   type ToShape[V] <: Tuple = V match {
     case Seq[elem] => Dim.Dynamic *: ToShape[elem]

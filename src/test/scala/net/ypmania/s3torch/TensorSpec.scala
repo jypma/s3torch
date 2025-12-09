@@ -5,6 +5,8 @@ import org.scalatest.Assertions._
 import Dim.Static
 import Dim.Dynamic
 import scala.reflect.ClassTag
+import net.ypmania.s3torch.internal.Broadcast.MaxEachDim
+import net.ypmania.s3torch.Shape.Widen
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -139,8 +141,57 @@ class TensorSpec extends UnitSpec {
         val t = Tensor((1, 2, 3))
         val r = t.flatten
         val rType: Tensor[Tuple1[Static[3L]], Int32] = r
+        assert(r.size == Seq(3L))
         assert(r.value.toSeq == Seq(1, 2, 3))
       }
     }
+
+    describe("plus") {
+      it("can add a primitive") {
+        val t = Tensor((1, 2, 3))
+        val r = t + 1
+        val rType: Tensor[Tuple1[Static[3L]], Int32] = r
+        assert(r.size == Seq(3L))
+        assert(r.value.toSeq == Seq(2, 3, 4))
+      }
+
+      it("can add vector and scalar") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor(1)
+        val r = a + b
+        val rType: Tensor[Tuple1[Static[3L]], Int32] = r
+        assert(r.size == Seq(3L))
+        assert(r.value.toSeq == Seq(2, 3, 4))
+      }
+
+      it("can add vectors of different lengths") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor(Tuple1(1))
+        val r = a + b
+        val rType: Tensor[Tuple1[Static[3L]], Int32] = r
+        assert(r.size == Seq(3L))
+        assert(r.value.toSeq == Seq(2, 3, 4))
+      }
+
+      it("can add a vector to a matrix") {
+        val a = Tensor((1, 2, 3, 4)) // [4]
+        val b = Tensor((             // [4, 1]
+          Tuple1(5),
+          Tuple1(6),
+          Tuple1(7),
+          Tuple1(8)
+        ))
+        val r = a + b
+        val rType: Tensor[(Static[4L], Static[4L]), Int32] = r
+        assert(r.size == Seq(4L, 4L))
+        assert(r.value.toSeq == Seq(
+          Seq(6, 7, 8, 9),
+          Seq(7, 8, 9, 10),
+          Seq(8, 9, 10, 11),
+          Seq(9, 10, 11, 12))
+        )
+      }
+    }
+
   }
 }

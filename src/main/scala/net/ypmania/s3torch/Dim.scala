@@ -32,4 +32,13 @@ object Dim extends DimLowPriorityGivens {
 
   /** A dimension known to be 1 at compile time */
   type One = Static[1L]
+
+  type Max[D1 <: Dim, D2 <: Dim] <: Dim = (D1, D2) match {
+    case (Static[s1], Static[s2]) => (s1 > s2) match {
+      case true => D1
+      case false => D2
+    }
+    case _ => Dynamic
+  }
+
 }
