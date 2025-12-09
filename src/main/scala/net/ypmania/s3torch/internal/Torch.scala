@@ -8,6 +8,8 @@ import net.ypmania.s3torch.Layout
 import net.ypmania.s3torch.Device
 
 object Torch {
+  def manualSeed(seed: Long): Unit = pytorch.global.torch.manual_seed(seed)
+
   // TODO make CreationOptions case class, which can create itself from DefaultV2
   def tensorOptions(
       dtype: DType,

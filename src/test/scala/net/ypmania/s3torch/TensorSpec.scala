@@ -43,6 +43,14 @@ class TensorSpec extends UnitSpec {
         assert(t.value.toSeq == Seq(1.0, 2.0, 3.0))
       }
 
+      it("can create a dynamic float vector") {
+        // FIXME investigate what happens if we leave out [Float] here
+        val t = Tensor(Seq[Float](1.0, 2.0, 3.0), float32)
+        val tType: Tensor[Tuple1[Dynamic], Float32] = t
+        assert(t.size == Seq(3L))
+        assert(t.value.toSeq == Seq(1.0, 2.0, 3.0))
+      }
+
       it("can create a static double vector") {
         val t = Tensor((1.0, 2.0, 3.0))
         val tType: Tensor[Tuple1[Static[3L]], Float64] = t
@@ -111,6 +119,29 @@ class TensorSpec extends UnitSpec {
         Tensor(5.0, float16)
         Tensor(5.0, float32)
         Tensor(5.0, float64)
+      }
+    }
+
+    describe("arange") {
+      it("can create a range from ints") {
+        val t = Tensor.arange(0, 3, 1)
+        val tType: Tensor[Tuple1[Dynamic], Int32] = t
+        assert(t.size == Seq(3L))
+        assert(t.value.toSeq == Seq(0, 1, 2))
+      }
+
+      it("can create a range from doubles") {
+        val t = Tensor.arange(0.0, 3.0, 1.0)
+        val tType: Tensor[Tuple1[Dynamic], Float64] = t
+        assert(t.size == Seq(3L))
+        assert(t.value.toSeq == Seq(0, 1, 2))
+      }
+
+      it("can create a range from Dim") {
+        val t = Tensor.arangeOf(ExampleStatic)
+        val tType: Tensor[Tuple1[ExampleStatic.type], Int64] = t
+        assert(t.size == Seq(10L))
+        assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
       }
     }
 

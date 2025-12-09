@@ -15,6 +15,8 @@ import internal.Broadcast
 import scala.collection.immutable.ArraySeq
 
 import Shape.Scalar
+import net.ypmania.s3torch.internal.FromScala.ToScalar
+import net.ypmania.s3torch.internal.Torch
 
 class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   type Shape = S
@@ -40,6 +42,8 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def -[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.sub(tensor.native))
   def *[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.mul(tensor.native))
   def /[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.div(tensor.native))
+
+  private[Tensor] def unsafeWithShape[S1 <: Tuple]: Tensor[S1, T] = this.asInstanceOf[Tensor[S1, T]]
 }
 
 object Tensor {
@@ -47,6 +51,12 @@ object Tensor {
     fromScala(value, fromScala.defaultDType)
   def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
     fromScala(value, dtype)
+
+  def arangeOf[D <: Dim](dim: D): Tensor[Tuple1[D], Int64] = arange(0L, dim.size, 1L).unsafeWithShape[Tuple1[D]]
+
+  def arange[V, T <: DType](start: V, end: V, step: V)(using toScalar: ToScalar[V], fromScala: FromScala[V]): Tensor[Tuple1[Dim.Dynamic], fromScala.DefaultDType] = {
+    new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(fromScala.defaultDType)))
+  }
 
   def zeros[T <: DType](using dtype: DefaultV2.DType[T]) = new ZerosApply(dtype.value)
 
