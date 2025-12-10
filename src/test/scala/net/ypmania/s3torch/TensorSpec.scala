@@ -143,6 +143,13 @@ class TensorSpec extends UnitSpec {
         assert(t.size == Seq(10L))
         assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
       }
+
+      it("can create a float range from Dim") {
+        val t = Tensor.arangeOf(ExampleStatic, float32)
+        val tType: Tensor[Tuple1[ExampleStatic.type], Float32] = t
+        assert(t.size == Seq(10L))
+        assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
+      }
     }
 
     describe("zeros") {
