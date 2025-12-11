@@ -32,7 +32,7 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def floor: Tensor[S, T] = new Tensor(native.floor())
   def floor_divide[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.floor_divide(toScalar(value)))
   def floor_divide[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.floor_divide(tensor.native))
-
+  def remainder[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.remainder(toScalar(value)))
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
   def unsqueezeAfter[D <: Dim](d: D)(using ValueOf[Shape.IndexOf[S, D]]): Tensor[Shape.InsertAfter[S, Dim.One, D], T] =
@@ -51,10 +51,15 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     ???
   }
 
-  def +[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.add(tensor.native))
-  def -[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.sub(tensor.native))
-  def *[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.mul(tensor.native))
-  def /[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.div(tensor.native))
+  def +[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.add(toScalar(value)))
+  def -[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.sub(toScalar(value)))
+  def *[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.mul(toScalar(value)))
+  def /[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.div(toScalar(value)))
+
+  def #+[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.add(tensor.native))
+  def #-[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.sub(tensor.native))
+  def #*[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.mul(tensor.native))
+  def #/[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.div(tensor.native))
 
   private[Tensor] def unsafeWithShape[S1 <: Tuple]: Tensor[S1, T] = this.asInstanceOf[Tensor[S1, T]]
 }
@@ -77,14 +82,6 @@ object Tensor {
 
 
   def zeros[T <: DType](using dtype: DefaultV2.DType[T]) = new ZerosApply(dtype.value)
-
-  // Primitive addition are extension methods as to not overlap with +-/* with "Tensor" as argument
-  extension[S <: Tuple, T <: DType](t: Tensor[S, T]) {
-    def +[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(t.native.add(toScalar(value)))
-    def -[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(t.native.sub(toScalar(value)))
-    def *[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(t.native.mul(toScalar(value)))
-    def /[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(t.native.div(toScalar(value)))
-  }
 
   trait Squeeze[S <: Tuple] {
     type OutputShape <: Tuple
