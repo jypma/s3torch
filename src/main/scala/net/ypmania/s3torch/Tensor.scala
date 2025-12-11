@@ -25,7 +25,13 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   import Tensor.*
   import Tuple.:*
 
+  def exp: Tensor[S, T] = new Tensor(native.exp)
+
   def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
+
+  def floor: Tensor[S, T] = new Tensor(native.floor())
+  def floor_divide[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.floor_divide(toScalar(value)))
+  def floor_divide[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.floor_divide(tensor.native))
 
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
