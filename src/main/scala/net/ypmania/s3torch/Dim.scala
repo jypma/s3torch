@@ -22,6 +22,7 @@ object Dim extends DimLowPriorityGivens {
     override def size = _size
   }
 
+  /** A reference made to an unknown dimension (typically used as a type parameter to generic building blocks) */
   case class Ref[D <: Dim](ref: D) extends Dim {
     override def size = ref.size
   }
@@ -50,4 +51,28 @@ object Dim extends DimLowPriorityGivens {
     }
   }
 
+  trait DimArg[D <: Dim] {
+    type Out <: Dim
+    def apply(d: D): Out
+  }
+  trait DimArgPrio0 {
+    given mkRef[D <: Dim]: DimArg[D] with {
+      type Out = Ref[D]
+      def apply(d: D) = Ref(d)
+    }
+  }
+  object DimArg extends DimArgPrio0 {
+    given asStatic[L <: Long, D <: Static[L]]: DimArg[D] with {
+      type Out = D
+      def apply(d: D) = d
+    }
+    given asDynamic[D <: Dim.Dynamic]: DimArg[D] with {
+      type Out = D
+      def apply(d: D) = d
+    }
+    given asRef[D <: Dim]: DimArg[Ref[D]] with {
+      type Out = Ref[D]
+      def apply(d: Ref[D]) = d
+    }
+  }
 }

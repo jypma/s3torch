@@ -17,6 +17,7 @@ import scala.collection.immutable.ArraySeq
 import Shape.Scalar
 import net.ypmania.s3torch.internal.FromScala.ToScalar
 import net.ypmania.s3torch.internal.Torch
+import net.ypmania.s3torch.Dim.DimArg
 
 class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   type Shape = S
@@ -34,6 +35,7 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def floor_divide[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.floor_divide(tensor.native))
   def remainder[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.remainder(toScalar(value)))
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
+  def sin: Tensor[S, T] = new Tensor(native.sin)
 
   def unsqueezeAfter[D <: Dim](d: D)(using ValueOf[Shape.IndexOf[S, D]]): Tensor[Shape.InsertAfter[S, Dim.One, D], T] =
     new Tensor(native.unsqueeze(valueOf[Shape.IndexOf[S, D]]))
@@ -70,8 +72,8 @@ object Tensor {
   def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
     fromScala(value, dtype)
 
-  def arangeOf[D <: Dim](dim: D): Tensor[Tuple1[D], Int64] = arange(0L, dim.size, 1L).unsafeWithShape[Tuple1[D]]
-  def arangeOf[D <: Dim, T <: DType](dim: D, dtype: T): Tensor[Tuple1[D], T] = arange(0L, dim.size, 1L, dtype).unsafeWithShape[Tuple1[D]]
+  def arangeOf[D <: Dim](dim: D)(using d: DimArg[D]): Tensor[Tuple1[d.Out], Int64] = arange(0L, dim.size, 1L).unsafeWithShape
+  def arangeOf[D <: Dim, T <: DType](dim: D, dtype: T)(using a: DimArg[D]): Tensor[Tuple1[a.Out], T] = arange(0L, dim.size, 1L, dtype).unsafeWithShape
 
   def arange[V](start: V, end: V, step: V)(using toScalar: ToScalar[V], fromScala: FromScala[V]): Tensor[Tuple1[Dim.Dynamic], fromScala.DefaultDType] = {
     new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(fromScala.defaultDType)))
@@ -79,7 +81,6 @@ object Tensor {
   def arange[V, T <: DType](start: V, end: V, step: V, dtype: T)(using toScalar: ToScalar[V]): Tensor[Tuple1[Dim.Dynamic], T] = {
     new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(dtype)))
   }
-
 
   def zeros[T <: DType](using dtype: DefaultV2.DType[T]) = new ZerosApply(dtype.value)
 
