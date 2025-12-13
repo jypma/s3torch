@@ -27,15 +27,12 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   import Tensor.*
   import Tuple.:*
 
-  def exp: Tensor[S, T] = new Tensor(native.exp)
-
   def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
 
   def floor: Tensor[S, T] = new Tensor(native.floor())
   def floor_divide[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.floor_divide(_), _.floor_divide(_))
   def remainder[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.remainder(_), _.remainder(_))
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
-  def sin: Tensor[S, T] = new Tensor(native.sin)
 
   def unsqueezeAfter[D <: Dim](d: D)(using ValueOf[Shape.IndexOf[S, D]]): Tensor[Shape.InsertAfter[S, Dim.One, D], T] =
     new Tensor(native.unsqueeze(valueOf[Shape.IndexOf[S, D]]))
@@ -61,6 +58,9 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   private[Tensor] def unsafeWithShape[S1 <: Tuple]: Tensor[S1, T] = this.asInstanceOf[Tensor[S1, T]]
 }
 
+/** Math functions like sin, exp, are definied here, since "sin(x)"
+  * approximated mathemetical notation better than "x.sin", even
+  * though the latter would be more idiomatic Scala. */
 object Tensor {
   def apply[V](value: V)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, fromScala.DefaultDType] =
     fromScala(value, fromScala.defaultDType)
@@ -76,6 +76,10 @@ object Tensor {
   def arange[V, T <: DType](start: V, end: V, step: V, dtype: T)(using toScalar: ToScalar[V]): Tensor[Tuple1[Dim.Dynamic], T] = {
     new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(dtype)))
   }
+
+  def cos[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.cos)
+  def exp[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.exp)
+  def sin[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.sin)
 
   def zeros[T <: DType](using dtype: DefaultV2.DType[T]) = new ZerosApply(dtype.value)
 
