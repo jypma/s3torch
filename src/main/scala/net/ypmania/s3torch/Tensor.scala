@@ -11,6 +11,7 @@ import internal.FromScala
 import internal.ToScala
 import internal.Flatten
 import internal.Broadcast
+import internal.TensorOperand
 
 import scala.collection.immutable.ArraySeq
 
@@ -31,9 +32,8 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
 
   def floor: Tensor[S, T] = new Tensor(native.floor())
-  def floor_divide[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.floor_divide(toScalar(value)))
-  def floor_divide[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.floor_divide(tensor.native))
-  def remainder[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.remainder(toScalar(value)))
+  def floor_divide[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.floor_divide(_), _.floor_divide(_))
+  def remainder[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.remainder(_), _.remainder(_))
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
   def sin: Tensor[S, T] = new Tensor(native.sin)
 
@@ -53,15 +53,10 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     ???
   }
 
-  def +[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.add(toScalar(value)))
-  def -[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.sub(toScalar(value)))
-  def *[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.mul(toScalar(value)))
-  def /[V](value: V)(using toScalar: FromScala.ToScalar[V]): Tensor[S, T] = new Tensor(native.div(toScalar(value)))
-
-  def #+[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.add(tensor.native))
-  def #-[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.sub(tensor.native))
-  def #*[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.mul(tensor.native))
-  def #/[S2 <: Tuple, T2 <: DType](tensor: Tensor[S2, T2]): Tensor[Broadcast[S, S2], Promoted[T, T2]] = new Tensor[Broadcast[S, S2], Promoted[T, T2]](native.div(tensor.native))
+  def +[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.add(_), _.add(_))
+  def -[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.sub(_), _.sub(_))
+  def *[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.mul(_), _.mul(_))
+  def /[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.div(_), _.div(_))
 
   private[Tensor] def unsafeWithShape[S1 <: Tuple]: Tensor[S1, T] = this.asInstanceOf[Tensor[S1, T]]
 }

@@ -206,7 +206,7 @@ class TensorSpec extends UnitSpec {
       it("can add vector and scalar") {
         val a = Tensor((1, 2, 3))
         val b = Tensor(1)
-        val r = a #+ b
+        val r = a + b
         val rType: Tensor[Tuple1[Static[3L]], Int32] = r
         assert(r.size == Seq(3L))
         assert(r.value.toSeq == Seq(2, 3, 4))
@@ -215,7 +215,7 @@ class TensorSpec extends UnitSpec {
       it("can add vectors of different lengths") {
         val a = Tensor((1, 2, 3))
         val b = Tensor(Tuple1(1))
-        val r = a #+ b
+        val r = a + b
         val rType: Tensor[Tuple1[Static[3L]], Int32] = r
         assert(r.size == Seq(3L))
         assert(r.value.toSeq == Seq(2, 3, 4))
@@ -229,7 +229,7 @@ class TensorSpec extends UnitSpec {
           Tuple1(7),
           Tuple1(8)
         ))
-        val r = a #+ b
+        val r = a + b
         val rType: Tensor[(Static[4L], Static[4L]), Int32] = r
         assert(r.size == Seq(4L, 4L))
         assert(r.value.toSeq == Seq(
