@@ -248,7 +248,7 @@ class TensorSpec extends UnitSpec {
       val matrix = Tensor.zeros(DimA, DimB)
 
       it("can unsqueeze after last") {
-        val r = vector.unsqueezeAfterLast
+        val r = vector.unsqueezeAfter(Shape.Select.Last)
         val rType: Tensor[(DimA.type, Static[1L]), Float32] = r
         assert(r.size == Seq(2L, 1L))
         assert(r.value.toSeq == Seq(Seq(0), Seq(0)))
@@ -279,7 +279,14 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can unsqueeze before first") {
-        val r = vector.unsqueezeBeforeFirst
+        val r = vector.unsqueezeBefore(Shape.Select.First)
+        val rType: Tensor[(Static[1L], DimA.type), Float32] = r
+        assert(r.size == Seq(1L, 2L))
+        assert(r.value.toSeq == Seq(Seq(0, 0)))
+      }
+
+      it("can unsqueeze before first (by index)") {
+        val r = vector.unsqueezeBefore(Shape.Select.Idx(0))
         val rType: Tensor[(Static[1L], DimA.type), Float32] = r
         assert(r.size == Seq(1L, 2L))
         assert(r.value.toSeq == Seq(Seq(0, 0)))

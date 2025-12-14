@@ -18,7 +18,8 @@ import scala.collection.immutable.ArraySeq
 import Shape.Scalar
 import net.ypmania.s3torch.internal.FromScala.ToScalar
 import net.ypmania.s3torch.internal.Torch
-import net.ypmania.s3torch.Dim.DimArg
+import net.ypmania.s3torch.Dim.*
+import net.ypmania.s3torch.Shape.*
 
 class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   type Shape = S
@@ -34,12 +35,11 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def remainder[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.remainder(_), _.remainder(_))
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
-  def unsqueezeAfter[D <: Dim](d: D)(using ValueOf[Shape.IndexOf[S, D]]): Tensor[Shape.InsertAfter[S, Dim.One, D], T] =
-    new Tensor(native.unsqueeze(valueOf[Shape.IndexOf[S, D]] + 1))
-  def unsqueezeAfterLast(using v:ValueOf[Tuple.Size[S]]): Tensor[S :* Dim.One, T] = new Tensor(native.unsqueeze(v.value))
-  def unsqueezeBefore[D <: Dim](d: D)(using ValueOf[Shape.IndexOf[S, D]]): Tensor[Shape.InsertBefore[S, Dim.One, D], T] =
-    new Tensor(native.unsqueeze(valueOf[Shape.IndexOf[S, D]]))
-  def unsqueezeBeforeFirst(using v:ValueOf[Tuple.Size[S]]): Tensor[Dim.One *: S, T] = new Tensor(native.unsqueeze(0))
+  def unsqueezeAfter[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertAfter[S, Dim.One, Idx], T] =
+    new Tensor(native.unsqueeze(idx.value + 1))
+
+  def unsqueezeBefore[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertBefore[S, Dim.One, Idx], T] =
+    new Tensor(native.unsqueeze(idx.value))
 
   def value(using toScala: ToScala[S, T]) = toScala(native)
 
