@@ -256,21 +256,56 @@ class TensorSpec extends UnitSpec {
 
       it("can unsqueeze after the last dim of a matrix") {
         val r = matrix.unsqueezeAfter(DimB)
-        val rType: Tensor[(DimA.type, Static[1L], DimB.type), Float32] = r
-        assert(r.size == Seq(2L, 1L, 3L))
+        val rType: Tensor[(DimA.type, DimB.type, Static[1L]), Float32] = r
+        assert(r.size == Seq(2L, 3L, 1L))
         assert(r.value.toSeq == Seq(
-          Seq(Seq(0,0,0)),
-          Seq(Seq(0,0,0))
+          Seq(Seq(0),Seq(0),Seq(0)),
+          Seq(Seq(0),Seq(0),Seq(0))
         ))
       }
 
       it("can unsqueeze after the first dim of a matrix") {
         val r = matrix.unsqueezeAfter(DimA)
+        val rType: Tensor[(DimA.type, Static[1L], DimB.type), Float32] = r
+        assert(r.size == Seq(2L, 1L, 3L))
+        assert(r.value.toSeq == Seq(
+          Seq(
+            Seq(0,0,0)
+          ),
+          Seq(
+            Seq(0,0,0)
+          ),
+        ))
+      }
+
+      it("can unsqueeze before first") {
+        val r = vector.unsqueezeBeforeFirst
+        val rType: Tensor[(Static[1L], DimA.type), Float32] = r
+        assert(r.size == Seq(1L, 2L))
+        assert(r.value.toSeq == Seq(Seq(0, 0)))
+      }
+
+      it("can unsequeeze before first dim of a matrix") {
+        val r = matrix.unsqueezeBefore(DimA)
         val rType: Tensor[(Static[1L], DimA.type, DimB.type), Float32] = r
         assert(r.size == Seq(1L, 2L, 3L))
         assert(r.value.toSeq == Seq(
           Seq(
             Seq(0,0,0),
+            Seq(0,0,0)
+          )
+        ))
+      }
+
+      it("can unsequeeze before last dim of a matrix") {
+        val r = matrix.unsqueezeBefore(DimB)
+        val rType: Tensor[(DimA.type, Static[1L], DimB.type), Float32] = r
+        assert(r.size == Seq(2L, 1L, 3L))
+        assert(r.value.toSeq == Seq(
+          Seq(
+            Seq(0,0,0)
+          ),
+          Seq(
             Seq(0,0,0)
           ),
         ))

@@ -35,9 +35,11 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
   def unsqueezeAfter[D <: Dim](d: D)(using ValueOf[Shape.IndexOf[S, D]]): Tensor[Shape.InsertAfter[S, Dim.One, D], T] =
-    new Tensor(native.unsqueeze(valueOf[Shape.IndexOf[S, D]]))
-
+    new Tensor(native.unsqueeze(valueOf[Shape.IndexOf[S, D]] + 1))
   def unsqueezeAfterLast(using v:ValueOf[Tuple.Size[S]]): Tensor[S :* Dim.One, T] = new Tensor(native.unsqueeze(v.value))
+  def unsqueezeBefore[D <: Dim](d: D)(using ValueOf[Shape.IndexOf[S, D]]): Tensor[Shape.InsertBefore[S, Dim.One, D], T] =
+    new Tensor(native.unsqueeze(valueOf[Shape.IndexOf[S, D]]))
+  def unsqueezeBeforeFirst(using v:ValueOf[Tuple.Size[S]]): Tensor[Dim.One *: S, T] = new Tensor(native.unsqueeze(0))
 
   def value(using toScala: ToScala[S, T]) = toScala(native)
 

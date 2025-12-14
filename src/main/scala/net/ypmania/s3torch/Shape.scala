@@ -21,7 +21,15 @@ object Shape {
     case _ *: tail => 1 + IndexOf[tail, D]
   }
 
-  type InsertAfter[S <: Shape, I <: Dim, D <: Dim] <: Shape = IndexOf[S, D] match { // Take, Drop, Concat
+  type InsertAfter[S <: Shape, I <: Dim, D <: Dim] <: Shape = IndexOf[S, D] match {
+    case -1 => S
+    case _ => Tuple.Concat[
+      Tuple.Take[S, IndexOf[S, D] + 1],
+      I *: Tuple.Drop[S, IndexOf[S, D] + 1]
+    ]
+  }
+
+  type InsertBefore[S <: Shape, I <: Dim, D <: Dim] <: Shape = IndexOf[S, D] match {
     case -1 => S
     case _ => Tuple.Concat[
       Tuple.Take[S, IndexOf[S, D]],
