@@ -12,6 +12,7 @@ import internal.ToScala
 import internal.Flatten
 import internal.Broadcast
 import internal.TensorOperand
+import internal.UpdateSource
 
 import scala.collection.immutable.ArraySeq
 
@@ -35,9 +36,13 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def remainder[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.remainder(_), _.remainder(_))
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
+  def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): this.type = {
+    updateSource(native, idx.toNative(indices), value)
+    this
+   }
+
   def unsqueezeAfter[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertAfter[S, Dim.One, Idx], T] =
     new Tensor(native.unsqueeze(idx.value + 1))
-
   def unsqueezeBefore[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertBefore[S, Dim.One, Idx], T] =
     new Tensor(native.unsqueeze(idx.value))
 

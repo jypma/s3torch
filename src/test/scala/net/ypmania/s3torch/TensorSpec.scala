@@ -241,6 +241,23 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("update") {
+      it("can set a single value in a vector") {
+        val a = Tensor((1, 2, 3))
+        a(0) = 4
+        assert(a.value.toSeq == Seq(4,2,3))
+      }
+
+      it("can set a single value in a matrix") {
+        val t = Tensor((
+          ((1,2,3)),
+          ((4,5,6))
+        ))
+        t((1, 1)) = 9
+        assert(t.value.toSeq == Seq(Seq(1,2,3), Seq(4,9,6)))
+      }
+    }
+
     describe("unsqueeze") {
       case object DimA extends Static[2L]
       case object DimB extends Static[3L]
