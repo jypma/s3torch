@@ -14,6 +14,21 @@ trait IndexPrio0 {
 }
 
 object Index extends IndexPrio0 {
+  case class Slice(from: Option[Int], to: Option[Int], step: Option[Int])
+  object Slice:
+    private def extract(index: Option[Int] | Int) = index match
+      case i: Option[Int] => i
+      case i: Int         => Option(i)
+    def apply(
+        start: Option[Int] | Int = None,
+        end: Option[Int] | Int = None,
+        step: Option[Int] | Int = None
+    ): Slice = Slice(extract(start), extract(end), extract(step))
+
+  given [D <: Dim]: Index[D, Slice] with {
+    def toSymInt(maybeInt: Option[Int]) = maybeInt.map(l => pytorch.SymIntOptional(pytorch.SymInt(l))).orNull
+    def toNative(s: Slice) = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(s.from), toSymInt(s.to), toSymInt(s.step)))
+  }
   // TODO match Dim.Static explicitly with a Int & Singleton. We'll have to introduce a Conversion[Int & Singleton, StaticIndex] and then a given for StaticIndex.
 
   // Allow a tuple with the actual dimension type, instead of just the value

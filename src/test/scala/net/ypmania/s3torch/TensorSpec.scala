@@ -2,6 +2,7 @@ package net.ypmania.s3torch
 
 import org.scalatest.Assertions._
 
+import Index.Slice
 import Dim.Static
 import Dim.Dynamic
 import scala.reflect.ClassTag
@@ -273,6 +274,12 @@ class TensorSpec extends UnitSpec {
         assert(a.value.toSeq == Seq(Seq(0,9),Seq(0,0),Seq(0,0)))
       }
 
+      it("can set a slice of a vector") {
+        val v = Tensor.zeros(6L)
+        var ones = Tensor((1, 1, 1))
+        v(Slice(step = 2)) = ones
+        assert(v.value.toSeq == Seq(1, 0, 1, 0, 1, 0))
+      }
     }
 
     describe("unsqueeze") {
