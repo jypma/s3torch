@@ -15,6 +15,11 @@ trait IndexPrio0 {
 
 object Index extends IndexPrio0 {
   // TODO match Dim.Static explicitly with a Int & Singleton. We'll have to introduce a Conversion[Int & Singleton, StaticIndex] and then a given for StaticIndex.
+
+  // Allow a tuple with the actual dimension type, instead of just the value
+  given [D <: Dim, T](using i:Index[D, T]): Index[D, (D, T)] with {
+    def toNative(t: (D, T)) = i.toNative(t._2)
+  }
 }
 
 trait Indices[S <: Shape, T] {
@@ -29,6 +34,7 @@ object Indices {
   given [D1 <: Dim, D2 <: Dim, T1](using i1: Index[D1, T1]): Indices[(D1, D2), T1] with {
     def toNative(t: T1) = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(i1.toNative(t)))
   }
+  // TODO rewrite as recursion
   given [D1 <: Dim, D2 <: Dim, T1, T2](using i1: Index[D1, T1], i2: Index[D2, T2]): Indices[(D1, D2), (T1, T2)] with {
     def toNative(t: (T1, T2)) = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(i1.toNative(t._1), i2.toNative(t._2)))
   }

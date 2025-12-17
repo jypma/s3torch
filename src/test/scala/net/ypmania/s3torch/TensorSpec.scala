@@ -248,6 +248,13 @@ class TensorSpec extends UnitSpec {
         assert(a.value.toSeq == Seq(4,2,3))
       }
 
+      it("can set a value by specifying the dimension") {
+        case object MyDim extends Dim.Static[3L]
+        val a = Tensor.zeros(MyDim)
+        a(MyDim -> 0) = 4
+        assert(a.value.toSeq == Seq(4,0,0))
+      }
+
       it("can set a single value in a matrix") {
         val t = Tensor((
           ((1,2,3)),
@@ -256,6 +263,16 @@ class TensorSpec extends UnitSpec {
         t((1, 1)) = 9
         assert(t.value.toSeq == Seq(Seq(1,2,3), Seq(4,9,6)))
       }
+
+      it("can set a value in a matrix by specifying the dimension, as tuple or args") {
+        case object MyDimA extends Dim.Static[3L]
+        case object MyDimB extends Dim.Static[2L]
+        val a = Tensor.zeros(MyDimA, MyDimB)
+        // If these are swapped, we get a nice compile error.
+        a(MyDimA -> 0, MyDimB -> 1) = 9
+        assert(a.value.toSeq == Seq(Seq(0,9),Seq(0,0),Seq(0,0)))
+      }
+
     }
 
     describe("unsqueeze") {

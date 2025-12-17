@@ -40,6 +40,15 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     updateSource(native, idx.toNative(indices), value)
     this
    }
+  def update[I1,I2,V](index1: I1, index2: I2, value: V)(using idx: Indices[S,(I1,I2)], updateSource: UpdateSource[V]): this.type = {
+    updateSource(native, idx.toNative((index1, index2)), value)
+    this
+  }
+  // TODO rewrite recursively as... macro perhaps? Or drop the syntax, just do tuples?
+  def update[I1,I2,I3,V](index1: I1, index2: I2, index3: I3, value: V)(using idx: Indices[S,(I1,I2,I3)], updateSource: UpdateSource[V]): this.type = {
+    updateSource(native, idx.toNative((index1, index2, index3)), value)
+    this
+  }
 
   def unsqueezeAfter[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertAfter[S, Dim.One, Idx], T] =
     new Tensor(native.unsqueeze(idx.value + 1))
