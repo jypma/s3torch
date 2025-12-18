@@ -26,6 +26,20 @@ object Dim extends DimLowPriorityGivens {
   case class Ref[D <: Dim](ref: D) extends Dim {
     override def size = ref.size
   }
+  object Ref {
+    type Wrap[S <: Tuple] <: Tuple = S match {
+      case EmptyTuple => EmptyTuple
+      //case Ref[ref] *: tail => Ref[ref] *: Wrap[tail]
+      case dim *: tail => Ref[dim] *: Wrap[tail]
+    }
+    def wrap[S <: Tuple, T <: DType](t: Tensor[S,T]): Tensor[Wrap[S], T] = t.asInstanceOf
+
+    type Unwrap[S <: Tuple] <: Tuple = S match {
+      case EmptyTuple => EmptyTuple
+      case Ref[ref] *: tail => ref *: Unwrap[tail]
+    }
+    def unwrap[S <: Tuple, T <: DType](t: Tensor[S,T]): Tensor[Unwrap[S], T] = t.asInstanceOf
+  }
 
   // The "+ 0L" hack here is needed, since scala 3.7.4 otherwise will allow Long variables to match here, even though
   // their compile-time value is unknown.

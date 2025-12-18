@@ -16,6 +16,10 @@ class ZerosApply[T <: DType](dtype: T) {
     zeros(Seq(d1.size, d2.size))
   }
 
+  def apply[D1 <: Dim, D2 <: Dim, D3 <: Dim](d1: D1, d2: D2, d3: D3)(using a1: DimArg[D1], a2: DimArg[D2], a3: DimArg[D3]): Tensor[(a1.Out, a2.Out, a3.Out), T] = {
+    zeros(Seq(d1.size, d2.size, d3.size))
+  }
+
   private def zeros[S <: Tuple](size: Seq[Long]): Tensor[S,T] = new Tensor(
     torch.torch_zeros(
       size.toArray,
