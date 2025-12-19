@@ -4,7 +4,7 @@ import org.bytedeco.pytorch
 import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.Shape
 import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.Promoted
+import net.ypmania.s3torch.DType.Promoted
 import net.ypmania.s3torch.Dim
 
 /** Type class that exists for V where V can be the operand to an operation on a tensor with either a scalar (resulting in the same shaped tensor), or another tensor (resulting in Broadcast being applied) */

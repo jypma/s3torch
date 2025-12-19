@@ -24,6 +24,8 @@ import org.bytedeco.javacpp.DoublePointer
 
 import compiletime.ops.int.ToLong
 
+import net.ypmania.s3torch.DType.*
+
 trait FromScala[V] {
   type OutputShape <: Tuple
   type DefaultDType <: DType
@@ -34,38 +36,38 @@ trait FromScala[V] {
 object FromScala {
   // We need to explicitly extend these traits directly for each given. If we pull them in using givens, the types don't resolve.
   trait ToBool {
-    type DefaultDType = Bool
-    def defaultDType = bool
+    type DefaultDType = Bool.type
+    def defaultDType = Bool
   }
 
   trait ToInt8 {
-    type DefaultDType = Int8
-    def defaultDType = int8
+    type DefaultDType = Int8.type
+    def defaultDType = Int8
   }
 
   trait ToInt16 {
-    type DefaultDType = Int16
-    def defaultDType = int16
+    type DefaultDType = Int16.type
+    def defaultDType = Int16
   }
 
   trait ToInt32 {
-    type DefaultDType = Int32
-    def defaultDType = int32
+    type DefaultDType = Int32.type
+    def defaultDType = Int32
   }
 
   trait ToInt64 {
-    type DefaultDType = Int64
-    def defaultDType = int64
+    type DefaultDType = Int64.type
+    def defaultDType = Int64
   }
 
   trait ToFloat32 {
-    type DefaultDType = Float32
-    def defaultDType = float32
+    type DefaultDType = Float32.type
+    def defaultDType = Float32
   }
 
   trait ToFloat64 {
-    type DefaultDType = Float64
-    def defaultDType = float64
+    type DefaultDType = Float64.type
+    def defaultDType = Float64
   }
 
   trait ToScalar[V] extends (V => pytorch.Scalar)

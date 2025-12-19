@@ -11,6 +11,7 @@ import java.nio.DoubleBuffer
 import java.nio.Buffer
 import scala.reflect.ClassTag
 import scala.collection.immutable.ArraySeq
+import DType.*
 
 trait ToScala[-S <: Tuple, +T <: DType] {
   type OutputType
@@ -23,12 +24,12 @@ object ToScala {
     def apply(native: pytorch.Tensor) = get(native)
   }
 
-  given ItemTo[Byte](_.item_byte) with ToScala[EmptyTuple, Int8] with {}
-  given ItemTo[Short](_.item_short) with ToScala[EmptyTuple, Int16] with {}
-  given ItemTo[Int](_.item_int) with ToScala[EmptyTuple, Int32] with {}
-  given ItemTo[Long](_.item_long) with ToScala[EmptyTuple, Int64] with {}
-  given ItemTo[Float](_.item_float) with ToScala[EmptyTuple, Float32] with {}
-  given ItemTo[Double](_.item_double) with ToScala[EmptyTuple, Float64] with {}
+  given ItemTo[Byte](_.item_byte) with ToScala[EmptyTuple, Int8.type] with {}
+  given ItemTo[Short](_.item_short) with ToScala[EmptyTuple, Int16.type] with {}
+  given ItemTo[Int](_.item_int) with ToScala[EmptyTuple, Int32.type] with {}
+  given ItemTo[Long](_.item_long) with ToScala[EmptyTuple, Int64.type] with {}
+  given ItemTo[Float](_.item_float) with ToScala[EmptyTuple, Float32.type] with {}
+  given ItemTo[Double](_.item_double) with ToScala[EmptyTuple, Float64.type] with {}
 
   abstract class ContiguousToArray[V: ClassTag](get: (pytorch.Tensor, Array[V]) => Unit) {
     type OutputType = Array[V]
@@ -46,12 +47,12 @@ object ToScala {
     }
   }
 
-  given [D <: Dim]: ContiguousToArray[Byte](_.createBuffer[ByteBuffer].get(_)) with ToScala[Tuple1[D], Int8] with {}
-  given [D <: Dim]: ContiguousToArray[Short](_.createBuffer[ShortBuffer].get(_)) with ToScala[Tuple1[D], Int16] with {}
-  given [D <: Dim]: ContiguousToArray[Int](_.createBuffer[IntBuffer].get(_)) with ToScala[Tuple1[D], Int32] with {}
-  given [D <: Dim]: ContiguousToArray[Long](_.createBuffer[LongBuffer].get(_)) with ToScala[Tuple1[D], Int64] with {}
-  given [D <: Dim]: ContiguousToArray[Float](_.createBuffer[FloatBuffer].get(_)) with ToScala[Tuple1[D], Float32] with {}
-  given [D <: Dim]: ContiguousToArray[Double](_.createBuffer[DoubleBuffer].get(_)) with ToScala[Tuple1[D], Float64] with {}
+  given [D <: Dim]: ContiguousToArray[Byte](_.createBuffer[ByteBuffer].get(_)) with ToScala[Tuple1[D], Int8.type] with {}
+  given [D <: Dim]: ContiguousToArray[Short](_.createBuffer[ShortBuffer].get(_)) with ToScala[Tuple1[D], Int16.type] with {}
+  given [D <: Dim]: ContiguousToArray[Int](_.createBuffer[IntBuffer].get(_)) with ToScala[Tuple1[D], Int32.type] with {}
+  given [D <: Dim]: ContiguousToArray[Long](_.createBuffer[LongBuffer].get(_)) with ToScala[Tuple1[D], Int64.type] with {}
+  given [D <: Dim]: ContiguousToArray[Float](_.createBuffer[FloatBuffer].get(_)) with ToScala[Tuple1[D], Float32.type] with {}
+  given [D <: Dim]: ContiguousToArray[Double](_.createBuffer[DoubleBuffer].get(_)) with ToScala[Tuple1[D], Float64.type] with {}
 
   type MkOutputType[S <: Tuple, ElemType] = S match {
     case EmptyTuple => ElemType
@@ -91,17 +92,17 @@ object ToScala {
     }
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Int]): ToScala[S, Int32] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Int]): ToScala[S, Int32.type] with {
     type OutputType = MkOutputType[S, Int]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Float]): ToScala[S, Float32] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Float]): ToScala[S, Float32.type] with {
     type OutputType = MkOutputType[S, Float]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Double]): ToScala[S, Float64] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Double]): ToScala[S, Float64.type] with {
     type OutputType = MkOutputType[S, Double]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }

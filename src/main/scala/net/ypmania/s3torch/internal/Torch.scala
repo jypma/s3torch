@@ -16,7 +16,7 @@ object Torch {
   ): pytorch.TensorOptions =
     pytorch
       .TensorOptions()
-      .dtype(ScalarTypeOptional(dtype.toScalarType))
+      .dtype(ScalarTypeOptional(dtype.scalarType))
       .layout(LayoutOptional(Layout.Strided.toNative))
       .device(DeviceOptional(Device.CPU.toNative))
       .requires_grad(BoolOptional(false))

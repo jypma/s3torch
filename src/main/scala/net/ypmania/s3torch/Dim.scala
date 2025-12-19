@@ -2,6 +2,8 @@ package net.ypmania.s3torch
 
 import  scala.compiletime.ops.long.*
 
+// Next idea: Dim is (L <: Long & Singleton | Unknown, N <: Name | Untagged)
+
 trait Dim {
   def size: Long
 }
@@ -23,7 +25,7 @@ object Dim extends DimLowPriorityGivens {
   }
 
   /** A reference made to an unknown dimension (typically used as a type parameter to generic building blocks) */
-  case class Ref[D <: Dim](ref: D) extends Dim {
+  case class Ref[+D <: Dim](ref: D) extends Dim {
     override def size = ref.size
   }
   object Ref {
@@ -32,12 +34,15 @@ object Dim extends DimLowPriorityGivens {
       //case Ref[ref] *: tail => Ref[ref] *: Wrap[tail]
       case dim *: tail => Ref[dim] *: Wrap[tail]
     }
+    /** Experimental */
     def wrap[S <: Tuple, T <: DType](t: Tensor[S,T]): Tensor[Wrap[S], T] = t.asInstanceOf
 
     type Unwrap[S <: Tuple] <: Tuple = S match {
       case EmptyTuple => EmptyTuple
       case Ref[ref] *: tail => ref *: Unwrap[tail]
+      case dim *: tail => dim *: Unwrap[tail]
     }
+    /** Experimental */
     def unwrap[S <: Tuple, T <: DType](t: Tensor[S,T]): Tensor[Unwrap[S], T] = t.asInstanceOf
   }
 

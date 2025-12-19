@@ -53,4 +53,7 @@ object Indices {
   given [D1 <: Dim, D2 <: Dim, T1, T2](using i1: Index[D1, T1], i2: Index[D2, T2]): Indices[(D1, D2), (T1, T2)] with {
     def toNative(t: (T1, T2)) = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(i1.toNative(t._1), i2.toNative(t._2)))
   }
+  given [D1 <: Dim, D2 <: Dim, D3 <: Dim, T1, T2, T3](using i1: Index[D1, T1], i2: Index[D2, T2], i3: Index[D3, T3]): Indices[(D1, D2, D3), (T1, T2, T3)] with {
+    def toNative(t: (T1, T2, T3)) = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(i1.toNative(t._1), i2.toNative(t._2), i3.toNative(t._3)))
+  }
 }

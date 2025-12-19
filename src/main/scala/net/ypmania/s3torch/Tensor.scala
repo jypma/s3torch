@@ -21,6 +21,7 @@ import net.ypmania.s3torch.internal.FromScala.ToScalar
 import net.ypmania.s3torch.internal.Torch
 import net.ypmania.s3torch.Dim.*
 import net.ypmania.s3torch.Shape.*
+import DType.*
 
 class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   type Shape = S
@@ -83,7 +84,7 @@ object Tensor {
   def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
     fromScala(value, dtype)
 
-  def arangeOf[D <: Dim](dim: D)(using d: DimArg[D]): Tensor[Tuple1[d.Out], Int64] = arange(0L, dim.size, 1L).unsafeWithShape
+  def arangeOf[D <: Dim](dim: D)(using d: DimArg[D]): Tensor[Tuple1[d.Out], Int64.type] = arange(0L, dim.size, 1L).unsafeWithShape
   def arangeOf[D <: Dim, T <: DType](dim: D, dtype: T)(using a: DimArg[D]): Tensor[Tuple1[a.Out], T] = arange(0L, dim.size, 1L, dtype).unsafeWithShape
 
   def arange[V](start: V, end: V, step: V)(using toScalar: ToScalar[V], fromScala: FromScala[V]): Tensor[Tuple1[Dim.Dynamic], fromScala.DefaultDType] = {
@@ -97,7 +98,7 @@ object Tensor {
   def exp[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.exp)
   def sin[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.sin)
 
-  def zeros[T <: DType](using dtype: DefaultV2.DType[T]) = new ZerosApply(dtype.value)
+  def zeros[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value)
 
   trait Squeeze[S <: Tuple] {
     type OutputShape <: Tuple
