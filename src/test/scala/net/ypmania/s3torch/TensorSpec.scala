@@ -9,6 +9,7 @@ import scala.reflect.ClassTag
 import net.ypmania.s3torch.internal.Broadcast.MaxEachDim
 import net.ypmania.s3torch.Shape.Widen
 import DType.*
+import Tensor.KeepDim
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -196,6 +197,41 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("mean") {
+      case object DimA extends Dim.Static[2L]
+      case object DimB extends Dim.Static[3L]
+
+      it("can calculate mean of first dim") {
+        var t = Tensor.zeros(DimA, DimB)
+        t((0,0)) = 3.0
+        t((1,0)) = 2.0
+        val res = t.meanBy(DimA)
+        val resType: Tensor[DimB.type *: EmptyTuple, Float32.type] = res
+        assert(res.size == Seq(3L))
+        assert(res.value.toSeq == Seq(2.5, 0, 0))
+      }
+
+      it("can calculate mean of second dim") {
+        var t = Tensor.zeros(DimA, DimB)
+        t((0,0)) = 3.0
+        t((1,0)) = 2.0
+        val res = t.meanBy(DimB)
+        val resType: Tensor[DimA.type *: EmptyTuple, Float32.type] = res
+        assert(res.size == Seq(2L))
+        assert(res.value.toSeq === Seq(1.0, 0.6666))
+      }
+
+      it("can calculate mean of selected dim and keep it") {
+        var t = Tensor.zeros(DimA, DimB)
+        t((0,0)) = 3.0
+        t((1,0)) = 2.0
+        val res = t.meanBy(DimA)(using KeepDim)
+        val resType: Tensor[(Dim.One, DimB.type), Float32.type] = res
+        assert(res.size == Seq(1L, 3L))
+        assert(res.value.toSeq == Seq(Seq(2.5, 0, 0)))
+      }
+    }
+
     describe("plus") {
       it("can add a primitive") {
         val t = Tensor((1, 2, 3))
@@ -240,6 +276,16 @@ class TensorSpec extends UnitSpec {
           Seq(8, 9, 10, 11),
           Seq(9, 10, 11, 12))
         )
+      }
+    }
+
+    describe("std") {
+      it("can calculate standard deviation") {
+        var t = Tensor((1.0, 2.0, 3.0))
+        val res = t.stdBy(Shape.Select.First)
+        val resType: Tensor[EmptyTuple, Float64.type] = res
+        assert(res.size == Seq())
+        assert(res.value == 1.0)
       }
     }
 

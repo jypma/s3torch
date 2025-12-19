@@ -72,4 +72,8 @@ object DType {
     // case (T, Complex128)                           => T
     case _                                         => DType
   }
+
+  /** Given that can be used to ensure T is floating-point (or complex) */
+  trait RequireFloat[T <: DType]
+  given [T <: BFloat16.type | Float16.type | Float32.type | Float64.type]: RequireFloat[T] with {}
 }

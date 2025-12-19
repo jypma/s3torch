@@ -13,6 +13,7 @@ import internal.Flatten
 import internal.Broadcast
 import internal.TensorOperand
 import internal.UpdateSource
+import internal.ReduceOperand
 
 import scala.collection.immutable.ArraySeq
 
@@ -22,6 +23,7 @@ import net.ypmania.s3torch.internal.Torch
 import net.ypmania.s3torch.Dim.*
 import net.ypmania.s3torch.Shape.*
 import DType.*
+import org.bytedeco.pytorch.ScalarTypeOptional
 
 class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   type Shape = S
@@ -36,6 +38,9 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def floor_divide[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.floor_divide(_), _.floor_divide(_))
   def remainder[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.remainder(_), _.remainder(_))
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
+
+  def stdBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D, correction: Double = 1.0)(using keep: K)(using op: ReduceOperand[S,D,Idx,K], ev: RequireFloat[T]): Tensor[op.Out, T] =
+    new Tensor(native.std(Array(op.index), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), op.keep))
 
   def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): this.type = {
     updateSource(native, idx.toNative(indices), value)
@@ -58,14 +63,8 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def value(using toScala: ToScala[S, T]) = toScala(native)
 
-
-  def maxBy[D](using rm: RemoveDim[S, D]): Tensor[rm.OutputShape, T] = {
-    ???
-  }
-
-  def maxBy[D](dim: D)(using rm: RemoveDim[S, D]): Tensor[rm.OutputShape, T] = {
-    ???
-  }
+  def meanBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K], ev: RequireFloat[T]): Tensor[op.Out, T] =
+    new Tensor(native.mean(Array(op.index), op.keep, new ScalarTypeOptional))
 
   def +[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.add(_), _.add(_))
   def -[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.sub(_), _.sub(_))
@@ -79,6 +78,8 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   * approximated mathemetical notation better than "x.sin", even
   * though the latter would be more idiomatic Scala. */
 object Tensor {
+  val KeepDim = ReduceOperand.KeepDim
+
   def apply[V](value: V)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, fromScala.DefaultDType] =
     fromScala(value, fromScala.defaultDType)
   def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
@@ -129,35 +130,5 @@ object Tensor {
     def squeeze: Tensor[sq.OutputShape, T] = {
       ???
     }
-  }
-
-  // Target one dimension and remove it (used by max[dim=N, keepdim=false], squeeze[dims=...], etc.)
-
-  trait RemoveDim[-S <: Tuple, D] {
-    type OutputShape <: Tuple
-  }
-
-  given removeD1i[D1 <: Dim]: RemoveDim[Tuple1[D1], 0] with {
-    type OutputShape = Scalar
-  }
-
-  given removeD1n[D1 <: Dim]: RemoveDim[Tuple1[D1], D1] with {
-    type OutputShape = Scalar
-  }
-
-  given removeD2i0[D1 <: Dim, D2 <: Dim]: RemoveDim[(D1, D2), 0] with {
-    type OutputShape = Tuple1[D2]
-  }
-
-  given removeD2n0[D1 <: Dim, D2 <: Dim]: RemoveDim[(D1, D2), D1] with {
-    type OutputShape = Tuple1[D2]
-  }
-
-  given removeD2i1[D1 <: Dim, D2 <: Dim]: RemoveDim[(D1, D2), 1] with {
-    type OutputShape = Tuple1[D1]
-  }
-
-  given removeD2n1[D1 <: Dim, D2 <: Dim]: RemoveDim[(D1, D2), D2] with {
-    type OutputShape = Tuple1[D1]
   }
 }
