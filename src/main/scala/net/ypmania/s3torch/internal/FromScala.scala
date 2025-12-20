@@ -29,7 +29,7 @@ import net.ypmania.s3torch.DType.*
 trait FromScala[V] {
   type OutputShape <: Tuple
   type DefaultDType <: DType
-  def apply[T <: DType](value: V, t: T): Tensor[OutputShape, T]
+  def apply[T <: DType](value: V): Tensor[OutputShape, T]
   def defaultDType: DefaultDType
 }
 
@@ -82,10 +82,10 @@ object FromScala {
   abstract class FromPrimitive[V](using toScalar: ToScalar[V]) extends FromScala[V] {
     type OutputShape = Scalar
 
-    override def apply[T <: DType](value: V, dtype: T): Tensor[Scalar, T] = {
+    override def apply[T <: DType](value: V): Tensor[Scalar, T] = {
       val tensor = torch.scalar_tensor(
         toScalar(value),
-        Torch.tensorOptions(dtype)
+        Torch.tensorOptions(defaultDType)
       )
       new Tensor(tensor)
     }
@@ -108,9 +108,9 @@ object FromScala {
   abstract class FromSeq[S, V](toPointer: Seq[V] => Pointer)(using toSeq: ToSeq[S, V]) extends FromScala[S] {
     type OutputShape = ToShape[S]
 
-    override def apply[T <: DType](value: S, dtype: T): Tensor[OutputShape, T] = {
+    override def apply[T <: DType](value: S): Tensor[OutputShape, T] = {
       val seq = toSeq(value)
-      val tensor = torch.from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(dtype))
+      val tensor = torch.from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(defaultDType))
       new Tensor(tensor)
     }
   }
@@ -132,10 +132,10 @@ object FromScala {
   abstract class FromSeq2D[S1, S2, V](using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, V], fromScala: FromScala[Seq[V]]) extends FromScala[S1] {
     type OutputShape = ToShape[S1]
 
-    override def apply[T <: DType](value: S1, dtype: T): Tensor[OutputShape, T] = {
+    override def apply[T <: DType](value: S1): Tensor[OutputShape, T] = {
       val seqs1 = toSeq1(value)
       val seq = seqs1.map(s => toSeq2(s)).flatten
-      new Tensor(fromScala(seq, dtype).native.view(seqs1.size, seq.length / seqs1.size))
+      new Tensor(fromScala(seq).native.view(seqs1.size, seq.length / seqs1.size))
     }
   }
 
@@ -151,9 +151,9 @@ object FromScala {
   abstract class FromSeq3D[S1, S2, S3, V](using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, S3], toSeq3: ToSeq[S3, V], fromScala: FromScala[Seq[V]]) extends FromScala[S1] {
     type OutputShape = ToShape[S1]
 
-    override def apply[T <: DType](value: S1, dtype: T): Tensor[OutputShape, T] = {
+    override def apply[T <: DType](value: S1): Tensor[OutputShape, T] = {
       val seq = toSeq1(value).map(s2 => toSeq2(s2).map(s3 => toSeq3(s3)))
-      new Tensor(fromScala(seq.flatten.flatten, dtype).native.view(seq.size, seq.head.size, seq.head.head.size))
+      new Tensor(fromScala(seq.flatten.flatten).native.view(seq.size, seq.head.size, seq.head.head.size))
     }
   }
 

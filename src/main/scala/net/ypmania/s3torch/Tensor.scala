@@ -39,8 +39,12 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def remainder[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.remainder(_), _.remainder(_))
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
+  def to[T1 <: DType](dtype: T1): Tensor[S, T1] = new Tensor(native.to(dtype.scalarType))
+
   def stdBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D, correction: Double = 1.0)(using keep: K)(using op: ReduceOperand[S,D,Idx,K], ev: RequireFloat[T]): Tensor[op.Out, T] =
     new Tensor(native.std(Array(op.index), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), op.keep))
+  def meanBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K], ev: RequireFloat[T]): Tensor[op.Out, T] =
+    new Tensor(native.mean(Array(op.index), op.keep, new ScalarTypeOptional))
 
   def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): this.type = {
     updateSource(native, idx.toNative(indices), value)
@@ -63,8 +67,6 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def value(using toScala: ToScala[S, T]) = toScala(native)
 
-  def meanBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K], ev: RequireFloat[T]): Tensor[op.Out, T] =
-    new Tensor(native.mean(Array(op.index), op.keep, new ScalarTypeOptional))
 
   def +[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.add(_), _.add(_))
   def -[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.sub(_), _.sub(_))
@@ -81,9 +83,9 @@ object Tensor {
   val KeepDim = ReduceOperand.KeepDim
 
   def apply[V](value: V)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, fromScala.DefaultDType] =
-    fromScala(value, fromScala.defaultDType)
+    fromScala(value)
   def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
-    fromScala(value, dtype)
+    fromScala(value).to(dtype)
 
   def arangeOf[D <: Dim](dim: D)(using d: DimArg[D]): Tensor[Tuple1[d.Out], Int64.type] = arange(0L, dim.size, 1L).unsafeWithShape
   def arangeOf[D <: Dim, T <: DType](dim: D, dtype: T)(using a: DimArg[D]): Tensor[Tuple1[a.Out], T] = arange(0L, dim.size, 1L, dtype).unsafeWithShape
@@ -99,7 +101,8 @@ object Tensor {
   def exp[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.exp)
   def sin[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.sin)
 
-  def zeros[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value)
+  def ones[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value, torch.torch_ones(_, _))
+  def zeros[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value, torch.torch_zeros(_, _))
 
   trait Squeeze[S <: Tuple] {
     type OutputShape <: Tuple
