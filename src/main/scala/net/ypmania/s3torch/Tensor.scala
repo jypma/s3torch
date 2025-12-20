@@ -41,11 +41,6 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def to[T1 <: DType](dtype: T1): Tensor[S, T1] = new Tensor(native.to(dtype.scalarType))
 
-  def stdBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D, correction: Double = 1.0)(using keep: K)(using op: ReduceOperand[S,D,Idx,K], ev: RequireFloat[T]): Tensor[op.Out, T] =
-    new Tensor(native.std(Array(op.index), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), op.keep))
-  def meanBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K], ev: RequireFloat[T]): Tensor[op.Out, T] =
-    new Tensor(native.mean(Array(op.index), op.keep, new ScalarTypeOptional))
-
   def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): this.type = {
     updateSource(native, idx.toNative(indices), value)
     this
@@ -103,6 +98,15 @@ object Tensor {
 
   def ones[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value, torch.torch_ones(_, _))
   def zeros[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value, torch.torch_zeros(_, _))
+
+  // ---- Methods on Tensor that require floats
+  extension[S <: Shape, T <: DType.Floaty](t: Tensor[S, T]) {
+    // TODO include some ReduceOperandApply abstraction, in 0 and 1 arity, to clean up duplication here
+    def stdBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D, correction: Double = 1.0)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): Tensor[op.Out, T] =
+      new Tensor(t.native.std(Array(op.index), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), op.keep))
+    def meanBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): Tensor[op.Out, T] =
+      new Tensor(t.native.mean(Array(op.index), op.keep, new ScalarTypeOptional))
+  }
 
   trait Squeeze[S <: Tuple] {
     type OutputShape <: Tuple

@@ -73,7 +73,6 @@ object DType {
     case _                                         => DType
   }
 
-  /** Given that can be used to ensure T is floating-point (or complex) */
-  trait RequireFloat[T <: DType]
-  given [T <: BFloat16.type | Float16.type | Float32.type | Float64.type]: RequireFloat[T] with {}
+  /** A floating-point or complex type (which is required for operations like mean, std and others) */
+  type Floaty = BFloat16.type | Float16.type | Float32.type | Float64.type
 }

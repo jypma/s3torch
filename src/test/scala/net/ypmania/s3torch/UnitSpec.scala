@@ -32,11 +32,17 @@ abstract class UnitSpec extends AnyFunSpec {
       case _ => false
     }
   }
+  implicit val float1dEqualArray:Equality[Array[Float]] = new Equality[Array[Float]] {
+    def areEqual(a: Array[Float], b: Any) = float1dEqual.areEqual(a.toSeq, b)
+  }
   implicit val double1dEqual:Equality[Seq[Double]] = new Equality[Seq[Double]] {
     def areEqual(a: Seq[Double], b: Any): Boolean = b match {
       case seq:Seq[?] => a.zip(seq).forall(doubleEqual.areEqual(_,_))
       case _ => false
     }
+  }
+  implicit val double1dEqualArray:Equality[Array[Double]] = new Equality[Array[Double]] {
+    def areEqual(a: Array[Double], b: Any) = double1dEqual.areEqual(a.toSeq, b)
   }
   implicit val float2dEqual:Equality[Seq[Seq[Float]]] = new Equality[Seq[Seq[Float]]] {
     def areEqual(a: Seq[Seq[Float]], b: Any): Boolean = b match {
