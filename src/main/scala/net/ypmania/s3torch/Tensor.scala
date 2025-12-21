@@ -91,6 +91,7 @@ object Tensor {
 
   def ones[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value, torch.torch_ones(_, _))
   def zeros[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value, torch.torch_zeros(_, _))
+  def rand[T <: DType](using dtype: Default[T], rnd:RandomSource) = rnd(new ZerosApply(dtype.value, torch.torch_rand(_, _)))
 
   // ---- Methods on Tensor that require floats
   extension[S <: Shape, T <: DType.Floaty](t: Tensor[S, T]) {

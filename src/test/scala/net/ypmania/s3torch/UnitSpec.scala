@@ -6,6 +6,18 @@ import org.bytedeco.pytorch
 import org.scalactic.Equality
 
 abstract class UnitSpec extends AnyFunSpec {
+  given RandomSource with {
+    override def apply[T](fn: => T) = withSeed(0) { fn }
+
+    override def fork: RandomSource = new RandomSource {
+      var seed = 0L
+      def apply[T](fn: => T) = withSeed(seed) {
+        seed += 1
+        fn
+      }
+    }
+  }
+
   def withSeed[T](seed: Long)(fn: => T): T = {
     UnitSpec.synchronized {
       pytorch.global.torch.manual_seed(seed)

@@ -163,6 +163,15 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("rand") {
+      it("can generate random numbers using fixed seed") {
+        // Seed provided by given RandomSource in UnitTest.scala
+        val t = Tensor.rand(3L)
+        assert(t.size == Seq(3L))
+        assert(t.value.toSeq === Seq(0.4962, 0.7682, 0.0884))
+      }
+    }
+
     describe("zeros") {
       it("can create with dimension 1") {
         val of1static = Tensor.zeros(1L)
