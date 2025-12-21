@@ -12,7 +12,7 @@ class ZerosApply[T <: DType](dtype: T, mkTensor: (Array[Long], pytorch.TensorOpt
     zeros(Seq(d1.size))
   }
 
-  // TODO Find a nice recursive way (args to tuple?) to express higher dimensions
+  // This can't be a tuple and done recursively, as a given's abstract type implementation can not depend on other givens.
   def apply[D1 <: Dim, D2 <: Dim](d1: D1, d2: D2)(using a1: DimArg[D1], a2: DimArg[D2]): Tensor[(a1.Out, a2.Out), T] = {
     zeros(Seq(d1.size, d2.size))
   }

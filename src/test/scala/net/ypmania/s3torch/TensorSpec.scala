@@ -296,6 +296,12 @@ class TensorSpec extends UnitSpec {
         assert(a.value.toSeq == Seq(4,2,3))
       }
 
+      it("can set a scalar") {
+        val a = Tensor(1.0)
+        a(EmptyTuple) = 4
+        assert(a.value == 4)
+      }
+
       it("can set a value by specifying the dimension") {
         case object MyDim extends Dim.Static[3L]
         val a = Tensor.zeros(MyDim)
@@ -317,7 +323,7 @@ class TensorSpec extends UnitSpec {
         case object MyDimB extends Dim.Static[2L]
         val a = Tensor.zeros(MyDimA, MyDimB)
         // If these are swapped, we get a nice compile error.
-        a(MyDimA -> 0, MyDimB -> 1) = 9
+        a((MyDimA -> 0, MyDimB -> 1)) = 9
         assert(a.value.toSeq == Seq(Seq(0,9),Seq(0,0),Seq(0,0)))
       }
 

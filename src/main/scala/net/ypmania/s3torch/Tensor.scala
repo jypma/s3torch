@@ -44,15 +44,6 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): this.type = {
     updateSource(native, idx.toNative(indices), value)
     this
-   }
-  def update[I1,I2,V](index1: I1, index2: I2, value: V)(using idx: Indices[S,(I1,I2)], updateSource: UpdateSource[V]): this.type = {
-    updateSource(native, idx.toNative((index1, index2)), value)
-    this
-  }
-  // TODO rewrite recursively as... macro perhaps? Or drop the syntax, just do tuples?
-  def update[I1,I2,I3,V](index1: I1, index2: I2, index3: I3, value: V)(using idx: Indices[S,(I1,I2,I3)], updateSource: UpdateSource[V]): this.type = {
-    updateSource(native, idx.toNative((index1, index2, index3)), value)
-    this
   }
 
   def unsqueezeAfter[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertAfter[S, Dim.One, Idx], T] =
@@ -92,8 +83,10 @@ object Tensor {
     new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(dtype)))
   }
 
+    // TODO consider a FunctionApply abstraction, to clean up duplication here
   def cos[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.cos)
   def exp[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.exp)
+  def relu[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.relu)
   def sin[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.sin)
 
   def ones[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value, torch.torch_ones(_, _))
@@ -101,7 +94,7 @@ object Tensor {
 
   // ---- Methods on Tensor that require floats
   extension[S <: Shape, T <: DType.Floaty](t: Tensor[S, T]) {
-    // TODO include some ReduceOperandApply abstraction, in 0 and 1 arity, to clean up duplication here
+    // TODO consider a  ReduceOperandApply abstraction, in 0 and 1 arity, to clean up duplication here
     def stdBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D, correction: Double = 1.0)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): Tensor[op.Out, T] =
       new Tensor(t.native.std(Array(op.index), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), op.keep))
     def meanBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): Tensor[op.Out, T] =

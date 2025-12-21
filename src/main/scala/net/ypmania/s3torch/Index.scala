@@ -29,7 +29,6 @@ object Index extends IndexPrio0 {
     def toSymInt(maybeInt: Option[Int]) = maybeInt.map(l => pytorch.SymIntOptional(pytorch.SymInt(l))).orNull
     def toNative(s: Slice) = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(s.from), toSymInt(s.to), toSymInt(s.step)))
   }
-  // TODO match Dim.Static explicitly with a Int & Singleton. We'll have to introduce a Conversion[Int & Singleton, StaticIndex] and then a given for StaticIndex.
 
   // Allow a tuple with the actual dimension type, instead of just the value
   given [D <: Dim, T](using i:Index[D, T]): Index[D, (D, T)] with {
@@ -38,22 +37,21 @@ object Index extends IndexPrio0 {
 }
 
 trait Indices[S <: Shape, T] {
-  def toNative(t: T): pytorch.TensorIndexArrayRef
+  def indexes(t: T): Seq[pytorch.TensorIndex]
+  def toNative(t: T): pytorch.TensorIndexArrayRef = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(indexes(t)*))
 }
 
 object Indices {
-  // We explicitly don't define EmptyTuple here, since setting a single value through .value = would be nicer syntax.
+  /* Allow a single Dim without tuple syntax */
   given [D <: Dim, T](using i1: Index[D, T]): Indices[Tuple1[D], T] with {
-    def toNative(t: T) = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(i1.toNative(t)))
+    def indexes(t: T) = Seq(i1.toNative(t))
   }
-  given [D1 <: Dim, D2 <: Dim, T1](using i1: Index[D1, T1]): Indices[(D1, D2), T1] with {
-    def toNative(t: T1) = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(i1.toNative(t)))
+
+  given Indices[EmptyTuple, EmptyTuple] with {
+    def indexes(t: EmptyTuple)= Seq.empty
   }
-  // TODO rewrite as recursion
-  given [D1 <: Dim, D2 <: Dim, T1, T2](using i1: Index[D1, T1], i2: Index[D2, T2]): Indices[(D1, D2), (T1, T2)] with {
-    def toNative(t: (T1, T2)) = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(i1.toNative(t._1), i2.toNative(t._2)))
-  }
-  given [D1 <: Dim, D2 <: Dim, D3 <: Dim, T1, T2, T3](using i1: Index[D1, T1], i2: Index[D2, T2], i3: Index[D3, T3]): Indices[(D1, D2, D3), (T1, T2, T3)] with {
-    def toNative(t: (T1, T2, T3)) = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(i1.toNative(t._1), i2.toNative(t._2), i3.toNative(t._3)))
+
+  given [D <: Dim, I, DTail <: Tuple, ITail <: Tuple](using i: Index[D, I], tail: Indices[DTail, ITail]): Indices[D *: DTail, I *: ITail] with {
+    def indexes(idx: I *: ITail) = i.toNative(idx.head) +: tail.indexes(idx.tail)
   }
 }
