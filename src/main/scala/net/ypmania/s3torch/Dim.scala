@@ -81,7 +81,7 @@ object Dim extends DimLowPriorityGivens {
     }
   }
   object DimArg extends DimArgPrio0 {
-    given asStatic[L <: Long, D <: Static[L]]: DimArg[D] with {
+    given asStatic[L <: Long & Singleton, D <: Static[L]]: DimArg[D] with {
       type Out = D
       def apply(d: D) = d
     }
@@ -94,4 +94,32 @@ object Dim extends DimLowPriorityGivens {
       def apply(d: Ref[D]) = d
     }
   }
+
+  type IsDivisableBy[D, L <: Long] <: Boolean = D match {
+    case Dim.Static[v] => v % L match {
+      case 0L => true
+      case _ => false
+    }
+    case _ => false
+  }
+  type DividedBy[D, L <: Long] <: Long = D match {
+    case Dim.Static[v] => v / L
+  }
+
+  trait DivisableBy[+D, +L <: Long] {
+    type Res <: Long
+  }
+  //given [D <: Long, L <: Long](using D % L =:= 0L): DivisableBy[Dim.Static[D], L] with {}
+  given [D, L <: Long](using IsDivisableBy[D, L] =:= true): DivisableBy[D, L] with {
+    type Res = DividedBy[D, L]
+  }
+  infix type |/[D, L <: Long] = DivisableBy[D, L]
+
+  /*
+  type DividedBy[D, L <: Long] <: Dim = D match {
+    case Dim.Static[v] => Dim.Static[v / L]
+    case _ => Dim
+  }
+   infix type /[D, L <: Long] = DividedBy[D, L]
+   */
 }

@@ -421,5 +421,31 @@ class TensorSpec extends UnitSpec {
         ))
       }
     }
+
+    describe("withSplit") {
+      case object DimA extends Static[6L]
+      case object DimB extends Static[3L]
+      val matrix = Tensor.zeros(DimA, DimB)
+
+      it("can split") {
+        val res = matrix.withSplit(DimA, 2L) { t =>
+          val tType: Tensor[(Static[3L], Static[2L], DimB.type), Float32.type] = t
+          assert(t.size == Seq(3L, 2L, 3L))
+          t((0, 0, 0)) = 1.0
+          t((1, 0, 0)) = 1.0
+          t((2, 0, 0)) = 1.0
+        }
+        val resType: Tensor[(DimA.type, DimB.type), Float32.type] = res
+
+        assert(res.value == Seq(
+          Seq(1.0, 0.0, 0.0),
+          Seq(0.0, 0.0, 0.0),
+          Seq(1.0, 0.0, 0.0),
+          Seq(0.0, 0.0, 0.0),
+          Seq(1.0, 0.0, 0.0),
+          Seq(0.0, 0.0, 0.0))
+        )
+      }
+    }
   }
 }

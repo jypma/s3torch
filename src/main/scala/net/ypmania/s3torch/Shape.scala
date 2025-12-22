@@ -8,8 +8,9 @@ type Shape = Tuple
 object Shape {
   type Scalar = EmptyTuple
 
-  /** The shape of S is widened to accomodate the dimensions of To, by prepending static dimensions of one. */
+  type Elem[X <: Shape, N <: Int] = Tuple.Elem[X, N]
 
+  /** The shape of S is widened to accomodate the dimensions of To, by prepending static dimensions of one. */
   type Widen[S <: Tuple, To <: Tuple] <: Tuple = Size[S] < Size[To] match {
     case true => Widen[Dim.One *: S, To]
     case false => S
@@ -37,6 +38,7 @@ object Shape {
     case (_, dim *: tail) => dim *: Remove[tail, Idx - 1]
   }
 
+  /** Replaces the dimension at [Idx] with the dimension [I] */
   type Replace[S <: Shape, I <: Dim, Idx <: Int] <: Shape = Idx match {
     case -1 => S
     case _ => Tuple.Concat[
@@ -45,6 +47,14 @@ object Shape {
     ]
   }
 
+  /** Replaces the dimension at [Idx] with all dimensions in tuple [I] */
+  type ReplaceWithTuple[S <: Shape, I <: Tuple, Idx <: Int] <: Shape = Idx match {
+    case -1 => S
+    case _ => Tuple.Concat[
+      Tuple.Take[S, Idx],
+      I ++ Tuple.Drop[S, Idx + 1]
+    ]
+  }
   type LastIdx[S <: Shape] = Tuple.Size[S] - 1
 
   /** Can be pulled in as a given to get "Idx" as the index of a selected dimension on a shape, by
