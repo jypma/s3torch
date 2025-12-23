@@ -298,6 +298,50 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("transpose") {
+      it("can swap two dims of a 3-dim tensor") {
+        val a = Tensor((
+          ((
+            ((1,2,3)),
+            ((4,5,6))
+          )),
+          ((
+            ((7,8,9)),
+            ((10,11,12))
+          ))
+        ))
+        val aType: Tensor[(Static[2L], Static[2L], Static[3L]), Int32.type] = a
+        val b = a.transpose(Shape.Select.Idx(0), Shape.Select.Idx(2))
+        val bType: Tensor[(Static[3L], Static[2L], Static[2L]), Int32.type] = b
+        assert(b.value == Seq(
+          Seq(
+            Seq(1, 7),
+            Seq(4, 10)
+          ), Seq(
+            Seq(2, 8),
+            Seq(5, 11)
+          ), Seq(
+            Seq(3, 9),
+            Seq(6, 12)
+          )
+        ))
+      }
+
+      it("can transpose a matrix without extra args") {
+        val m = Tensor(
+          Tuple1(
+            ((1, 2))
+          )
+        )
+        val r = m.transpose
+        val rType: Tensor[(Static[2L], Static[1L]), Int32.type] = r
+        assert(r.value === Seq(
+          Seq(1),
+          Seq(2)
+        ))
+      }
+    }
+
     describe("update") {
       it("can set a single value in a vector") {
         val a = Tensor((1, 2, 3))

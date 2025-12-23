@@ -34,14 +34,16 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   import Tuple.:*
 
   def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
-
   def floor: Tensor[S, T] = new Tensor(native.floor())
-  def floor_divide[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.floor_divide(_), _.floor_divide(_))
-  def remainder[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.remainder(_), _.remainder(_))
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
-
   def to[T1 <: DType](dtype: T1): Tensor[S, T1] = new Tensor(native.to(dtype.scalarType))
-
+  def transpose[D1, D2, Idx1 <: Int, Idx2 <: Int](d1: D1, d2: D2)(using s1: Shape.Select[S,D1,Idx1], i1: ValueOf[Idx1], s2:Shape.Select[S,D2,Idx2], i2: ValueOf[Idx2]): Tensor[Shape.Swap[S, Idx1, Idx2], T] = {
+    new Tensor(native.transpose(i1.value, i2.value))
+  }
+  def transpose(using Is2D[S]): Tensor[Shape.Swap[S, 0, 1], T] = {
+    // Somehow, defining this as an extension method on Tensor[(D1, D2)]fails to compile.
+    new Tensor(native.transpose(0L, 1L))
+  }
   def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): this.type = {
     updateSource(native, idx.toNative(indices), value)
     this
@@ -65,6 +67,10 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     new Tensor(fn(new Tensor(native.view(sizes.toArray*))).native.view(oursize.toArray*))
   }
 
+  // --- Binary operands ----
+
+  def floor_divide[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.floor_divide(_), _.floor_divide(_))
+  def remainder[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.remainder(_), _.remainder(_))
   def +[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.add(_), _.add(_))
   def -[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.sub(_), _.sub(_))
   def *[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.mul(_), _.mul(_))
@@ -113,6 +119,12 @@ object Tensor {
       new Tensor(t.native.mean(Array(op.index), op.keep, new ScalarTypeOptional))
   }
 
+  // ---- Methods on Tensor that only exist on scalars
+  extension[T <: DType](t: Tensor[Scalar, T]) {
+    def backward(): Unit = t.native.backward()
+  }
+
+  // TODO refactor or remove
   trait Squeeze[S <: Tuple] {
     type OutputShape <: Tuple
   }
@@ -131,11 +143,6 @@ object Tensor {
 
   given squeezeD2b[D1 <: Dim, D2 <: Dim.One]: Squeeze[(D1, D2)] with {
     type OutputShape = Tuple1[D1]
-  }
-
-  // Operations that only exist on scalars
-  extension[T <: DType](t: Tensor[Scalar, T]) {
-    def backward(): Unit = t.native.backward()
   }
 
   extension [S <: Tuple, T <: DType](t: Tensor[S, T])(using sq:Squeeze[S]) {

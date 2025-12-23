@@ -57,6 +57,29 @@ object Shape {
   }
   type LastIdx[S <: Shape] = Tuple.Size[S] - 1
 
+  /** Swaps two dimensions  */
+  type Swap[S <: Shape, I1 <: Int, I2 <: Int] = (I1 < I2) match {
+    case true => internal.SwapLT[S, I1, I2]
+    case false => internal.SwapLT[S, I2, I1]
+  }
+
+  object internal {
+    type SwapLT[S <: Shape, I1 <: Int, I2 <: Int] = I1 match {
+      case -1 => S
+      case _ =>
+        Take[S, I1] ++ (Elem[S, I2] *: Replace[Drop[S, I1 + 1], Elem[S, I1], I2 - I1 - 1])
+    }
+  }
+
+  trait Is2D[S <: Shape] {
+    type D1 <: Dim
+    type D2 <: Dim
+  }
+  given [A <: Dim, B <: Dim]: Is2D[(A, B)] with {
+    type D1 = A
+    type D2 = B
+  }
+
   /** Can be pulled in as a given to get "Idx" as the index of a selected dimension on a shape, by
     * the dimension's type, First or Last, or compile-time specific numeric index Idx. */
   trait Select[S <: Shape, D, Idx <: Int]
@@ -70,6 +93,7 @@ object Shape {
 
     given [S <: Shape, D <: Dim]: Select[S, D, IndexOf[S, D]] with {}
 
+    // TODO add implicit conversion like Dim.fromLongStatic so we can do "3" instead of "Idx(3)"
     case class Idx[I <: Int & Singleton](i: I)
     given int[S <: Shape, I <: Int & Singleton]: Select[S, Idx[I], I] with {}
   }
