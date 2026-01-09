@@ -95,6 +95,7 @@ object Dim extends DimLowPriorityGivens {
     }
   }
 
+
   type IsDivisableBy[D, L <: Long] <: Boolean = D match {
     case Dim.Static[v] => v % L match {
       case 0L => true
@@ -113,7 +114,8 @@ object Dim extends DimLowPriorityGivens {
   given [D, L <: Long](using IsDivisableBy[D, L] =:= true): DivisableBy[D, L] with {
     type Res = DividedBy[D, L]
   }
-  infix type |/[D, L <: Long] = DivisableBy[D, L]
+  infix type |/[+D, +L <: Long] = DivisableBy[D, L]
+
 
   /*
   type DividedBy[D, L <: Long] <: Dim = D match {
@@ -122,4 +124,6 @@ object Dim extends DimLowPriorityGivens {
   }
    infix type /[D, L <: Long] = DividedBy[D, L]
    */
+
+
 }

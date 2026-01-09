@@ -18,7 +18,6 @@ object Shape {
 
   type IndexOf[S <: Shape, D <: Dim] <: Int = S match {
     case D *: tail => 0
-    case EmptyTuple => -1
     case _ *: tail => 1 + IndexOf[tail, D]
   }
 
@@ -82,16 +81,21 @@ object Shape {
 
   /** Can be pulled in as a given to get "Idx" as the index of a selected dimension on a shape, by
     * the dimension's type, First or Last, or compile-time specific numeric index Idx. */
-  trait Select[S <: Shape, D, Idx <: Int]
+  trait Select[S <: Shape, D, Idx <: Int] {
+    type I = Idx
+  }
 
   object Select {
     case object First
-    given [S <: Shape]: Select[S, First.type, 0] with {}
+    given first[S <: Shape]: Select[S, First.type, 0] with {}
 
     case object Last
-    given [S <: Shape]: Select[S, Last.type, Tuple.Size[S] - 1] with {}
+    given last[S <: Shape]: Select[S, Last.type, Tuple.Size[S] - 1] with {}
 
-    given [S <: Shape, D <: Dim]: Select[S, D, IndexOf[S, D]] with {}
+    // This will only select a dim where D is an explicit type. If D
+    // is a type parameter, it's only known to be a subclass of Dim,
+    // so you can't use match types with that.
+    given dim[S <: Shape, D <: Dim]: Select[S, D, IndexOf[S, D]] with {}
 
     // TODO add implicit conversion like Dim.fromLongStatic so we can do "3" instead of "Idx(3)"
     case class Idx[I <: Int & Singleton](i: I)

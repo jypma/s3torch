@@ -58,13 +58,18 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   /** Transforms a split version of this tensor, split across dimension D in N parts, using the given function, while retaining the original
     type once computation is complete. */
-  def withSplit[D, Idx <: Int, N <: Long & Singleton](d: D, n: N)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx], div: Elem[S, Idx] |/ N)
-    (fn: IdFn[Tensor[Shape.ReplaceWithTuple[S, (Dim.Static[div.Res], Dim.Static[N]), Idx], T]]): Tensor[S, T] = {
-    val oursize = size
-    val (before, after) = oursize.splitAt(idx.value)
-    val dimsize = after.head
-    val sizes = before :+ (dimsize / n) :+ n :++ after.tail
-    new Tensor(fn(new Tensor(native.view(sizes.toArray*))).native.view(oursize.toArray*))
+  def withSplit[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx]) = new WithSplitApply[Idx, Elem[S, Idx]](idx.value)
+  class WithSplitApply[Idx <: Int, D](idx: Idx) {
+    // Somehow, Scala won't resolve a given of "D |/ N" if we allow n to be an arbitrary parameter of type N. It has to be an explicit type.
+    def apply[N <: Long & Singleton](using div: D |/ N, n: ValueOf[N])
+      (fn: IdFn[Tensor[Shape.ReplaceWithTuple[S, (Dim.Static[div.Res], Dim.Static[N]), Idx], T]]): Tensor[S, T] = {
+      val oursize = size
+      val (before, after) = oursize.splitAt(idx)
+      val dimsize = after.head
+      val sizes = before :+ (dimsize / n.value) :+ n.value :++ after.tail
+      new Tensor(fn(new Tensor(native.view(sizes.toArray*))).native.view(oursize.toArray*))
+    }
+
   }
 
   // --- Binary operands ----

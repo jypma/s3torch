@@ -472,7 +472,7 @@ class TensorSpec extends UnitSpec {
       val matrix = Tensor.zeros(DimA, DimB)
 
       it("can split") {
-        val res = matrix.withSplit(DimA, 2L) { t =>
+        val res = matrix.withSplit(DimA)[2L] { t =>
           val tType: Tensor[(Static[3L], Static[2L], DimB.type), Float32.type] = t
           assert(t.size == Seq(3L, 2L, 3L))
           t((0, 0, 0)) = 1.0
@@ -490,6 +490,13 @@ class TensorSpec extends UnitSpec {
           Seq(0.0, 0.0, 0.0))
         )
       }
+
+      it("can split on last") {
+        case object DimC extends Static[4L]
+        val t = Tensor.zeros(DimA, DimB, DimC)
+        val r = t.withSplit(DimC)[4L] { t => t}
+      }
     }
   }
 }
+
