@@ -1,24 +1,7 @@
-# Ways to handle dimensions
+# s3torch
 
-- Completely statically checked as actual ints
-- Completely runtime checked
-- Combinations
+This is a Scala library on top of `libtorch`. It provides full dimensional type safety for its `Tensor` type.
 
-# Need for actual ints at compile time
-- Broadcasting of pytorch needs to do comparisons between dimensions, so they can't just be opaque types.
-- Concatenation of tensors at the least needs plus and minus arithmetic.
+This started out as a branch of [storch](https://github.com/bytedeco/storch), but currently is its own thing, to allow more freedom in re-modeling the `Tensor` class without having to fix a lot of usages.
 
-# Need for dimensions at runtime
-
-## Vary a hyperparameter
-Not really, just write the invoked method with a generic type parameter of the size being varied
-
-## Reading of unknown size files
-They're typically split into training examples of known explicit size fairly early on. Let's find examples.
-
-## Reading unknown size of training examples
-Also fine, we'll pick 1 or some other known batch afterwards.
-
-# How to get dimensions at runtime
-Ignore the types, just use `torch.size`.
-
+More documentation is coming soon.
