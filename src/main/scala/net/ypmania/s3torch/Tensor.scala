@@ -46,10 +46,10 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def split[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx]) = new SplitApply[Idx, Elem[S, Idx]](idx.value)
   class SplitApply[Idx <: Int, D](idx: Idx) {
     def apply[N <: Long & Singleton](using dv: D |/ N, n: ValueOf[N]):
-        Tensor[Shape.ReplaceWithTuple[S, (Shape.Elem[S, Idx] / N, Dim.Static[N]), Idx], T] = {
+        Tensor[Shape.ReplaceWithTuple[S, (Dim.Static[N], Shape.Elem[S, Idx] / N), Idx], T] = {
       val (before, after) = size.splitAt(idx)
       val dimsize = after.head
-      val sizes = before :+ (dimsize / n.value) :+ n.value :++ after.tail
+      val sizes = before :+ n.value :+ (dimsize / n.value) :++ after.tail
       new Tensor(native.view(sizes.toArray*))
     }
   }
@@ -68,9 +68,10 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     this
   }
 
-  /** Merges two dimensions that have previously been split off using split() */
+  /** Merges two dimensions that have previously been split off using split(). The selected dimension must be of type DividedDim, and must have a preceding
+    * dimension with the remainder of the division. */
   def unsplit[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx])(using VerifyShape[Unsplit[S, Idx]]): Tensor[Unsplit[S, Idx], T] = {
-    val (before, after) = size.splitAt(idx.value)
+    val (before, after) = size.splitAt(idx.value - 1)
     val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
     new Tensor(native.view(sizes.toArray*))
   }

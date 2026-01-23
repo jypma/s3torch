@@ -97,7 +97,9 @@ class Transformer[
       // q.withSplit(Last)[NHeads] { f => f }
 
       val s = q.split(Last)[NHeads]
-      val sType: Tensor[(BatchSize, SeqLen, DModel / NHeads, Static[NHeads]), T] = s
+      // TODO remove, just to align with video
+      val sType: Tensor[(BatchSize, SeqLen, Static[NHeads], DModel / NHeads), T] = s
+
       ???
     }
   }

@@ -127,9 +127,10 @@ object Dim extends DimLowPriorityGivens {
     case Long => scala.compiletime.ops.long./[D, L]
     case Dim.Static[v] => scala.compiletime.ops.long./[v, L]
   }
-  trait DividedDim[D, L, R <: Long] extends Dim.Static[R] {
+  abstract class DividedDim[D, L, R <: Long](using ValueOf[R]) extends Dim {
     type Orig = D
     type Divisor = L
+    override def size = valueOf[R]
   }
   infix type /[D, L <: Long] = DividedDim[D, L, DividedBy[D, L]]
 

@@ -80,6 +80,8 @@ object Shape {
     type D2 = B
   }
 
+  // TODO ----------- move Select trait to its own file --------------
+
   /** Can be pulled in as a given to get "Idx" as the index of a selected dimension on a shape, by
     * the dimension's type, First or Last, or compile-time specific numeric index Idx. */
   trait Select[S <: Shape, D, Idx <: Int] {

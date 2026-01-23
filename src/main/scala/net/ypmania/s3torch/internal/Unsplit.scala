@@ -8,7 +8,7 @@ import net.ypmania.s3torch.Dim.*
 
 type Unsplit[S <: Shape, Idx <: Int] <: Shape = (S, Idx) match {
   case (EmptyTuple, 0) => EmptyTuple
-  case (DividedDim[originalDim, divisor, _] *: Dim.Static[next] *: tail, 0) =>
+  case (Dim.Static[next] *: DividedDim[originalDim, divisor, _] *: tail, 1) =>
     next match {
       case divisor => originalDim *: tail
     }

@@ -476,8 +476,8 @@ class TensorSpec extends UnitSpec {
         val matrix = Tensor.zeros(DimA, DimB)
         matrix((1, 1)) = 1.0
         val res = matrix.split(DimA)[2L]
-        val resType: Tensor[(DimA.type / 2L, Static[2L], DimB.type), Float32.type] = res
-        assert(res.size == Seq(3L, 2L, 3L))
+        val resType: Tensor[(Static[2L], DimA.type / 2L, DimB.type), Float32.type] = res
+        assert(res.size == Seq(2L, 3L, 3L))
         assert(res.value(0)(1)(1) == 1.0)
 
         val un = res.unsplit(Divided(DimA))
@@ -489,8 +489,8 @@ class TensorSpec extends UnitSpec {
         case object DimC extends Static[4L]
         val t = Tensor.zeros(DimA, DimB, DimC)
         val res = t.split(DimC)[4L]
-        val resType: Tensor[(DimA.type, DimB.type, DimC.type / 4L, Static[4L]), Float32.type] = res
-        assert(res.size == Seq(6L, 3L, 1L, 4L))
+        val resType: Tensor[(DimA.type, DimB.type, Static[4L], DimC.type / 4L), Float32.type] = res
+        assert(res.size == Seq(6L, 3L, 4L, 1L))
 
         val un = res.unsplit(Divided(DimC))
         assert(un.size == Seq(6L, 3L, 4L))
