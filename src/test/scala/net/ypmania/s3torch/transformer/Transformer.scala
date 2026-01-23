@@ -21,12 +21,11 @@ import net.ypmania.s3torch.Shape.Select.Idx
 class Transformer[
   NHeads <: Long & Singleton,
   DModelN <: Long & Singleton,
+  DModel <: Dim.Static[DModelN],
   VocabSize <: Dim,
   SeqLen <: Dim,
   BatchSize <: Dim,
-  T <: DType.Floaty](vocabSize: VocabSize, seqLen: SeqLen, batchSize: BatchSize, nHeads: NHeads)(using dtype: Default[T] /*, dv: DModel |/ NHeads */)(using RandomSource, ValueOf[NHeads], ValueOf[DModelN]) {
-  case object dModel extends Dim.Static[DModelN]
-  type DModel = dModel.type
+  T <: DType.Floaty](dModel: DModel, vocabSize: VocabSize, seqLen: SeqLen, batchSize: BatchSize, nHeads: NHeads)(using dtype: Default[T], dv: DModelN |/ NHeads)(using RandomSource, ValueOf[NHeads], ValueOf[DModelN]) {
   type Batch = Tensor[(BatchSize, SeqLen, DModel), T]
 
   class InputEmbeddings extends Module {
@@ -38,19 +37,16 @@ class Transformer[
   class PositionalEncoding(dropoutProb: Double) extends Module {
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
-    val position = Tensor.arangeOf(seqLen, dtype.value).unsqueezeAfter(Last)
-    val indices = Tensor.arangeOf(dModel, dtype.value).floor_divide(2)
-    val phase_offset = Tensor.arangeOf(dModel, dtype.value).remainder(2) * (Math.PI * 0.5)
+    val position = Tensor.arangeOf(Ref(seqLen), dtype.value).unsqueezeAfter(Last)
+    val indices = Tensor.arangeOf(Ref(dModel), dtype.value).floor_divide(2)
+    val phase_offset = Tensor.arangeOf(Ref(dModel), dtype.value).remainder(2) * (Math.PI * 0.5)
     val div_term = exp(indices * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 
     def apply(in: Batch): Batch = {
-/*
       Ref.unwrap(
         dropout(Ref.wrap(in) + positionalEncodingDeltas)
       )
- */
-???
     }
   }
 
@@ -96,7 +92,13 @@ class Transformer[
       // the type system doesn't know that SeqLen and BatchSize are
       // different types from dModel.
 
-      q.withSplit(Last)[NHeads] { f => f }
+      //val idv: Dim.IsDivisibleBy[dModel.type, NHeads] = true
+      //val dv = Dim.dv[dModel.type, NHeads]
+      // q.withSplit(Last)[NHeads] { f => f }
+
+      val s = q.split(Last)[NHeads]
+      val sType: Tensor[(BatchSize, SeqLen, DModel / NHeads, Static[NHeads]), T] = s
+      ???
     }
   }
 }

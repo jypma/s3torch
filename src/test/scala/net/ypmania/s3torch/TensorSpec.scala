@@ -10,6 +10,8 @@ import net.ypmania.s3torch.internal.Broadcast.MaxEachDim
 import net.ypmania.s3torch.Shape.Widen
 import DType.*
 import Tensor.KeepDim
+import net.ypmania.s3torch.Dim.*
+import net.ypmania.s3torch.Shape.Select.*
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -466,37 +468,33 @@ class TensorSpec extends UnitSpec {
       }
     }
 
-    describe("withSplit") {
+    describe("split and unsplit") {
       case object DimA extends Static[6L]
       case object DimB extends Static[3L]
-      val matrix = Tensor.zeros(DimA, DimB)
 
-      it("can split") {
-        val res = matrix.withSplit(DimA)[2L] { t =>
-          val tType: Tensor[(Static[3L], Static[2L], DimB.type), Float32.type] = t
-          assert(t.size == Seq(3L, 2L, 3L))
-          t((0, 0, 0)) = 1.0
-          t((1, 0, 0)) = 1.0
-          t((2, 0, 0)) = 1.0
-        }
-        val resType: Tensor[(DimA.type, DimB.type), Float32.type] = res
+      it("can split on specific dim") {
+        val matrix = Tensor.zeros(DimA, DimB)
+        matrix((1, 1)) = 1.0
+        val res = matrix.split(DimA)[2L]
+        val resType: Tensor[(DimA.type / 2L, Static[2L], DimB.type), Float32.type] = res
+        assert(res.size == Seq(3L, 2L, 3L))
+        assert(res.value(0)(1)(1) == 1.0)
 
-        assert(res.value == Seq(
-          Seq(1.0, 0.0, 0.0),
-          Seq(0.0, 0.0, 0.0),
-          Seq(1.0, 0.0, 0.0),
-          Seq(0.0, 0.0, 0.0),
-          Seq(1.0, 0.0, 0.0),
-          Seq(0.0, 0.0, 0.0))
-        )
+        val un = res.unsplit(Divided(DimA))
+        assert(un.size == Seq(6L, 3L))
+        assert(un.value(1)(1) == 1.0)
       }
 
       it("can split on last") {
         case object DimC extends Static[4L]
         val t = Tensor.zeros(DimA, DimB, DimC)
-        val r = t.withSplit(DimC)[4L] { t => t}
+        val res = t.split(DimC)[4L]
+        val resType: Tensor[(DimA.type, DimB.type, DimC.type / 4L, Static[4L]), Float32.type] = res
+        assert(res.size == Seq(6L, 3L, 1L, 4L))
+
+        val un = res.unsplit(Divided(DimC))
+        assert(un.size == Seq(6L, 3L, 4L))
       }
     }
   }
 }
-

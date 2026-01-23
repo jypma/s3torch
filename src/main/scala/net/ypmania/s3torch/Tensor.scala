@@ -14,6 +14,7 @@ import internal.Broadcast
 import internal.TensorOperand
 import internal.UpdateSource
 import internal.ReduceOperand
+import internal.Unsplit
 
 import scala.collection.immutable.ArraySeq
 
@@ -34,9 +35,26 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   import Tuple.:*
 
   def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
+
   def floor: Tensor[S, T] = new Tensor(native.floor())
+
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
+
+  /** Transforms a split version of this tensor, split across dimension D in N parts, using the given function, while retaining the original
+    type once computation is complete. */
+  def split[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx]) = new SplitApply[Idx, Elem[S, Idx]](idx.value)
+  class SplitApply[Idx <: Int, D](idx: Idx) {
+    def apply[N <: Long & Singleton](using dv: D |/ N, n: ValueOf[N]):
+        Tensor[Shape.ReplaceWithTuple[S, (Shape.Elem[S, Idx] / N, Dim.Static[N]), Idx], T] = {
+      val (before, after) = size.splitAt(idx)
+      val dimsize = after.head
+      val sizes = before :+ (dimsize / n.value) :+ n.value :++ after.tail
+      new Tensor(native.view(sizes.toArray*))
+    }
+  }
+
   def to[T1 <: DType](dtype: T1): Tensor[S, T1] = new Tensor(native.to(dtype.scalarType))
+
   def transpose[D1, D2, Idx1 <: Int, Idx2 <: Int](d1: D1, d2: D2)(using s1: Shape.Select[S,D1,Idx1], i1: ValueOf[Idx1], s2:Shape.Select[S,D2,Idx2], i2: ValueOf[Idx2]): Tensor[Shape.Swap[S, Idx1, Idx2], T] = {
     new Tensor(native.transpose(i1.value, i2.value))
   }
@@ -49,28 +67,22 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     this
   }
 
+  /** Merges two dimensions that have previously been split off using split() */
+  def unsplit[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx]): Tensor[Unsplit[S, Idx], T] = {
+    val (before, after) = size.splitAt(idx.value)
+    val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
+    new Tensor(native.view(sizes.toArray*))
+  }
+
+  /** Inserts a dimension of One after D */
   def unsqueezeAfter[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertAfter[S, Dim.One, Idx], T] =
     new Tensor(native.unsqueeze(idx.value + 1))
+
+  /** Inserts a dimension of One before D */
   def unsqueezeBefore[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertBefore[S, Dim.One, Idx], T] =
     new Tensor(native.unsqueeze(idx.value))
 
   def value(using toScala: ToScala[S, T]) = toScala(native)
-
-  /** Transforms a split version of this tensor, split across dimension D in N parts, using the given function, while retaining the original
-    type once computation is complete. */
-  def withSplit[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx]) = new WithSplitApply[Idx, Elem[S, Idx]](idx.value)
-  class WithSplitApply[Idx <: Int, D](idx: Idx) {
-    // Somehow, Scala won't resolve a given of "D |/ N" if we allow n to be an arbitrary parameter of type N. It has to be an explicit type.
-    def apply[N <: Long & Singleton](using div: D |/ N, n: ValueOf[N])
-      (fn: IdFn[Tensor[Shape.ReplaceWithTuple[S, (Dim.Static[div.Res], Dim.Static[N]), Idx], T]]): Tensor[S, T] = {
-      val oursize = size
-      val (before, after) = oursize.splitAt(idx)
-      val dimsize = after.head
-      val sizes = before :+ (dimsize / n.value) :+ n.value :++ after.tail
-      new Tensor(fn(new Tensor(native.view(sizes.toArray*))).native.view(oursize.toArray*))
-    }
-
-  }
 
   // --- Binary operands ----
 

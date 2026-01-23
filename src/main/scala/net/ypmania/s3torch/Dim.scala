@@ -95,35 +95,46 @@ object Dim extends DimLowPriorityGivens {
     }
   }
 
+  // TODO ---------------- move division stuff internals to different file under internal ----------------
 
-  type IsDivisableBy[D, L <: Long] <: Boolean = D match {
-    case Dim.Static[v] => v % L match {
+  type IsDivisibleByLong[A <: Long, B <: Long] = A % B match {
       case 0L => true
       case _ => false
-    }
+  }
+
+  type IsDivisibleBy[D, L <: Long] <: Boolean = D match {
+    case Long => IsDivisibleByLong[D, L]
+    case Dim.Static[v] => IsDivisibleByLong[v, L]
     case _ => false
   }
-  type DividedBy[D, L <: Long] <: Long = D match {
-    case Dim.Static[v] => v / L
-  }
 
-  trait DivisableBy[+D, +L <: Long] {
+  trait DivisibleBy[+D, +L <: Long] {
     type Res <: Long
   }
-  //given [D <: Long, L <: Long](using D % L =:= 0L): DivisableBy[Dim.Static[D], L] with {}
-  given [D, L <: Long](using IsDivisableBy[D, L] =:= true): DivisableBy[D, L] with {
-    type Res = DividedBy[D, L]
+
+  type StaticSize[D] <: Long = D match {
+    case Dim.Static[size] => size
   }
-  infix type |/[+D, +L <: Long] = DivisableBy[D, L]
 
-
-  /*
-  type DividedBy[D, L <: Long] <: Dim = D match {
-    case Dim.Static[v] => Dim.Static[v / L]
-    case _ => Dim
+  object DivisibleBy {
+    given fromNums[A <: Long, B <: Long](using A % B =:= 0L): DivisibleBy[A, B] with {}
+    given fromNum[A <: Long, D <: Dim.Static[A], B <: Long](using DivisibleBy[A, B]): DivisibleBy[D, B] with {}
+    given fromDim[D, B <: Long](using StaticSize[D] % B =:= 0L): DivisibleBy[D, B] with {}
   }
-   infix type /[D, L <: Long] = DividedBy[D, L]
-   */
+  infix type |/[+D, +L <: Long] = DivisibleBy[D, L]
 
+  type DividedBy[D, L <: Long] <: Long = D match {
+    case Long => scala.compiletime.ops.long./[D, L]
+    case Dim.Static[v] => scala.compiletime.ops.long./[v, L]
+  }
+  trait DividedDim[D, L, R <: Long] extends Dim.Static[R] {
+    type Orig = D
+    type Divisor = L
+  }
+  infix type /[D, L <: Long] = DividedDim[D, L, DividedBy[D, L]]
 
+  type IndexOfDivided[S <: Shape, D <: Dim] <: Int = S match {
+    case DividedDim[D, _, _] *: tail => 0
+    case _ *: tail => scala.compiletime.ops.int.+[IndexOfDivided[tail, D], 1]
+  }
 }

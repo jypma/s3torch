@@ -6,6 +6,8 @@ import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.Dim.Static
 import net.ypmania.s3torch.DType.*
+import net.ypmania.s3torch.Default
+import net.ypmania.s3torch.Dim.DivisibleBy
 
 class TransformerSpec extends UnitSpec {
   case object DModel extends Dim.Static[4L]
@@ -13,6 +15,7 @@ class TransformerSpec extends UnitSpec {
   case object SeqLen extends Dim.Static[3L]
   case object Dff extends Dim.Static[5L]
   case object BatchSize extends Dim.Static[1L]
+
   val transformer = new Transformer(DModel, VocabSize, SeqLen, BatchSize, 4L)
 
   describe("Transformer.InputEmbedding") {
@@ -21,7 +24,7 @@ class TransformerSpec extends UnitSpec {
     it("should apply a scaled embedding") {
       val in = Tensor((0, 1, 2, 1)) // a test value for each element in our VocabSize
       val res = inputEmb(in)
-      val resType: Tensor[(Static[4L], DModel.type), Float32.type] = res
+      val resType = res
 
       assert(res.value === List(
         Seq(3.0819, -0.5868, -4.3575, 1.1368),

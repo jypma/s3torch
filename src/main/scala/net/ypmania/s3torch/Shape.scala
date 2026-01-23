@@ -2,6 +2,7 @@ package net.ypmania.s3torch
 
 import scala.compiletime.ops.int.*
 import Tuple.*
+import net.ypmania.s3torch.Dim.IndexOfDivided
 
 type Shape = Tuple
 
@@ -86,19 +87,39 @@ object Shape {
   }
 
   object Select {
+    /** Selects the first dimension (with index 0) */
     case object First
     given first[S <: Shape]: Select[S, First.type, 0] with {}
 
+    /** Selects the last dimension (with the highest index) */
     case object Last
     given last[S <: Shape]: Select[S, Last.type, Tuple.Size[S] - 1] with {}
 
     // This will only select a dim where D is an explicit type. If D
     // is a type parameter, it's only known to be a subclass of Dim,
     // so you can't use match types with that.
+    /** Selects a dimension by their exact type. */
     given dim[S <: Shape, D <: Dim]: Select[S, D, IndexOf[S, D]] with {}
 
     // TODO add implicit conversion like Dim.fromLongStatic so we can do "3" instead of "Idx(3)"
+    /** Selects the dimension at the given index, starting from 0 */
     case class Idx[I <: Int & Singleton](i: I)
     given int[S <: Shape, I <: Int & Singleton]: Select[S, Idx[I], I] with {}
+
+    /** Selects a specific dimension by type, for which no value might be available. */
+    trait At[D <: Dim]
+    object At {
+      def apply[D <: Dim]: At[D] = new At {}
+      def apply[D <: Dim](d: D): At[D] = new At {}
+    }
+    given atDim[S <: Shape, D <: Dim]: Select[S, At[D], IndexOf[S, D]] with {}
+
+    /** Selects a dimension that's based on an earlier division (split) of another dimension */
+    trait Divided[D <: Dim]
+    object Divided {
+      def apply[D <: Dim]: Divided[D] = new Divided {}
+      def apply[D <: Dim](d: D): Divided[D] = new Divided {}
+    }
+    given fromDivided[S <: Shape, D <: Dim]: Select[S, Divided[D], IndexOfDivided[S, D]] with {}
   }
 }
