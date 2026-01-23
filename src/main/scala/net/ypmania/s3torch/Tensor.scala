@@ -15,6 +15,7 @@ import internal.TensorOperand
 import internal.UpdateSource
 import internal.ReduceOperand
 import internal.Unsplit
+import internal.VerifyShape
 
 import scala.collection.immutable.ArraySeq
 
@@ -68,7 +69,7 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   }
 
   /** Merges two dimensions that have previously been split off using split() */
-  def unsplit[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx]): Tensor[Unsplit[S, Idx], T] = {
+  def unsplit[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx])(using VerifyShape[Unsplit[S, Idx]]): Tensor[Unsplit[S, Idx], T] = {
     val (before, after) = size.splitAt(idx.value)
     val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
     new Tensor(native.view(sizes.toArray*))
