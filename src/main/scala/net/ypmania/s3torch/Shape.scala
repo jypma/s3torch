@@ -97,11 +97,10 @@ object Shape {
     case object Last
     given last[S <: Shape]: Select[S, Last.type, Tuple.Size[S] - 1] with {}
 
-    // This will only select a dim where D is an explicit type. If D
-    // is a type parameter, it's only known to be a subclass of Dim,
-    // so you can't use match types with that.
     /** Selects a dimension by their exact type. */
-    given dim[S <: Shape, D <: Dim]: Select[S, D, IndexOf[S, D]] with {}
+    given dimFound[Head <: Dim, Tail <: Shape]: Select[Head *: Tail, Head, 0] with {}
+    import scala.util.NotGiven
+    given dimNotFound[Head <: Dim, Tail <: Shape, D <: Dim, Idx <: Int](using Select[Tail, D, Idx], NotGiven[D =:= Head]): Select[Head *: Tail, D, Idx + 1] with {}
 
     // TODO add implicit conversion like Dim.fromLongStatic so we can do "3" instead of "Idx(3)"
     /** Selects the dimension at the given index, starting from 0 */
@@ -114,7 +113,7 @@ object Shape {
       def apply[D <: Dim]: At[D] = new At {}
       def apply[D <: Dim](d: D): At[D] = new At {}
     }
-    given atDim[S <: Shape, D <: Dim]: Select[S, At[D], IndexOf[S, D]] with {}
+    given atDim[S <: Shape, D <: Dim, Idx <: Int](using Select[S, D, Idx]): Select[S, At[D], Idx] with {}
 
     /** Selects a dimension that's based on an earlier division (split) of another dimension */
     trait Divided[D <: Dim]

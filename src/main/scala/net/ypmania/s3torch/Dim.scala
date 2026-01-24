@@ -25,7 +25,7 @@ object Dim extends DimLowPriorityGivens {
   }
 
   /** A reference made to an unknown dimension (typically used as a type parameter to generic building blocks) */
-  case class Ref[+D <: Dim](ref: D) extends Dim {
+  case class Ref[D <: Dim](ref: D) extends Dim {
     override def size = ref.size
   }
   object Ref {

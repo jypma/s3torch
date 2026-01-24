@@ -16,6 +16,7 @@ import net.ypmania.s3torch.nn.Embedding
 import net.ypmania.s3torch.nn.Linear
 import net.ypmania.s3torch.Dim.*
 import net.ypmania.s3torch.Shape.Select.Idx
+import net.ypmania.s3torch.Shape.Select.At
 
 // Plain pytorch source: https://www.youtube.com/watch?v=ISNdQcPhsts
 class Transformer[
@@ -77,28 +78,25 @@ class Transformer[
   }
 
   class MultiHeadAttention(dropoutProb: Double) extends Module {
-    val queryWeights = addModule("queryWeights", Linear(dModel, dModel)) // FIXME Maybe there should be no bias here if it's just a mul.
-    val keyWeights = addModule("keyWeights", Linear(dModel, dModel))
-    val valueWeights = addModule("valueWeights", Linear(dModel, dModel))
-    val outputWeights = addModule("outputWeights", Linear(dModel, dModel))
+    val queryWeights = addModule("queryWeights", Linear(Ref(dModel), Ref(dModel))) // FIXME Maybe there should be no bias here if it's just a mul.
+    val keyWeights = addModule("keyWeights", Linear(Ref(dModel), Ref(dModel)))
+    val valueWeights = addModule("valueWeights", Linear(Ref(dModel), Ref(dModel)))
+    val outputWeights = addModule("outputWeights", Linear(Ref(dModel), Ref(dModel)))
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
     def apply(query: Batch, key: Batch, value: Batch, mask: Batch): Batch = {
-      val q = queryWeights(query)
-      val k = keyWeights(key)
-      val v = valueWeights(value)
+      val q = queryWeights(Ref.wrap(query))
+      val k = keyWeights(Ref.wrap(key))
+      val v = valueWeights(Ref.wrap(value))
 
-      // Split on dModel. Can't refer to dModel by name here, since
-      // the type system doesn't know that SeqLen and BatchSize are
-      // different types from dModel.
+      // Split the dModel dimension into NHeads heads
+      val s = q.split(Ref(dModel))[NHeads]
+      val sType: Tensor[(Ref[BatchSize], Ref[SeqLen], Static[NHeads], Ref[DModel] / NHeads), T] = s
 
-      //val idv: Dim.IsDivisibleBy[dModel.type, NHeads] = true
-      //val dv = Dim.dv[dModel.type, NHeads]
-      // q.withSplit(Last)[NHeads] { f => f }
+      // Swap the SeqLen and NHeads dimensions
+      val st = s.transpose(Ref(seqLen), At[Static[NHeads]])
 
-      val s = q.split(Last)[NHeads]
-      // TODO remove, just to align with video
-      val sType: Tensor[(BatchSize, SeqLen, Static[NHeads], DModel / NHeads), T] = s
+      val stType: Tensor[(Ref[BatchSize], Static[NHeads], Ref[SeqLen], Ref[DModel] / NHeads), T] = st
 
       ???
     }
