@@ -2,7 +2,6 @@ package net.ypmania.s3torch
 
 import scala.compiletime.ops.int.*
 import Tuple.*
-import net.ypmania.s3torch.Dim.IndexOfDivided
 import net.ypmania.s3torch.Dim.DividedDim
 
 type Shape = Tuple
@@ -16,11 +15,6 @@ object Shape {
   type Widen[S <: Tuple, To <: Tuple] <: Tuple = Size[S] < Size[To] match {
     case true => Widen[Dim.One *: S, To]
     case false => S
-  }
-
-  type IndexOf[S <: Shape, D <: Dim] <: Int = S match {
-    case D *: tail => 0
-    case _ *: tail => 1 + IndexOf[tail, D]
   }
 
   type InsertBefore[S <: Shape, I <: Dim, Idx <: Int] <: Shape = Idx match {

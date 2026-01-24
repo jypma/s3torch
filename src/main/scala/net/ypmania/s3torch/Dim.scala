@@ -133,9 +133,4 @@ object Dim extends DimLowPriorityGivens {
     override def size = valueOf[R]
   }
   infix type /[D, L <: Long] = DividedDim[D, L, DividedBy[D, L]]
-
-  type IndexOfDivided[S <: Shape, D <: Dim] <: Int = S match {
-    case DividedDim[D, _, _] *: tail => 0
-    case _ *: tail => scala.compiletime.ops.int.+[IndexOfDivided[tail, D], 1]
-  }
 }
