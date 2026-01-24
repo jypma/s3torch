@@ -3,6 +3,7 @@ package net.ypmania.s3torch
 import scala.compiletime.ops.int.*
 import Tuple.*
 import net.ypmania.s3torch.Dim.IndexOfDivided
+import net.ypmania.s3torch.Dim.DividedDim
 
 type Shape = Tuple
 
@@ -100,7 +101,7 @@ object Shape {
     /** Selects a dimension by their exact type. */
     given dimFound[Head <: Dim, Tail <: Shape]: Select[Head *: Tail, Head, 0] with {}
     import scala.util.NotGiven
-    given dimNotFound[Head <: Dim, Tail <: Shape, D <: Dim, Idx <: Int](using Select[Tail, D, Idx], NotGiven[D =:= Head]): Select[Head *: Tail, D, Idx + 1] with {}
+    given dimNotFound[Head <: Dim, Tail <: Shape, D <: Dim, Idx <: Int](using Select[Tail, D, Idx], NotGiven[Head =:= D]): Select[Head *: Tail, D, Idx + 1] with {}
 
     // TODO add implicit conversion like Dim.fromLongStatic so we can do "3" instead of "Idx(3)"
     /** Selects the dimension at the given index, starting from 0 */
@@ -121,6 +122,7 @@ object Shape {
       def apply[D <: Dim]: Divided[D] = new Divided {}
       def apply[D <: Dim](d: D): Divided[D] = new Divided {}
     }
-    given fromDivided[S <: Shape, D <: Dim]: Select[S, Divided[D], IndexOfDivided[S, D]] with {}
+    given dividedFound[D <: Dim, Tail <: Shape, L, R <: Long]: Select[DividedDim[D, L, R] *: Tail, Divided[D], 0] with {}
+    given dividedNotFound[Head <: Dim, Tail <: Shape, D <: Dim, Idx <: Int](using Select[Tail, Divided[D], Idx]): Select[Head *: Tail, Divided[D], Idx + 1] with {}
   }
 }

@@ -17,6 +17,7 @@ import net.ypmania.s3torch.nn.Linear
 import net.ypmania.s3torch.Dim.*
 import net.ypmania.s3torch.Shape.Select.Idx
 import net.ypmania.s3torch.Shape.Select.At
+import net.ypmania.s3torch.Shape.Select.Divided
 
 // Plain pytorch source: https://www.youtube.com/watch?v=ISNdQcPhsts
 class Transformer[
@@ -92,6 +93,10 @@ class Transformer[
       // Split the dModel dimension into NHeads heads
       val s = q.split(Ref(dModel))[NHeads]
       val sType: Tensor[(Ref[BatchSize], Ref[SeqLen], Static[NHeads], Ref[DModel] / NHeads), T] = s
+
+      // Just a temp test that this keeps compiling
+      val tstUnsplit = s.unsplit(Divided[Ref[DModel]])
+      val tstUnsplitT: Tensor[(Ref[BatchSize], Ref[SeqLen], Ref[DModel]), T] = tstUnsplit
 
       // Swap the SeqLen and NHeads dimensions
       val st = s.transpose(Ref(seqLen), At[Static[NHeads]])

@@ -12,6 +12,7 @@ import DType.*
 import Tensor.KeepDim
 import net.ypmania.s3torch.Dim.*
 import net.ypmania.s3torch.Shape.Select.*
+import net.ypmania.s3torch.Shape.Select
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
