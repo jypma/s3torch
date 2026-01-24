@@ -2,8 +2,6 @@ package net.ypmania.s3torch
 
 import  scala.compiletime.ops.long.*
 
-// Next idea: Dim is (L <: Long & Singleton | Unknown, N <: Name | Untagged)
-
 trait Dim {
   def size: Long
 }
@@ -24,28 +22,6 @@ object Dim extends DimLowPriorityGivens {
     override def size = _size
   }
 
-  /** A reference made to an unknown dimension (typically used as a type parameter to generic building blocks) */
-  case class Ref[D <: Dim](ref: D) extends Dim {
-    override def size = ref.size
-  }
-  object Ref {
-    type Wrap[S <: Tuple] <: Tuple = S match {
-      case EmptyTuple => EmptyTuple
-      //case Ref[ref] *: tail => Ref[ref] *: Wrap[tail]
-      case dim *: tail => Ref[dim] *: Wrap[tail]
-    }
-    /** Experimental */
-    def wrap[S <: Tuple, T <: DType](t: Tensor[S,T]): Tensor[Wrap[S], T] = t.asInstanceOf
-
-    type Unwrap[S <: Tuple] <: Tuple = S match {
-      case EmptyTuple => EmptyTuple
-      case Ref[ref] *: tail => ref *: Unwrap[tail]
-      case dim *: tail => dim *: Unwrap[tail]
-    }
-    /** Experimental */
-    def unwrap[S <: Tuple, T <: DType](t: Tensor[S,T]): Tensor[Unwrap[S], T] = t.asInstanceOf
-  }
-
   // The "+ 0L" hack here is needed, since scala 3.7.4 otherwise will allow Long variables to match here, even though
   // their compile-time value is unknown.
   given fromLongStatic[L <: Long & Singleton](using ValueOf[L], ValueOf[L + 0L]): Conversion[L, Static[L]] with {
@@ -57,42 +33,28 @@ object Dim extends DimLowPriorityGivens {
   /** A dimension known to be 1 at compile time */
   type One = Static[1L]
 
-  type Max[D1 <: Dim, D2 <: Dim] <: Dim = D1 match {
-    case D2 => D1 // Same type => pick any
-    case _ => (D1, D2) match {
-      case (One, _) => D2 // Either Dim is one => pick the other
-      case (_, One) => D1
-      case (Static[s1], Static[s2]) => (s1 > s2) match {
-        case true => D1 // If static, pick whichever is bigger
-        case false => D2
-      }
-      case _ => Dynamic // Fallback, we don't know statically which one is bigger
-    }
+  /** Given that gives the maximum of both A and B as M */
+  trait Max[A <: Dim, B <: Dim, M <: Dim] {
+    type Res = M
   }
-
-  trait DimArg[D <: Dim] {
-    type Out <: Dim
-    def apply(d: D): Out
+  trait MaxPrio0 {
+    // Fallback, we don't know statically which one is bigger
+    given fallback[A <: Dim, B <: Dim]: Max[A, B, Dynamic] with {}
   }
-  trait DimArgPrio0 {
-    given mkRef[D <: Dim]: DimArg[D] with {
-      type Out = Ref[D]
-      def apply(d: D) = Ref(d)
-    }
+  trait MaxPrio1 extends MaxPrio0 {
+    // If both static, pick whichever is bigger
+    given lt[AL <: Long, BL <: Long, A <: Static[AL], B <: Static[BL]](using AL < BL =:= true): Max[A, B, B] with {}
+    given gt[AL <: Long, BL <: Long, A <: Static[AL], B <: Static[BL]](using AL > BL =:= true): Max[A, B, A] with {}
+    given eq[AL <: Long, BL <: Long, A <: Static[AL], B <: Static[BL]](using AL =:= BL): Max[A, B, A] with {}
   }
-  object DimArg extends DimArgPrio0 {
-    given asStatic[L <: Long & Singleton, D <: Static[L]]: DimArg[D] with {
-      type Out = D
-      def apply(d: D) = d
-    }
-    given asDynamic[D <: Dim.Dynamic]: DimArg[D] with {
-      type Out = D
-      def apply(d: D) = d
-    }
-    given asRef[D <: Dim]: DimArg[Ref[D]] with {
-      type Out = Ref[D]
-      def apply(d: Ref[D]) = d
-    }
+  trait MaxPrio2 extends MaxPrio1 {
+    // Either dim is one => pick the other
+    given oneA[D <: Dim]: Max[One, D, D] with {}
+    given oneB[D <: Dim]: Max[D, One, D] with {}
+  }
+  object Max extends MaxPrio2 {
+    // Same type => pick any
+    given same[A <: Dim, B <: Dim](using A =:= B): Max[A, B, A] with {}
   }
 
   // TODO ---------------- move division stuff internals to different file under internal ----------------

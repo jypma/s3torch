@@ -6,7 +6,6 @@ import Index.Slice
 import Dim.Static
 import Dim.Dynamic
 import scala.reflect.ClassTag
-import net.ypmania.s3torch.internal.Broadcast.MaxEachDim
 import net.ypmania.s3torch.Shape.Widen
 import DType.*
 import Tensor.KeepDim
@@ -153,7 +152,7 @@ class TensorSpec extends UnitSpec {
       it("can create a range from unknown Dim") {
         val dim: Dim = ExampleStatic
         val t = Tensor.arangeOf(dim)
-        val tType: Tensor[Tuple1[Dim.Ref[Dim]], Int64.type] = t
+        val tType: Tensor[Tuple1[Dim], Int64.type] = t
         assert(t.size == Seq(10L))
         assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
       }

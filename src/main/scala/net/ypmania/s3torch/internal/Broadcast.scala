@@ -4,11 +4,21 @@ import  scala.compiletime.ops.long.*
 import net.ypmania.s3torch.*
 import Shape.Widen
 
-type Broadcast[S1 <: Tuple, S2 <: Tuple] = Broadcast.MaxEachDim[Widen[S1, S2], Widen[S2, S1]]
+trait Broadcast[S1 <: Tuple, S2 <: Tuple, R <: Tuple]
 
 object Broadcast {
-  type MaxEachDim[S1 <: Tuple, S2 <: Tuple] <: Tuple = (S1, S2) match {
-    case (EmptyTuple, EmptyTuple) => EmptyTuple
-    case (d1 *: tail1, d2 *: tail2) => Dim.Max[d1, d2] *: MaxEachDim[tail1, tail2]
+  trait MaxEachDim[S1 <: Tuple, S2 <: Tuple, R <: Tuple]
+
+  object MaxEachDim {
+    given empty: MaxEachDim[EmptyTuple, EmptyTuple, EmptyTuple] with {}
+
+    given one[A <: Dim, AT <: Tuple, B <: Dim, BT <: Tuple, R <: Dim, RT <: Tuple](using
+      MaxEachDim[AT, BT, RT],
+      Dim.Max[A, B, R]
+    ): MaxEachDim[A *: AT, B *: BT, R *: RT] with {}
   }
+
+  given [S1 <: Tuple, S2 <: Tuple, R <: Tuple](using
+    MaxEachDim[Widen[S1, S2], Widen[S2, S1], R]
+  ): Broadcast[S1, S2, R] with {}
 }

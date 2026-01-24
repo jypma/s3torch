@@ -49,9 +49,18 @@ class TransformerSpec extends UnitSpec {
   describe("LayerNormalization") {
     val norm = new transformer.LayerNormalization
     it("should normalize by mean and std") {
-      val in = Tensor((1.0, 2.0, 3.0), Float32)
+      val in = Tensor.zeros(BatchSize, SeqLen, DModel)
+      in((0, 0, 0)) = 1.0
+      in((0, 0, 1)) = 2.0
+      in((0, 0, 2)) = 3.0
       val res = norm(in)
-      assert(res.value === Seq(-0.99999, 0.0, 0.99999))
+      assert(res.value === Seq(
+        Seq(
+          Seq(-0.38729805, 0.38729805, 1.1618942, -1.1618942),
+          Seq(0.0, 0.0, 0.0, 0.0),
+          Seq(0.0, 0.0, 0.0, 0.0)
+        )
+      ))
     }
   }
 

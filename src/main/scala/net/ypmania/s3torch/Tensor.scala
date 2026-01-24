@@ -88,12 +88,12 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   // --- Binary operands ----
 
-  def floor_divide[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.floor_divide(_), _.floor_divide(_))
-  def remainder[V](value: V)(using op: TensorOperand[V]): op.Out[S, T] = op(this, value, _.remainder(_), _.remainder(_))
-  def +[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.add(_), _.add(_))
-  def -[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.sub(_), _.sub(_))
-  def *[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.mul(_), _.mul(_))
-  def /[V](value: V)(using op: TensorOperand[V]): op.Out[S,T] = op(this, value, _.div(_), _.div(_))
+  def floor_divide[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.floor_divide(_), _.floor_divide(_))
+  def remainder[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.remainder(_), _.remainder(_))
+  def +[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.add(_), _.add(_))
+  def -[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.sub(_), _.sub(_))
+  def *[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.mul(_), _.mul(_))
+  def /[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.div(_), _.div(_))
 
   private[Tensor] def unsafeWithShape[S1 <: Tuple]: Tensor[S1, T] = this.asInstanceOf[Tensor[S1, T]]
 }
@@ -109,8 +109,8 @@ object Tensor {
   def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
     fromScala(value).to(dtype)
 
-  def arangeOf[D <: Dim](dim: D)(using d: DimArg[D]): Tensor[Tuple1[d.Out], Int64.type] = arange(0L, dim.size, 1L).unsafeWithShape
-  def arangeOf[D <: Dim, T <: DType](dim: D, dtype: T)(using a: DimArg[D]): Tensor[Tuple1[a.Out], T] = arange(0L, dim.size, 1L, dtype).unsafeWithShape
+  def arangeOf[D <: Dim](dim: D): Tensor[Tuple1[D], Int64.type] = arange(0L, dim.size, 1L).unsafeWithShape
+  def arangeOf[D <: Dim, T <: DType](dim: D, dtype: T): Tensor[Tuple1[D], T] = arange(0L, dim.size, 1L, dtype).unsafeWithShape
 
   def arange[V](start: V, end: V, step: V)(using toScalar: ToScalar[V], fromScala: FromScala[V]): Tensor[Tuple1[Dim.Dynamic], fromScala.DefaultDType] = {
     new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(fromScala.defaultDType)))

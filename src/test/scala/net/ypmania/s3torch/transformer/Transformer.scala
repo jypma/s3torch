@@ -4,10 +4,8 @@ import net.ypmania.s3torch.nn.Module
 import net.ypmania.s3torch.*
 import net.ypmania.s3torch.DType.*
 import Tensor._
-import net.ypmania.s3torch.Dim.Max
 import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Dim.Static
-import net.ypmania.s3torch.Dim.Ref
 import net.ypmania.s3torch.Shape.Select.Last
 import scala.Tuple.Append
 import net.ypmania.s3torch.internal.ReduceOperand
@@ -39,16 +37,14 @@ class Transformer[
   class PositionalEncoding(dropoutProb: Double) extends Module {
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
-    val position = Tensor.arangeOf(Ref(seqLen), dtype.value).unsqueezeAfter(Last)
-    val indices = Tensor.arangeOf(Ref(dModel), dtype.value).floor_divide(2)
-    val phase_offset = Tensor.arangeOf(Ref(dModel), dtype.value).remainder(2) * (Math.PI * 0.5)
+    val position = Tensor.arangeOf(seqLen, dtype.value).unsqueezeAfter(Last)
+    val indices = Tensor.arangeOf(dModel, dtype.value).floor_divide(2)
+    val phase_offset = Tensor.arangeOf(dModel, dtype.value).remainder(2) * (Math.PI * 0.5)
     val div_term = exp(indices * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 
     def apply(in: Batch): Batch = {
-      Ref.unwrap(
-        dropout(Ref.wrap(in) + positionalEncodingDeltas)
-      )
+      dropout(in + positionalEncodingDeltas)
     }
   }
 
@@ -56,8 +52,8 @@ class Transformer[
     val alpha = addParameter("alpha", Tensor.ones(1L))
     val bias = addParameter("bias", Tensor.zeros(1L))
 
-    def apply[S <: Shape, Idx <: Int](in: Tensor[S, T])(using ReduceOperand[S,Last.type,Idx,KeepDim.type]) = {
-      val mean = in.meanBy(Last)(using KeepDim)
+    def apply(in: Batch): Batch = {
+      val mean = in.meanBy(Last)(using KeepDim) // FIXME verify this, video says "everything after batch" but picks last.
       val std = in.stdBy(Last)(using KeepDim)
 
       alpha * (in - mean) / (std + eps) + bias
@@ -79,29 +75,29 @@ class Transformer[
   }
 
   class MultiHeadAttention(dropoutProb: Double) extends Module {
-    val queryWeights = addModule("queryWeights", Linear(Ref(dModel), Ref(dModel))) // FIXME Maybe there should be no bias here if it's just a mul.
-    val keyWeights = addModule("keyWeights", Linear(Ref(dModel), Ref(dModel)))
-    val valueWeights = addModule("valueWeights", Linear(Ref(dModel), Ref(dModel)))
-    val outputWeights = addModule("outputWeights", Linear(Ref(dModel), Ref(dModel)))
+    val queryWeights = addModule("queryWeights", Linear(dModel, dModel)) // FIXME Maybe there should be no bias here if it's just a mul.
+    val keyWeights = addModule("keyWeights", Linear(dModel, dModel))
+    val valueWeights = addModule("valueWeights", Linear(dModel, dModel))
+    val outputWeights = addModule("outputWeights", Linear(dModel, dModel))
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
     def apply(query: Batch, key: Batch, value: Batch, mask: Batch): Batch = {
-      val q = queryWeights(Ref.wrap(query))
-      val k = keyWeights(Ref.wrap(key))
-      val v = valueWeights(Ref.wrap(value))
+      val q = queryWeights(query)
+      val k = keyWeights(key)
+      val v = valueWeights(value)
 
       // Split the dModel dimension into NHeads heads
-      val s = q.split(Ref(dModel))[NHeads]
-      val sType: Tensor[(Ref[BatchSize], Ref[SeqLen], Static[NHeads], Ref[DModel] / NHeads), T] = s
+      val s = q.split(dModel)[NHeads]
+      val sType: Tensor[(BatchSize, SeqLen, Static[NHeads], DModel / NHeads), T] = s
 
       // Just a temp test that this keeps compiling
-      val tstUnsplit = s.unsplit(Divided[Ref[DModel]])
-      val tstUnsplitT: Tensor[(Ref[BatchSize], Ref[SeqLen], Ref[DModel]), T] = tstUnsplit
+      val tstUnsplit = s.unsplit(Divided[DModel])
+      val tstUnsplitT: Tensor[(BatchSize, SeqLen, DModel), T] = tstUnsplit
 
       // Swap the SeqLen and NHeads dimensions
-      val st = s.transpose(Ref(seqLen), At[Static[NHeads]])
+      val st = s.transpose(seqLen, At[Static[NHeads]])
 
-      val stType: Tensor[(Ref[BatchSize], Static[NHeads], Ref[SeqLen], Ref[DModel] / NHeads), T] = st
+      val stType: Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] = st
 
       ???
     }
