@@ -119,4 +119,16 @@ object Shape {
     given dividedFound[D <: Dim, Tail <: Shape, L, R <: Long]: Select[DividedDim[D, L, R] *: Tail, Divided[D], 0] with {}
     given dividedNotFound[Head <: Dim, Tail <: Shape, D <: Dim, Idx <: Int](using Select[Tail, Divided[D], Idx]): Select[Head *: Tail, Divided[D], Idx + 1] with {}
   }
+
+
+  trait SelectIdx[S <: Shape, D] {
+    type Idx <: Int
+    def idx: Idx
+  }
+  object SelectIdx {
+    given [S <: Shape, D, I <: Int](using s:Select[S, D, I], i:ValueOf[I]): SelectIdx[S, D] with {
+      type Idx = I
+      def idx = i.value
+    }
+  }
 }

@@ -87,15 +87,15 @@ class Transformer[
       val v = valueWeights(value)
 
       // Split the dModel dimension into NHeads heads
-      val s = q.split(dModel)[NHeads]
+      val s = q.split[DModel].into[NHeads]
       val sType: Tensor[(BatchSize, SeqLen, Static[NHeads], DModel / NHeads), T] = s
 
       // Just a temp test that this keeps compiling
-      val tstUnsplit = s.unsplit(Divided[DModel])
+      val tstUnsplit = s.unsplit[Divided[DModel]]
       val tstUnsplitT: Tensor[(BatchSize, SeqLen, DModel), T] = tstUnsplit
 
       // Swap the SeqLen and NHeads dimensions
-      val st = s.transpose(seqLen, At[Static[NHeads]])
+      val st = s.transpose[SeqLen, Static[NHeads]]
 
       val stType: Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] = st
 

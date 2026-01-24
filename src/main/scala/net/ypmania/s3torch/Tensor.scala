@@ -16,6 +16,7 @@ import internal.UpdateSource
 import internal.ReduceOperand
 import internal.Unsplit
 import internal.VerifyShape
+import internal.DimOperator
 
 import scala.collection.immutable.ArraySeq
 
@@ -43,9 +44,17 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   /** Transforms a split version of this tensor, split across dimension D in N parts, using the given function, while retaining the original
     type once computation is complete. */
-  def split[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx]) = new SplitApply[Idx, Elem[S, Idx]](idx.value)
+  val split = new DimOperator.Of1[S, T] {
+    type Out[Idx <: Int] = SplitApply[Idx, Elem[S, Idx]]
+    def run[Idx <: Int](idx: Idx) = new SplitApply(idx)
+  }
   class SplitApply[Idx <: Int, D](idx: Idx) {
-    def apply[N <: Long & Singleton](using dv: D |/ N, n: ValueOf[N]):
+    /** Splits the selected dimension into N parts. */
+    def into[N <: Long & Singleton](nn: N)(using dv: D |/ N, n: ValueOf[N]):
+        Tensor[Shape.ReplaceWithTuple[S, (Dim.Static[N], Shape.Elem[S, Idx] / N), Idx], T] = into
+
+    /** Splits the selected dimension into N parts. */
+    def into[N <: Long & Singleton](using dv: D |/ N, n: ValueOf[N]):
         Tensor[Shape.ReplaceWithTuple[S, (Dim.Static[N], Shape.Elem[S, Idx] / N), Idx], T] = {
       val (before, after) = size.splitAt(idx)
       val dimsize = after.head
@@ -56,10 +65,13 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def to[T1 <: DType](dtype: T1): Tensor[S, T1] = new Tensor(native.to(dtype.scalarType))
 
-  def transpose[D1, D2, Idx1 <: Int, Idx2 <: Int](d1: D1, d2: D2)(using s1: Shape.Select[S,D1,Idx1], i1: ValueOf[Idx1], s2:Shape.Select[S,D2,Idx2], i2: ValueOf[Idx2]): Tensor[Shape.Swap[S, Idx1, Idx2], T] = {
-    new Tensor(native.transpose(i1.value, i2.value))
+  /** Swaps the given two dimensions. */
+  val transpose = new DimOperator.Of2Tensor[S, T] {
+    type Out[I1 <: Int, I2 <: Int] = Shape.Swap[S, I1, I2]
+    def run[I1 <: Int, I2 <: Int](i1: I1, i2: I2) = new Tensor(native.transpose(i1, i2))
   }
-  def transpose(using Is2D[S]): Tensor[Shape.Swap[S, 0, 1], T] = {
+
+  def t(using Is2D[S]): Tensor[Shape.Swap[S, 0, 1], T] = {
     // Somehow, defining this as an extension method on Tensor[(D1, D2)]fails to compile.
     new Tensor(native.transpose(0L, 1L))
   }
@@ -70,19 +82,26 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   /** Merges two dimensions that have previously been split off using split(). The selected dimension must be of type DividedDim, and must have a preceding
     * dimension with the remainder of the division. */
-  def unsplit[D, Idx <: Int](d: D)(using sel: Shape.Select[S, D, Idx], idx: ValueOf[Idx])(using VerifyShape[Unsplit[S, Idx]]): Tensor[Unsplit[S, Idx], T] = {
-    val (before, after) = size.splitAt(idx.value - 1)
-    val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
-    new Tensor(native.view(sizes.toArray*))
+  val unsplit = new DimOperator.Of1Tensor[S, T] {
+    type Out[Idx <: Int] = Unsplit[S, Idx]
+    def run[Idx <: Int](idx: Idx) = {
+      val (before, after) = size.splitAt(idx - 1)
+      val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
+      new Tensor(native.view(sizes.toArray*))
+    }
   }
 
   /** Inserts a dimension of One after D */
-  def unsqueezeAfter[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertAfter[S, Dim.One, Idx], T] =
-    new Tensor(native.unsqueeze(idx.value + 1))
+  val unsqueezeAfter = new DimOperator.Of1Tensor[S, T] {
+    type Out[Idx <: Int] = Shape.InsertAfter[S, Dim.One, Idx]
+    def run[Idx <: Int](idx: Idx) = new Tensor(native.unsqueeze(idx + 1))
+  }
 
   /** Inserts a dimension of One before D */
-  def unsqueezeBefore[D, Idx <: Int](d: D)(using sel: Shape.Select[S,D,Idx], idx: ValueOf[Idx]): Tensor[Shape.InsertBefore[S, Dim.One, Idx], T] =
-    new Tensor(native.unsqueeze(idx.value))
+  val unsqueezeBefore = new DimOperator.Of1Tensor[S, T] {
+    type Out[Idx <: Int] = Shape.InsertBefore[S, Dim.One, Idx]
+    def run[Idx <: Int](idx: Idx) = new Tensor(native.unsqueeze(idx))
+  }
 
   def value(using toScala: ToScala[S, T]) = toScala(native)
 

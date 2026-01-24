@@ -335,7 +335,7 @@ class TensorSpec extends UnitSpec {
             ((1, 2))
           )
         )
-        val r = m.transpose
+        val r = m.t
         val rType: Tensor[(Static[2L], Static[1L]), Int32.type] = r
         assert(r.value === Seq(
           Seq(1),
@@ -404,6 +404,10 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can unsqueeze after the last dim of a matrix") {
+        // Verify that we can unsqueeze by type as well
+        val r2 = matrix.unsqueezeAfter[DimB.type]
+        val r2Type: Tensor[(DimA.type, DimB.type, Static[1L]), Float32.type] = r2
+
         val r = matrix.unsqueezeAfter(DimB)
         val rType: Tensor[(DimA.type, DimB.type, Static[1L]), Float32.type] = r
         assert(r.size == Seq(2L, 3L, 1L))
@@ -475,7 +479,7 @@ class TensorSpec extends UnitSpec {
       it("can split on specific dim") {
         val matrix = Tensor.zeros(DimA, DimB)
         matrix((1, 1)) = 1.0
-        val res = matrix.split(DimA)[2L]
+        val res = matrix.split(DimA).into[2L]
         val resType: Tensor[(Static[2L], DimA.type / 2L, DimB.type), Float32.type] = res
         assert(res.size == Seq(2L, 3L, 3L))
         assert(res.value(0)(1)(1) == 1.0)
@@ -488,7 +492,7 @@ class TensorSpec extends UnitSpec {
       it("can split on last") {
         case object DimC extends Static[4L]
         val t = Tensor.zeros(DimA, DimB, DimC)
-        val res = t.split(DimC)[4L]
+        val res = t.split(DimC).into[4L]
         val resType: Tensor[(DimA.type, DimB.type, Static[4L], DimC.type / 4L), Float32.type] = res
         assert(res.size == Seq(6L, 3L, 4L, 1L))
 
