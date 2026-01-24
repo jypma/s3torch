@@ -36,6 +36,8 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   import Tensor.*
   import Tuple.:*
 
+  def *>[U](f: Tensor[S,T] => U) = f(this)
+
   def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
 
   def floor: Tensor[S, T] = new Tensor(native.floor())

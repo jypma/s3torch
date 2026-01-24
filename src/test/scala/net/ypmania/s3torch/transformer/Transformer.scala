@@ -66,11 +66,7 @@ class Transformer[
     val l2 = addModule("l2", Linear(dff, dModel))
 
     def apply(in: Batch): Batch = {
-      l2(
-        dropout(
-          relu(l1(in))
-        )
-      )
+      in *> l1.apply *> relu *> dropout.apply *> l2.apply
     }
   }
 
@@ -81,7 +77,12 @@ class Transformer[
     val outputWeights = addModule("outputWeights", Linear(dModel, dModel))
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
+    /** Splits the dModel dimension into NHeads heads, and swap the SeqLen and NHeads dimensions. */
+    private def splitHeads(b: Batch): Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] =
+      b.split[DModel].into[NHeads].transpose[SeqLen, Static[NHeads]]
+
     def apply(query: Batch, key: Batch, value: Batch, mask: Batch): Batch = {
+      /*
       val q = queryWeights(query)
       val k = keyWeights(key)
       val v = valueWeights(value)
@@ -98,6 +99,10 @@ class Transformer[
       val st = s.transpose[SeqLen, Static[NHeads]]
 
       val stType: Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] = st
+*/
+      val q = query *> queryWeights.apply *> splitHeads
+      val k = key *> keyWeights.apply *> splitHeads
+      val v = value *> valueWeights.apply *> splitHeads
 
       ???
     }

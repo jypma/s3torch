@@ -11,7 +11,7 @@ import Tuple.*
 import Shape.*
 import scala.compiletime.ops.int.*
 
-class Linear[In <: Dim, Out <: Dim] private (native: pytorch.LinearImpl) extends AbstractModule(native){
+class Linear[In <: Dim, Out <: Dim] private (native: pytorch.LinearImpl) extends AbstractModule(native) {
   def apply[S <: Shape, T <: DType, Idx <: Int](in: Tensor[S, T])(using Tuple.Last[S] =:= In): Tensor[Replace[S, Out, LastIdx[S]],T] = new Tensor(native.forward(in.native))
 }
 
