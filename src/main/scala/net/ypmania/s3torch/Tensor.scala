@@ -128,7 +128,7 @@ object Tensor {
   def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
     fromScala(value).to(dtype)
 
-  def arangeOf[D <: Dim](dim: D): Tensor[Tuple1[D], Int64.type] = arange(0L, dim.size, 1L).unsafeWithShape
+  def arangeOf[D <: Dim, T <: DType](dim: D)(using dtype: Default[T]): Tensor[Tuple1[D], T] = arange(0L, dim.size, 1L, dtype.value).unsafeWithShape
   def arangeOf[D <: Dim, T <: DType](dim: D, dtype: T): Tensor[Tuple1[D], T] = arange(0L, dim.size, 1L, dtype).unsafeWithShape
 
   def arange[V](start: V, end: V, step: V)(using toScalar: ToScalar[V], fromScala: FromScala[V]): Tensor[Tuple1[Dim.Dynamic], fromScala.DefaultDType] = {

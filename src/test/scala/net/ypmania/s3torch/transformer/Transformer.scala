@@ -25,7 +25,7 @@ class Transformer[
   VocabSize <: Dim,
   SeqLen <: Dim,
   BatchSize <: Dim,
-  T <: DType.Floaty](dModel: DModel, vocabSize: VocabSize, seqLen: SeqLen, batchSize: BatchSize, nHeads: NHeads)(using dtype: Default[T], dv: DModelN |/ NHeads)(using RandomSource, ValueOf[NHeads], ValueOf[DModelN]) {
+  T <: DType.Floaty](dModel: DModel, vocabSize: VocabSize, seqLen: SeqLen, batchSize: BatchSize, nHeads: NHeads)(using Default[T], DModelN |/ NHeads, RandomSource, ValueOf[NHeads], ValueOf[DModelN]) {
   type Batch = Tensor[(BatchSize, SeqLen, DModel), T]
 
   class InputEmbeddings extends Module {
@@ -37,9 +37,9 @@ class Transformer[
   class PositionalEncoding(dropoutProb: Double) extends Module {
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
-    val position = Tensor.arangeOf(seqLen, dtype.value).unsqueezeAfter(Last)
-    val indices = Tensor.arangeOf(dModel, dtype.value).floor_divide(2)
-    val phase_offset = Tensor.arangeOf(dModel, dtype.value).remainder(2) * (Math.PI * 0.5)
+    val position = Tensor.arangeOf(seqLen).unsqueezeAfter(Last)
+    val indices = Tensor.arangeOf(dModel).floor_divide(2)
+    val phase_offset = Tensor.arangeOf(dModel).remainder(2) * (Math.PI * 0.5)
     val div_term = exp(indices * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 

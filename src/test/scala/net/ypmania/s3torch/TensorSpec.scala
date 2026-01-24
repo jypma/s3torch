@@ -144,7 +144,8 @@ class TensorSpec extends UnitSpec {
 
       it("can create a range from Dim") {
         val t = Tensor.arangeOf(ExampleStatic)
-        val tType: Tensor[Tuple1[ExampleStatic.type], Int64.type] = t
+        // Follows the default DType.
+        val tType: Tensor[Tuple1[ExampleStatic.type], Float32.type] = t
         assert(t.size == Seq(10L))
         assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
       }
@@ -152,7 +153,8 @@ class TensorSpec extends UnitSpec {
       it("can create a range from unknown Dim") {
         val dim: Dim = ExampleStatic
         val t = Tensor.arangeOf(dim)
-        val tType: Tensor[Tuple1[Dim], Int64.type] = t
+        // Follows the default DType.
+        val tType: Tensor[Tuple1[Dim], Float32.type] = t
         assert(t.size == Seq(10L))
         assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
       }
