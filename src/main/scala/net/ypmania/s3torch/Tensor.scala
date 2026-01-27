@@ -17,6 +17,7 @@ import internal.ReduceOperand
 import internal.Unsplit
 import internal.VerifyShape
 import internal.DimOperator
+import internal.MatMul
 
 import scala.collection.immutable.ArraySeq
 
@@ -41,6 +42,9 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
 
   def floor: Tensor[S, T] = new Tensor(native.floor())
+
+  def matmul[S2 <: Tuple, T2 <: DType, R <: Tuple](b: Tensor[S2, T2])(using MatMul[S, S2, R]): Tensor[R, Promoted[T, T2]] =
+    new Tensor(native.matmul(b.native))
 
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 

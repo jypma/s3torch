@@ -12,6 +12,10 @@ import Tensor.KeepDim
 import net.ypmania.s3torch.Dim.*
 import net.ypmania.s3torch.Shape.Select.*
 import net.ypmania.s3torch.Shape.Select
+import net.ypmania.s3torch.Shape.Scalar
+import net.ypmania.s3torch.internal.Broadcast
+import internal.MatMul
+import scala.Tuple.Concat
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -242,6 +246,62 @@ class TensorSpec extends UnitSpec {
         val resType: Tensor[(Dim.One, DimB.type), Float32.type] = res
         assert(res.size == Seq(1L, 3L))
         assert(res.value.toSeq == Seq(Seq(2.5, 0, 0)))
+      }
+    }
+
+    describe("matmul") {
+      case object DimA extends Dim.Static[2L]
+      case object DimB extends Dim.Static[3L]
+      case object DimC extends Dim.Static[4L]
+
+      it("can multiply two vectors") {
+        val a = Tensor.zeros(DimA)
+        val b = Tensor.zeros(DimA)
+        val r = a.matmul(b)
+        val rType: Tensor[Scalar, Float32.type] = r
+        assert(r.size == Seq())
+      }
+
+      it("can multiply two matrices") {
+        val a = Tensor.zeros(DimA, DimB)
+        val b = Tensor.zeros(DimB, DimC)
+        val r = a.matmul(b)
+        val rType: Tensor[(DimA.type, DimC.type), Float32.type] = r
+        assert(r.size == Seq(DimA.size, DimC.size))
+      }
+
+      it("can multiply vector with matrix") {
+        val a = Tensor.zeros(DimA)
+        val b = Tensor.zeros(DimA, DimB)
+        val r = a.matmul(b)
+        val rType: Tensor[Tuple1[DimB.type], Float32.type] = r
+        assert(r.size == Seq(DimB.size))
+      }
+
+      it("can multiply matrix with vector") {
+        val a = Tensor.zeros(DimA, DimB)
+        val b = Tensor.zeros(DimB)
+        val r = a.matmul(b)
+        val rType: Tensor[Tuple1[DimA.type], Float32.type] = r
+        assert(r.size == Seq(DimA.size))
+      }
+
+      /*
+      it("can multiply two batches of matrices") {
+        val a = Tensor.zeros(1L, DimA, DimB)
+        val b = Tensor.zeros(1L, DimB, DimC)
+        val r = a.matmul(b)
+        val rType: Tensor[(Static[1L], DimA.type, DimC.type), Float32.type] = r
+        assert(r.size == Seq(1L, DimA.size, DimC.size))
+      }
+       */
+      it("can multiply a matrix batch with a vector") {
+        val a = Tensor.zeros(1L, DimA, DimB)
+        val b = Tensor.zeros(DimB)
+        val r = a.matmul(b)
+        val rType: Tensor[(Static[1L], DimA.type), Float32.type] = r
+        assert(r.size == Seq(1L, DimA.size))
+
       }
     }
 

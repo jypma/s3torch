@@ -21,4 +21,11 @@ object Broadcast {
   given [S1 <: Tuple, S2 <: Tuple, R <: Tuple](using
     MaxEachDim[Widen[S1, S2], Widen[S2, S1], R]
   ): Broadcast[S1, S2, R] with {}
+
+  trait Apply[S1 <: Tuple, S2 <: Tuple] {
+    type Out <: Tuple
+  }
+  object Apply {
+    given[S1 <: Tuple, S2 <: Tuple, R <: Tuple](using Broadcast[S1, S2, R]): Apply[S1, S2] with { type Out = R }
+  }
 }
