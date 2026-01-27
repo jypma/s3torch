@@ -19,7 +19,7 @@ class ZerosApply[T <: DType](dtype: T, mkTensor: (Array[Long], pytorch.TensorOpt
     zeros(Seq(d1.size, d2.size, d3.size))
   }
 
-  // TODO create recursive apply with Tuple as argument and given that will give sizes
+  def apply[S <: Shape](s: S)(using sizes: Shape.Sizes[S]): Tensor[S, T] = zeros(sizes.value(s))
 
   private def zeros[S <: Tuple](size: Seq[Long]): Tensor[S,T] = new Tensor(
     mkTensor(

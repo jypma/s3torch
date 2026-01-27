@@ -16,6 +16,9 @@ object Dim extends DimLowPriorityGivens {
     type Size = S
     def size = valueOf[S]
   }
+  object Static {
+    def apply[L <: Long & Singleton](l: L)(using ValueOf[L]) = new Static[L] {}
+  }
 
   /** A dimension not known until runtime */
   class Dynamic(_size: Long) extends Dim {
@@ -32,30 +35,6 @@ object Dim extends DimLowPriorityGivens {
 
   /** A dimension known to be 1 at compile time */
   type One = Static[1L]
-
-  /** Given that gives the maximum of both A and B as M */
-  trait Max[A <: Dim, B <: Dim, M <: Dim] {
-    type Res = M
-  }
-  trait MaxPrio0 {
-    // Fallback, we don't know statically which one is bigger
-    given fallback[A <: Dim, B <: Dim]: Max[A, B, Dynamic] with {}
-  }
-  trait MaxPrio1 extends MaxPrio0 {
-    // If both static, pick whichever is bigger
-    given lt[AL <: Long, BL <: Long, A <: Static[AL], B <: Static[BL]](using AL < BL =:= true): Max[A, B, B] with {}
-    given gt[AL <: Long, BL <: Long, A <: Static[AL], B <: Static[BL]](using AL > BL =:= true): Max[A, B, A] with {}
-    given eq[AL <: Long, BL <: Long, A <: Static[AL], B <: Static[BL]](using AL =:= BL): Max[A, B, A] with {}
-  }
-  trait MaxPrio2 extends MaxPrio1 {
-    // Either dim is one => pick the other
-    given oneA[D <: Dim]: Max[One, D, D] with {}
-    given oneB[D <: Dim]: Max[D, One, D] with {}
-  }
-  object Max extends MaxPrio2 {
-    // Same type => pick any
-    given same[A <: Dim, B <: Dim](using A =:= B): Max[A, B, A] with {}
-  }
 
   // TODO ---------------- move division stuff internals to different file under internal ----------------
 

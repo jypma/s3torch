@@ -286,7 +286,6 @@ class TensorSpec extends UnitSpec {
         assert(r.size == Seq(DimA.size))
       }
 
-      /*
       it("can multiply two batches of matrices") {
         val a = Tensor.zeros(1L, DimA, DimB)
         val b = Tensor.zeros(1L, DimB, DimC)
@@ -294,13 +293,29 @@ class TensorSpec extends UnitSpec {
         val rType: Tensor[(Static[1L], DimA.type, DimC.type), Float32.type] = r
         assert(r.size == Seq(1L, DimA.size, DimC.size))
       }
-       */
-      it("can multiply a matrix batch with a vector") {
+
+      it("can broadcast uneqeual batches of matrices") {
         val a = Tensor.zeros(1L, DimA, DimB)
+        val b = Tensor.zeros(2L, DimB, DimC)
+        val r = a.matmul(b)
+        val rType: Tensor[(Static[2L], DimA.type, DimC.type), Float32.type] = r
+        assert(r.size == Seq(2L, DimA.size, DimC.size))
+      }
+
+      it("can broadcast different-dimensional batches of matrices") {
+        val a = Tensor.zeros(2L, DimA, DimB)
+        val b = Tensor.zeros((Static(1L), Static(2L), DimB, DimC))
+        val r = a.matmul(b)
+        val rType: Tensor[(Static[1L], Static[2L], DimA.type, DimC.type), Float32.type] = r
+        assert(r.size == Seq(1L, 2L, DimA.size, DimC.size))
+      }
+
+      it("can multiply a matrix batch with a vector") {
+        val a = Tensor.zeros((Static(1L), Static(4L), DimA, DimB))
         val b = Tensor.zeros(DimB)
         val r = a.matmul(b)
-        val rType: Tensor[(Static[1L], DimA.type), Float32.type] = r
-        assert(r.size == Seq(1L, DimA.size))
+        val rType: Tensor[(Static[1L], Static[4L], DimA.type), Float32.type] = r
+        assert(r.size == Seq(1L, 4L, DimA.size))
 
       }
     }
@@ -349,6 +364,16 @@ class TensorSpec extends UnitSpec {
           Seq(8, 9, 10, 11),
           Seq(9, 10, 11, 12))
         )
+      }
+
+      it("can add a vector to a matrix with unknown dimensions") {
+        val DimA = Dim.Dynamic(4)
+        val DimB1 = Dim.Dynamic(4)
+        val DimB2 = Dim.Dynamic(1) // 2 will throw a runtime exception in pytorch here.
+        val a = Tensor.zeros(DimA)
+        val b = Tensor.zeros(DimB1, DimB2)
+        val r = a + b
+        assert(r.size == Seq(4L, 4L))
       }
     }
 

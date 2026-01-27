@@ -75,6 +75,14 @@ object Shape {
     type D2 = B
   }
 
+  trait Sizes[S <: Shape] {
+    def value(s: S): Seq[Long]
+  }
+  object Sizes {
+    given Sizes[EmptyTuple] with { def value(s: EmptyTuple) = Seq.empty }
+    given [D <: Dim, Tail <: Shape](using tail: Sizes[Tail]): Sizes[D *: Tail] with { def value(s: D *: Tail) = s.head.size +: tail.value(s.tail) }
+  }
+
   // TODO ----------- move Select trait to its own file --------------
 
   /** Can be pulled in as a given to get "Idx" as the index of a selected dimension on a shape, by
