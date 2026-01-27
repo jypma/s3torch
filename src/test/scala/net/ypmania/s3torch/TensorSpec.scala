@@ -316,7 +316,30 @@ class TensorSpec extends UnitSpec {
         val r = a.matmul(b)
         val rType: Tensor[(Static[1L], Static[4L], DimA.type), Float32.type] = r
         assert(r.size == Seq(1L, 4L, DimA.size))
+      }
 
+      it("can multiply vector with matrix batch") {
+        val a = Tensor.zeros(DimA)
+        val b = Tensor.zeros(2L, DimA, DimB)
+        val r = a.matmul(b)
+        val rType: Tensor[(Static[2L], DimB.type), Float32.type] = r
+        assert(r.size == Seq(2L, DimB.size))
+      }
+
+      it("can multiply batch with matrix") {
+        val a = Tensor.zeros(2L, DimA, DimB)
+        val b = Tensor.zeros(DimB, DimC)
+        val r = a.matmul(b)
+        val rType: Tensor[(Static[2L], DimA.type, DimC.type), Float32.type] = r
+        assert(r.size == Seq(2L, DimA.size, DimC.size))
+      }
+
+      it("can multiply matrix with batch") {
+        val a = Tensor.zeros(DimA, DimB)
+        val b = Tensor.zeros(2L, DimB, DimC)
+        val r = a.matmul(b)
+        val rType: Tensor[(Static[2L], DimA.type, DimC.type), Float32.type] = r
+        assert(r.size == Seq(2L, DimA.size, DimC.size))
       }
     }
 
