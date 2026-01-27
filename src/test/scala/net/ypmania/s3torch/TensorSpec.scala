@@ -257,7 +257,7 @@ class TensorSpec extends UnitSpec {
       it("can multiply two vectors") {
         val a = Tensor.zeros(DimA)
         val b = Tensor.zeros(DimA)
-        val r = a.matmul(b)
+        val r = a `@` b
         val rType: Tensor[Scalar, Float32.type] = r
         assert(r.size == Seq())
       }

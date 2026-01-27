@@ -43,8 +43,11 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def floor: Tensor[S, T] = new Tensor(native.floor())
 
+  /** Matrix multiplication */
   def matmul[S2 <: Tuple, T2 <: DType, R <: Tuple](b: Tensor[S2, T2])(using MatMul[S, S2, R]): Tensor[R, Promoted[T, T2]] =
     new Tensor(native.matmul(b.native))
+  /** Matrix multiplication, alias for .matmul */
+  def `@`[S2 <: Tuple, T2 <: DType, R <: Tuple](b: Tensor[S2, T2])(using MatMul[S, S2, R]): Tensor[R, Promoted[T, T2]] = matmul(b)
 
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
