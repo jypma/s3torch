@@ -77,33 +77,18 @@ class Transformer[
     val outputWeights = addModule("outputWeights", Linear(dModel, dModel))
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
-    /** Splits the dModel dimension into NHeads heads, and swap the SeqLen and NHeads dimensions. */
+    /** Splits the dModel dimension into NHeads heads, and swap the SeqLen
+      * and NHeads dimensions, so each head looks at a sequence of
+      * vectors with that head's part of the original DModel. */
     private def splitHeads(b: Batch): Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] =
       b.split[DModel].into[NHeads].transpose[SeqLen, Static[NHeads]]
 
     def apply(query: Batch, key: Batch, value: Batch, mask: Batch): Batch = {
-      /*
-      val q = queryWeights(query)
-      val k = keyWeights(key)
-      val v = valueWeights(value)
-
-      // Split the dModel dimension into NHeads heads
-      val s = q.split[DModel].into[NHeads]
-      val sType: Tensor[(BatchSize, SeqLen, Static[NHeads], DModel / NHeads), T] = s
-
-      // Just a temp test that this keeps compiling
-      val tstUnsplit = s.unsplit[Divided[DModel]]
-      val tstUnsplitT: Tensor[(BatchSize, SeqLen, DModel), T] = tstUnsplit
-
-      // Swap the SeqLen and NHeads dimensions
-      val st = s.transpose[SeqLen, Static[NHeads]]
-
-      val stType: Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] = st
-*/
       val q = query *> queryWeights.apply *> splitHeads
       val k = key *> keyWeights.apply *> splitHeads
       val v = value *> valueWeights.apply *> splitHeads
 
+      val q_attention_scores = query `@` key.t
       ???
     }
   }

@@ -83,6 +83,13 @@ object Shape {
     given [D <: Dim, Tail <: Shape](using tail: Sizes[Tail]): Sizes[D *: Tail] with { def value(s: D *: Tail) = s.head.size +: tail.value(s.tail) }
   }
 
+  /** The batch dimension(s) of S */
+  type BatchOf[S <: Shape] = Take[S, Size[S] - 2]
+  /** The "A" matrix dimension, i.e. the first one */
+  type AOf[S <: Shape] = Last[Init[S]]
+  /** The "B" matrix dimension, i.e. the second one */
+  type BOf[S <: Shape] = Last[S]
+
   // TODO ----------- move Select trait to its own file --------------
 
   /** Can be pulled in as a given to get "Idx" as the index of a selected dimension on a shape, by

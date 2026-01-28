@@ -5,6 +5,9 @@ import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Shape
 import Tuple.*
 import net.ypmania.s3torch.Shape.Widen
+import net.ypmania.s3torch.Shape.BatchOf
+import net.ypmania.s3torch.Shape.AOf
+import net.ypmania.s3torch.Shape.BOf
 
 trait MatMul[S1 <: Tuple, S2 <: Tuple, R <: Tuple]
 
@@ -27,13 +30,6 @@ object MatMul {
   // 1-dimensional, the matrix-vector product is returned.
   // So, AxB matmul B, returning A
   given d1b[A <: Dim, B <: Dim]: MatMul[(A, B), Tuple1[B], Tuple1[A]] with {}
-
-  /** The batch dimension(s) of S */
-  type BatchOf[S <: Tuple] = Take[S, Size[S] - 2]
-  /** The "A" matrix dimension, i.e. the first one */
-  type AOf[S <: Tuple] = Last[Init[S]]
-  /** The "B" matrix dimension, i.e. the second one */
-  type BOf[S <: Tuple] = Last[S]
 
   // Broadcast for matrices
   given bt[D1 <: Tuple, D2 <: Tuple, R <: Tuple, BR <: Tuple](using

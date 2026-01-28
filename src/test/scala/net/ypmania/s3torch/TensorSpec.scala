@@ -438,8 +438,10 @@ class TensorSpec extends UnitSpec {
           )
         ))
       }
+    }
 
-      it("can transpose a matrix without extra args") {
+    describe("t") {
+      it("can transpose a matrix") {
         val m = Tensor(
           Tuple1(
             ((1, 2))
@@ -447,10 +449,18 @@ class TensorSpec extends UnitSpec {
         )
         val r = m.t
         val rType: Tensor[(Static[2L], Static[1L]), Int32.type] = r
+        assert(r.size == Seq(2L, 1L))
         assert(r.value === Seq(
           Seq(1),
           Seq(2)
         ))
+      }
+
+      it("can transpose a batched matrix") {
+        val m = Tensor.zeros(1L, 2L, 3L)
+        val r = m.t
+        val rType: Tensor[(Static[1L], Static[3L], Static[2L]), Float32.type] = r
+        assert(r.size == Seq(1L, 3L, 2L))
       }
     }
 

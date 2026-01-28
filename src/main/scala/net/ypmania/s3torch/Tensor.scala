@@ -18,6 +18,7 @@ import internal.Unsplit
 import internal.VerifyShape
 import internal.DimOperator
 import internal.MatMul
+import internal.Transpose
 
 import scala.collection.immutable.ArraySeq
 
@@ -80,10 +81,11 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     def run[I1 <: Int, I2 <: Int](i1: I1, i2: I2) = new Tensor(native.transpose(i1, i2))
   }
 
-  def t(using Is2D[S]): Tensor[Shape.Swap[S, 0, 1], T] = {
-    // Somehow, defining this as an extension method on Tensor[(D1, D2)]fails to compile.
-    new Tensor(native.transpose(0L, 1L))
-  }
+  /** Swaps the last two dimensions. Tensor must have >= 2 dimensions. */
+  def t[R <: Tuple](using Transpose[S, R]): Tensor[R, T] = {
+    new Tensor(native.transpose(-2L, -1L))
+   }
+
   def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): this.type = {
     updateSource(native, idx.toNative(indices), value)
     this
