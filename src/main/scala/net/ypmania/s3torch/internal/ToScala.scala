@@ -24,6 +24,7 @@ object ToScala {
     def apply(native: pytorch.Tensor) = get(native)
   }
 
+  given ItemTo[Boolean](_.item_bool) with ToScala[EmptyTuple, Bool.type] with {}
   given ItemTo[Byte](_.item_byte) with ToScala[EmptyTuple, Int8.type] with {}
   given ItemTo[Short](_.item_short) with ToScala[EmptyTuple, Int16.type] with {}
   given ItemTo[Int](_.item_int) with ToScala[EmptyTuple, Int32.type] with {}
@@ -47,6 +48,15 @@ object ToScala {
     }
   }
 
+  given [D <: Dim]: ContiguousToArray[Boolean]( { (tensor, result) =>
+    val buf = tensor.createBuffer[ByteBuffer]
+    var i = 0
+    val size = tensor.numel
+    while (i < size) do {
+      result(i) = buf.get(i) != 0
+      i += 1
+    }
+  }) with ToScala[Tuple1[D], Bool.type] with {}
   given [D <: Dim]: ContiguousToArray[Byte](_.createBuffer[ByteBuffer].get(_)) with ToScala[Tuple1[D], Int8.type] with {}
   given [D <: Dim]: ContiguousToArray[Short](_.createBuffer[ShortBuffer].get(_)) with ToScala[Tuple1[D], Int16.type] with {}
   given [D <: Dim]: ContiguousToArray[Int](_.createBuffer[IntBuffer].get(_)) with ToScala[Tuple1[D], Int32.type] with {}

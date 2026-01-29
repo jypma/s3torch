@@ -44,6 +44,17 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def floor: Tensor[S, T] = new Tensor(native.floor())
 
+  /** Fills elements of self tensor with value where mask is true. */
+  def maskedFill_[S2 <: Tuple, R <: Tuple, V](mask: Tensor[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): this.type = {
+    // Any [V] is indeed correct here, pytorch accepts doubles for int vectors.
+    native.masked_fill_(mask.native, toScalar(value))
+    this
+  }
+  /** Returns copy that fills elements of self tensor with value where mask is true. */
+  def maskedFill[S2 <: Tuple, R <: Tuple, V](b: Tensor[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Tensor[S,T] = {
+    new Tensor(native.masked_fill(b.native, toScalar(value)))
+  }
+
   /** Matrix multiplication */
   def matmul[S2 <: Tuple, T2 <: DType, R <: Tuple](b: Tensor[S2, T2])(using MatMul[S, S2, R]): Tensor[R, Promoted[T, T2]] =
     new Tensor(native.matmul(b.native))

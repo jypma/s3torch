@@ -88,7 +88,7 @@ class Transformer[
       val k = key *> keyWeights.apply *> splitHeads
       val v = value *> valueWeights.apply *> splitHeads
 
-      val q_attention_scores = query `@` key.t
+      val attention_scores = q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.toDouble) // 37:00
       ???
     }
   }

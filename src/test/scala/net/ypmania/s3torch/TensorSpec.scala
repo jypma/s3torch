@@ -74,6 +74,13 @@ class TensorSpec extends UnitSpec {
         assert(t.value.toSeq == Seq(1, 2, 3))
       }
 
+      it("can create a static boolean vector") {
+        val t = Tensor((true, true, false))
+        val tType: Tensor[Tuple1[Static[3L]], Bool.type] = t
+        assert(t.size == Seq(3L))
+        assert(t.value.toSeq == Seq(true, true, false))
+      }
+
       it("can create a static matrix") {
         val t = Tensor((
           ((1,2,3)),
@@ -246,6 +253,22 @@ class TensorSpec extends UnitSpec {
         val resType: Tensor[(Dim.One, DimB.type), Float32.type] = res
         assert(res.size == Seq(1L, 3L))
         assert(res.value.toSeq == Seq(Seq(2.5, 0, 0)))
+      }
+    }
+
+    describe("maskedFill_") {
+      it("can fill elements of a float vector") {
+        val t = Tensor((1.0, 2.0, 3.0))
+        t.maskedFill_(Tensor((false, true, false)), 4.0)
+        assert(t.value.toSeq == Seq(1.0, 4.0, 3.0))
+      }
+    }
+
+    describe("maskedFill") {
+      it("can fill elements of a float vector") {
+        val t = Tensor((1.0, 2.0, 3.0))
+        val res = t.maskedFill(Tensor((false, true, false)), 4.0)
+        assert(res.value.toSeq == Seq(1.0, 4.0, 3.0))
       }
     }
 

@@ -2,21 +2,6 @@ package net.ypmania.s3torch
 
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
-/*
-enum DType(private[s3torch] val scalarType: torch.ScalarType) {
-  case BFloat16 extends DType(torch.ScalarType.BFloat16)
-  case Bool extends DType(torch.ScalarType.Bool)
-  case Int8 extends DType(torch.ScalarType.Char)
-  case Int16 extends DType(torch.ScalarType.Short)
-  case Int32 extends DType(torch.ScalarType.Int)
-  case Int64 extends DType(torch.ScalarType.Long)
-  case Float16 extends DType(torch.ScalarType.Half)
-  case Float32 extends DType(torch.ScalarType.Float)
-  case Float64 extends DType(torch.ScalarType.Double)
-  case UInt8 extends DType(torch.ScalarType.Byte)
-  case Undefined extends DType(torch.ScalarType.Undefined)
-}
- */
 
 // This can't be an enum, since then "val t = Int8 is typed DType, not Int8.type"
 sealed abstract class DType(private[s3torch] val scalarType: torch.ScalarType)
