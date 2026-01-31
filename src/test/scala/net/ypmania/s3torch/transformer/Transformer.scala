@@ -66,7 +66,7 @@ class Transformer[
     val l2 = addModule("l2", Linear(dff, dModel))
 
     def apply(in: Batch): Batch = {
-      in *> l1.apply *> relu *> dropout.apply *> l2.apply
+      in ~> l1.apply ~> relu ~> dropout.apply ~> l2.apply
     }
   }
 
@@ -84,9 +84,9 @@ class Transformer[
       b.split[DModel].into[NHeads].transpose[SeqLen, Static[NHeads]]
 
     def apply(query: Batch, key: Batch, value: Batch, mask: Batch): Batch = {
-      val q = query *> queryWeights.apply *> splitHeads
-      val k = key *> keyWeights.apply *> splitHeads
-      val v = value *> valueWeights.apply *> splitHeads
+      val q = query ~> queryWeights.apply ~> splitHeads
+      val k = key ~> keyWeights.apply ~> splitHeads
+      val v = value ~> valueWeights.apply ~> splitHeads
 
       // "attention" method of the original video starts here
       val attention_scores = q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.toDouble) // 37:00

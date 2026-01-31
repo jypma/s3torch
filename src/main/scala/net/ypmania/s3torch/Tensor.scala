@@ -38,7 +38,7 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   import Tensor.*
   import Tuple.:*
 
-  def *>[U](f: Tensor[S,T] => U) = f(this)
+  def ~>[U](f: Tensor[S,T] => U) = f(this)
 
   def dtype: T = DType.of(native.dtype().toScalarType()).asInstanceOf[T]
 
