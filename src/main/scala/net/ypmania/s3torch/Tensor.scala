@@ -12,6 +12,7 @@ import internal.ToScala
 import internal.Flatten
 import internal.Broadcast
 import internal.TensorOperand
+import internal.TensorOperandBool
 import internal.UpdateSource
 import internal.ReduceOperand
 import internal.Unsplit
@@ -42,8 +43,18 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def dtype: T = DType.of(native.dtype().toScalarType()).asInstanceOf[T]
 
-  /** Computes element-wise equality. We don't define pytorch's "eq", since that has a different meaning in Scala. */
-  def *==[S2 <: Tuple, T2 <: DType, R <: Tuple](other: Tensor[S2, T2])(using Broadcast[S, S2, R]): Tensor[R, DType.Bool.type] = new Tensor(native.eq(other.native))
+  /** Computes element-wise equality. We don't define pytorch's "eq" or "==", since those have a different meaning in Scala. */
+  def #==[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.eq(_), _.eq(_))
+  /** Computes element-wise nonequality. We don't define pytorch's "eq" or "!=" since those have a different meaning in Scala. */
+  def #!=[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.ne(_), _.ne(_))
+  /** Computes element-wise greater than. */
+  def >[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.greater(_), _.greater(_))
+  /** Computes element-wise less than. */
+  def <[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.less(_), _.less(_))
+  /** Computes element-wise greater than or equal. */
+  def >=[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.greater_equal(_), _.greater_equal(_))
+  /** Computes element-wise less than or equal. */
+  def <=[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.less_equal(_), _.less_equal(_))
 
   /** True if `other` has the same size and elements as this tensor, false otherwise. */
   def equal[S2 <: Tuple](that: Tensor[S2, T])(using SameSize[S, S2]): Boolean = native.equal(that.native)

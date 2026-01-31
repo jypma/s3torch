@@ -211,20 +211,31 @@ class TensorSpec extends UnitSpec {
   }
 
   describe("Tensor") {
-    describe("*==") {
+    describe("#==") {
       it("can compare two tensors") {
         val a = Tensor((1, 2, 3))
         val b = Tensor((1, 42, 3))
-        val res = a *== b
+        val res = a #== b
         val resType: Tensor[Tuple1[Static[3L]], Bool.type] = res
         assert(res.size == Seq(3L))
         assert(res.value.toSeq == Seq(true, false, true))
       }
 
+      it("can compare tensor with a number") {
+        val a = Tensor((
+          ((1, 2)),
+          ((3, 4))
+        ))
+        val res = a #== 1
+        val resType: Tensor[(Static[2L], Static[2L]), Bool.type] = res
+        assert(res.size == Seq(2L, 2L))
+        assert(res.value.toSeq == Seq(Seq(true, false), Seq(false, false)))
+      }
+
       it("can compare two tensors of different type") {
         val a = Tensor((1, 2, 3))
         val b = Tensor((1.0, 42.0, 3.0))
-        val res = a *== b
+        val res = a #== b
         val resType: Tensor[Tuple1[Static[3L]], Bool.type] = res
         assert(res.size == Seq(3L))
         assert(res.value.toSeq == Seq(true, false, true))
@@ -236,7 +247,7 @@ class TensorSpec extends UnitSpec {
           ((1, 2, 3)),
           ((0, 2, 0))
         ))
-        val res = a *== b
+        val res = a #== b
         val resType: Tensor[(Static[2L], Static[3L]), Bool.type] = res
         assert(res.size == Seq(2L, 3L))
         assert(res.value.toSeq == Seq(
@@ -251,7 +262,7 @@ class TensorSpec extends UnitSpec {
           ((0, 2, 0))
         ))
         val b = Tensor((1, 2, 3))
-        val res = a *== b
+        val res = a #== b
         val resType: Tensor[(Static[2L], Static[3L]), Bool.type] = res
         assert(res.size == Seq(2L, 3L))
         assert(res.value.toSeq == Seq(
@@ -572,6 +583,10 @@ class TensorSpec extends UnitSpec {
         val b = Tensor.zeros(DimB1, DimB2)
         val r = a + b
         assert(r.size == Seq(4L, 4L))
+      }
+
+      it("can assign and overwrite") {
+        //val a = Tensor((6, 7))
       }
     }
 
