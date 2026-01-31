@@ -102,6 +102,11 @@ object ToScala {
     }
   }
 
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Boolean]): ToScala[S, Bool.type] with {
+    type OutputType = MkOutputType[S, Boolean]
+    def apply(native: pytorch.Tensor) = toSeq(native)
+  }
+
   given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Int]): ToScala[S, Int32.type] with {
     type OutputType = MkOutputType[S, Int]
     def apply(native: pytorch.Tensor) = toSeq(native)

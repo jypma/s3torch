@@ -2,11 +2,18 @@ package net.ypmania.s3torch
 
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
+import scala.compiletime.erasedValue
 
 // This can't be an enum, since then "val t = Int8 is typed DType, not Int8.type"
-sealed abstract class DType(private[s3torch] val scalarType: torch.ScalarType)
+sealed abstract class DType(private[s3torch] val scalarType: torch.ScalarType) {
+  DType.fromNative = DType.fromNative + (scalarType.value -> this)
+}
 
 object DType {
+  // We can't use the actual enum instance as key, since somehow the libtorch wrapper creates new
+  // enum instances that don't equal the constants we use below.
+  private var fromNative = Map.empty[Byte, DType]
+
   case object BFloat16 extends DType(torch.ScalarType.BFloat16)
   case object Bool extends DType(torch.ScalarType.Bool)
   case object Int8 extends DType(torch.ScalarType.Char)
@@ -18,6 +25,10 @@ object DType {
   case object Float64 extends DType(torch.ScalarType.Double)
   case object UInt8 extends DType(torch.ScalarType.Byte)
   case object Undefined extends DType(torch.ScalarType.Undefined)
+
+  def of(native: torch.ScalarType): DType = {
+    fromNative.getOrElse(native.value, Undefined)
+  }
 
   import DType.*
 

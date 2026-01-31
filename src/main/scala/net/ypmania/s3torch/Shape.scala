@@ -83,6 +83,9 @@ object Shape {
     given [D <: Dim, Tail <: Shape](using tail: Sizes[Tail]): Sizes[D *: Tail] with { def value(s: D *: Tail) = s.head.size +: tail.value(s.tail) }
   }
 
+  /** Given that is available if S1 has the same number of dimensions as S2 */
+  type SameSize[S1 <: Shape, S2 <: Shape] = Size[S1] =:= Size[S2]
+
   /** The batch dimension(s) of S */
   type BatchOf[S <: Shape] = Take[S, Size[S] - 2]
   /** The "A" matrix dimension, i.e. the first one */

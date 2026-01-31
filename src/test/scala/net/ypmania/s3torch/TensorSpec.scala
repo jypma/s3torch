@@ -211,6 +211,109 @@ class TensorSpec extends UnitSpec {
   }
 
   describe("Tensor") {
+    describe("*==") {
+      it("can compare two tensors") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1, 42, 3))
+        val res = a *== b
+        val resType: Tensor[Tuple1[Static[3L]], Bool.type] = res
+        assert(res.size == Seq(3L))
+        assert(res.value.toSeq == Seq(true, false, true))
+      }
+
+      it("can compare two tensors of different type") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1.0, 42.0, 3.0))
+        val res = a *== b
+        val resType: Tensor[Tuple1[Static[3L]], Bool.type] = res
+        assert(res.size == Seq(3L))
+        assert(res.value.toSeq == Seq(true, false, true))
+      }
+
+      it("can compare tensor with a batch") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((
+          ((1, 2, 3)),
+          ((0, 2, 0))
+        ))
+        val res = a *== b
+        val resType: Tensor[(Static[2L], Static[3L]), Bool.type] = res
+        assert(res.size == Seq(2L, 3L))
+        assert(res.value.toSeq == Seq(
+          Seq(true, true, true),
+          Seq(false, true, false)
+        ))
+      }
+
+      it("can compare a batch with a tensor") {
+        val a = Tensor((
+          ((1, 2, 3)),
+          ((0, 2, 0))
+        ))
+        val b = Tensor((1, 2, 3))
+        val res = a *== b
+        val resType: Tensor[(Static[2L], Static[3L]), Bool.type] = res
+        assert(res.size == Seq(2L, 3L))
+        assert(res.value.toSeq == Seq(
+          Seq(true, true, true),
+          Seq(false, true, false)
+        ))
+      }
+    }
+
+    describe("equal") {
+      it("are two tensors with same type and contents") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1, 2, 3))
+        assert(a.equal(b))
+      }
+
+      it("are not two tensors with same type and different contents") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1, 2, 4))
+        assert(!a.equal(b))
+      }
+
+      it("are not two tensors with same type and different size") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1, 2))
+        assert(!a.equal(b))
+      }
+
+      it("are not two tensors with same type and contents") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1.0, 2.0, 3.0))
+        //assert(a.equal(b)) this won't even compile.
+      }
+    }
+
+    describe("equals") {
+      it("are two tensors with same type and contents") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1, 2, 3))
+        assert(a == b)
+      }
+
+      it("are not two tensors with same type and different contents") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1, 2, 4))
+        assert(a != b)
+      }
+
+      it("are not two tensors with same type and different size") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1, 2))
+        assert(a != b)
+      }
+
+      it("are not two tensors with different type and contents") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1.0, 2.0, 3.0))
+        assert(!a.equals(b))
+        assert(a != b)
+      }
+    }
+
     describe("flatten") {
       it("can flatten a 1D tensor") {
         val t = Tensor((1, 2, 3))
@@ -262,6 +365,29 @@ class TensorSpec extends UnitSpec {
         t.maskedFill_(Tensor((false, true, false)), 4.0)
         assert(t.value.toSeq == Seq(1.0, 4.0, 3.0))
       }
+
+      it("can't fill elements of a float vector with a batch") {
+        val t = Tensor((1.0, 2.0, 3.0))
+        val m = Tensor((
+          ((false, true, false)),
+          ((true, false, true))
+        ))
+        // t.maskedFill_(m, 4.0) This won't compile, so that's good.
+      }
+
+      it("can fill elements of a batch with a vector") {
+        val t = Tensor((
+          ((1.0, 2.0, 3.0)),
+          ((4.0, 5.0, 6.0))
+        ))
+        val m = Tensor((false, true, false))
+        t.maskedFill_(m, 0.0)
+        assert(t.value.toSeq == Seq(
+          Seq(1.0, 0, 3.0),
+          Seq(4.0, 0, 6.0)
+        ))
+      }
+
     }
 
     describe("maskedFill") {
@@ -269,6 +395,32 @@ class TensorSpec extends UnitSpec {
         val t = Tensor((1.0, 2.0, 3.0))
         val res = t.maskedFill(Tensor((false, true, false)), 4.0)
         assert(res.value.toSeq == Seq(1.0, 4.0, 3.0))
+      }
+
+      it("can fill elements of a float vector with a batch") {
+        val t = Tensor((1.0, 2.0, 3.0))
+        val m = Tensor((
+          ((false, true, false)),
+          ((true, false, true))
+        ))
+        val r = t.maskedFill(m, 0.0)
+        assert(r.value.toSeq == Seq(
+          Seq(1.0, 0.0, 3.0),
+          Seq(0.0, 2.0, 0.0)
+        ))
+      }
+
+      it("can fill elements of batch with a vector") {
+        val t = Tensor((
+          ((1.0, 2.0, 3.0)),
+          ((4.0, 5.0, 6.0))
+        ))
+        val m = Tensor((false, true, false))
+        val r = t.maskedFill(m, 0.0)
+        assert(r.value.toSeq == Seq(
+          Seq(1.0, 0, 3.0),
+          Seq(4.0, 0, 6.0)
+        ))
       }
     }
 

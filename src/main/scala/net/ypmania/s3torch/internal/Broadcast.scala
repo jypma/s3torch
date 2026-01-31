@@ -8,6 +8,7 @@ import net.ypmania.s3torch.Dim.One
 import net.ypmania.s3torch.Dim.Dynamic
 import scala.util.NotGiven
 
+/** Given that shows that S1 and S2 are broadcastable, with shape R as result. */
 trait Broadcast[S1 <: Tuple, S2 <: Tuple, R <: Tuple]
 
 object Broadcast {
@@ -48,6 +49,7 @@ object Broadcast {
     MaxEachDim[Widen[S1, S2], Widen[S2, S1], R]
   ): Broadcast[S1, S2, R] with {}
 
+  /** Given that shows that the two shapes are broadcastable */
   trait Apply[S1 <: Tuple, S2 <: Tuple] {
     type Out <: Tuple
   }

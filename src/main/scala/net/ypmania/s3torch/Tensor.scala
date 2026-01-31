@@ -31,8 +31,8 @@ import DType.*
 import org.bytedeco.pytorch.ScalarTypeOptional
 
 class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
-  type Shape = S
-  type DType = T
+  type shape = S
+  type dType = T
   type IdFn[T] = T => T
 
   import Tensor.*
@@ -40,18 +40,33 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def *>[U](f: Tensor[S,T] => U) = f(this)
 
+  def dtype: T = DType.of(native.dtype().toScalarType()).asInstanceOf[T]
+
+  /** Computes element-wise equality. We don't define pytorch's "eq", since that has a different meaning in Scala. */
+  def *==[S2 <: Tuple, T2 <: DType, R <: Tuple](other: Tensor[S2, T2])(using Broadcast[S, S2, R]): Tensor[R, DType.Bool.type] = new Tensor(native.eq(other.native))
+
+  /** True if `other` has the same size and elements as this tensor, false otherwise. */
+  def equal[S2 <: Tuple](that: Tensor[S2, T])(using SameSize[S, S2]): Boolean = native.equal(that.native)
+
+  override def equals(that: Any): Boolean = that match {
+    case other: Tensor[?, ?] if dtype == other.dtype =>
+      native.equal(other.native)
+    case _ =>
+      false
+  }
+
   def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
 
   def floor: Tensor[S, T] = new Tensor(native.floor())
 
   /** Fills elements of self tensor with value where mask is true. */
-  def maskedFill_[S2 <: Tuple, R <: Tuple, V](mask: Tensor[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): this.type = {
+  def maskedFill_[S2 <: Tuple, V, R <: Tuple](mask: Tensor[S2, DType.Bool.type], value: V)(using Broadcast[S, S2, R], R =:= S)(using toScalar:FromScala.ToScalar[V]): this.type = {
     // Any [V] is indeed correct here, pytorch accepts doubles for int vectors.
     native.masked_fill_(mask.native, toScalar(value))
     this
   }
   /** Returns copy that fills elements of self tensor with value where mask is true. */
-  def maskedFill[S2 <: Tuple, R <: Tuple, V](b: Tensor[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Tensor[S,T] = {
+  def maskedFill[S2 <: Tuple, V, R <: Tuple](b: Tensor[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Tensor[R,T] = {
     new Tensor(native.masked_fill(b.native, toScalar(value)))
   }
 
