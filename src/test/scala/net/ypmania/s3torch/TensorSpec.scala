@@ -370,10 +370,10 @@ class TensorSpec extends UnitSpec {
       }
     }
 
-    describe("maskedFill_") {
+    describe("maskedFill") {
       it("can fill elements of a float vector") {
         val t = Tensor((1.0, 2.0, 3.0))
-        t.maskedFill_(Tensor((false, true, false)), 4.0)
+        t.maskedFill(Tensor((false, true, false)), 4.0)
         assert(t.value.toSeq == Seq(1.0, 4.0, 3.0))
       }
 
@@ -392,7 +392,7 @@ class TensorSpec extends UnitSpec {
           ((4.0, 5.0, 6.0))
         ))
         val m = Tensor((false, true, false))
-        t.maskedFill_(m, 0.0)
+        t.maskedFill(m, 0.0)
         assert(t.value.toSeq == Seq(
           Seq(1.0, 0, 3.0),
           Seq(4.0, 0, 6.0)
@@ -401,10 +401,10 @@ class TensorSpec extends UnitSpec {
 
     }
 
-    describe("maskedFill") {
+    describe("maskedFilled") {
       it("can fill elements of a float vector") {
         val t = Tensor((1.0, 2.0, 3.0))
-        val res = t.maskedFill(Tensor((false, true, false)), 4.0)
+        val res = t.maskedFilled(Tensor((false, true, false)), 4.0)
         assert(res.value.toSeq == Seq(1.0, 4.0, 3.0))
       }
 
@@ -414,7 +414,7 @@ class TensorSpec extends UnitSpec {
           ((false, true, false)),
           ((true, false, true))
         ))
-        val r = t.maskedFill(m, 0.0)
+        val r = t.maskedFilled(m, 0.0)
         assert(r.value.toSeq == Seq(
           Seq(1.0, 0.0, 3.0),
           Seq(0.0, 2.0, 0.0)
@@ -427,7 +427,7 @@ class TensorSpec extends UnitSpec {
           ((4.0, 5.0, 6.0))
         ))
         val m = Tensor((false, true, false))
-        val r = t.maskedFill(m, 0.0)
+        val r = t.maskedFilled(m, 0.0)
         assert(r.value.toSeq == Seq(
           Seq(1.0, 0, 3.0),
           Seq(4.0, 0, 6.0)

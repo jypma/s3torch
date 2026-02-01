@@ -95,7 +95,7 @@ class Transformer[
       // "attention" method of the original video starts here
       val attention_scores = q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads) // 37:00
       // Set the attention scores to a very low value wherever the mask is zero.
-      mask.foreach(m => attention_scores.maskedFill_(m #== 0, 1e-9))
+      mask.foreach(m => attention_scores.maskedFill(m #== 0, 1e-9))
 
       ???
     }

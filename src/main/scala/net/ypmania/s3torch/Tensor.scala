@@ -71,13 +71,12 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def floor: Tensor[S, T] = new Tensor(native.floor())
 
   /** Fills elements of self tensor with value where mask is true. */
-  def maskedFill_[S2 <: Tuple, V](mask: Tensor[S2, DType.Bool.type], value: V)(using Broadcast[S, S2, S])(using toScalar:FromScala.ToScalar[V]): this.type = {
+  def maskedFill[S2 <: Tuple, V](mask: Tensor[S2, DType.Bool.type], value: V)(using Broadcast[S, S2, S])(using toScalar:FromScala.ToScalar[V]): Unit = {
     // Any [V] is indeed correct here, pytorch accepts doubles for int vectors.
     native.masked_fill_(mask.native, toScalar(value))
-    this
   }
   /** Returns copy that fills elements of self tensor with value where mask is true. */
-  def maskedFill[S2 <: Tuple, V, R <: Tuple](b: Tensor[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Tensor[R,T] = {
+  def maskedFilled[S2 <: Tuple, V, R <: Tuple](b: Tensor[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Tensor[R,T] = {
     new Tensor(native.masked_fill(b.native, toScalar(value)))
   }
 
@@ -123,9 +122,8 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     new Tensor(native.transpose(-2L, -1L))
    }
 
-  def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): this.type = {
+  def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): Unit = {
     updateSource(native, idx.toNative(indices), value)
-    this
   }
 
   /** Merges two dimensions that have previously been split off using split(). The selected dimension must be of type DividedDim, and must have a preceding
