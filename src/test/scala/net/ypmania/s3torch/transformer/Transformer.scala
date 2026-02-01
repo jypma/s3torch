@@ -17,6 +17,7 @@ import net.ypmania.s3torch.Shape.Select.Idx
 import net.ypmania.s3torch.Shape.Select.At
 import net.ypmania.s3torch.Shape.Select.Divided
 import net.ypmania.s3torch.internal.Broadcast
+import net.ypmania.s3torch.internal.Broadcastable
 
 // Plain pytorch source: https://www.youtube.com/watch?v=ISNdQcPhsts
 class Transformer[
@@ -86,13 +87,13 @@ class Transformer[
     private def splitHeads(b: Batch): Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] =
       b.split[DModel].into[NHeads].transpose[SeqLen, Static[NHeads]]
 
-    def apply(query: Batch, key: Batch, value: Batch, mask: Option[Tensor[(SeqLen, SeqLen), T]]): Batch = {
+    def apply[M <: Tuple](query: Batch, key: Batch, value: Batch, mask: Option[Tensor[M, T]])(using Broadcastable[AttentionScores, M]): Batch = {
       val q = query ~> queryWeights.apply ~> splitHeads
       val k = key ~> keyWeights.apply ~> splitHeads
       val v = value ~> valueWeights.apply ~> splitHeads
 
       // "attention" method of the original video starts here
-      val attention_scores = q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.toDouble) // 37:00
+      val attention_scores = q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads) // 37:00
       // Set the attention scores to a very low value wherever the mask is zero.
       mask.foreach(m => attention_scores.maskedFill_(m #== 0, 1e-9))
 

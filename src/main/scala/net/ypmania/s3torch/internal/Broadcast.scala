@@ -11,6 +11,8 @@ import scala.util.NotGiven
 /** Given that shows that S1 and S2 are broadcastable, with shape R as result. */
 trait Broadcast[S1 <: Tuple, S2 <: Tuple, R <: Tuple]
 
+type Broadcastable[S1 <: Tuple, S2 <: Tuple] = Broadcast[S1, S2, S1]
+
 object Broadcast {
   /** Given that gives the maximum of both A and B as M */
   trait Max[A <: Dim, B <: Dim, M <: Dim] {
@@ -48,12 +50,4 @@ object Broadcast {
   given [S1 <: Tuple, S2 <: Tuple, R <: Tuple](using
     MaxEachDim[Widen[S1, S2], Widen[S2, S1], R]
   ): Broadcast[S1, S2, R] with {}
-
-  /** Given that shows that the two shapes are broadcastable */
-  trait Apply[S1 <: Tuple, S2 <: Tuple] {
-    type Out <: Tuple
-  }
-  object Apply {
-    given[S1 <: Tuple, S2 <: Tuple, R <: Tuple](using Broadcast[S1, S2, R]): Apply[S1, S2] with { type Out = R }
-  }
 }

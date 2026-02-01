@@ -71,7 +71,7 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def floor: Tensor[S, T] = new Tensor(native.floor())
 
   /** Fills elements of self tensor with value where mask is true. */
-  def maskedFill_[S2 <: Tuple, V, R <: Tuple](mask: Tensor[S2, DType.Bool.type], value: V)(using Broadcast[S, S2, R], R =:= S)(using toScalar:FromScala.ToScalar[V]): this.type = {
+  def maskedFill_[S2 <: Tuple, V](mask: Tensor[S2, DType.Bool.type], value: V)(using Broadcast[S, S2, S])(using toScalar:FromScala.ToScalar[V]): this.type = {
     // Any [V] is indeed correct here, pytorch accepts doubles for int vectors.
     native.masked_fill_(mask.native, toScalar(value))
     this
