@@ -11,7 +11,7 @@ class LinearSpec extends UnitSpec {
   case object BatchSize extends Static[1L]
 
   describe("Linear") {
-    val lin = withSeed(0) { Linear(In, Out) }
+    val lin = Linear(In, Out)
 
     it("Turns the last dimension from In to Out") {
       val in = Tensor.zeros(BatchSize, In)

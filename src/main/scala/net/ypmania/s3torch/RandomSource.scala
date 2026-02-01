@@ -1,6 +1,10 @@
 package net.ypmania.s3torch
 
-/** Wrapper trait that can wrap functions that use a source of randomness. This allows tests to set a reproducable random seed. */
+/** Wrapper trait that can wrap functions that use a source of
+  * randomness. This allows tests to set a reproducable random
+  * seed. We don't support libtorch's "Generator" concept, since
+  * libtorch's built-in neural network modules (nn.*) always use the
+  * global random generator anyway. */
 trait RandomSource() {
   def apply[T](fn: => T): T
 

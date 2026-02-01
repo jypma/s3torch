@@ -18,7 +18,7 @@ abstract class UnitSpec extends AnyFunSpec {
     }
   }
 
-  def withSeed[T](seed: Long)(fn: => T): T = {
+  private def withSeed[T](seed: Long)(fn: => T): T = {
     UnitSpec.synchronized {
       pytorch.global.torch.manual_seed(seed)
       fn

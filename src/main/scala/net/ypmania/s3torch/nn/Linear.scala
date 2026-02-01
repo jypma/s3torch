@@ -10,16 +10,17 @@ import net.ypmania.s3torch.Default
 import Tuple.*
 import Shape.*
 import scala.compiletime.ops.int.*
+import net.ypmania.s3torch.RandomSource
 
 class Linear[In <: Dim, Out <: Dim] private (native: pytorch.LinearImpl) extends AbstractModule(native) {
   def apply[S <: Shape, T <: DType, Idx <: Int](in: Tensor[S, T])(using Tuple.Last[S] =:= In): Tensor[Replace[S, Out, LastIdx[S]],T] = new Tensor(native.forward(in.native))
 }
 
 object Linear {
-  def apply[T <: DType](using dtype: Default[T]) = new Apply(dtype.value)
+  def apply[T <: DType](using dtype: Default[T], rnd: RandomSource) = new Apply(dtype.value)
 
-  class Apply[T <: DType](dtype: T) {
-    def apply[In <: Dim, Out <: Dim](in: In, out: Out): Linear[In, Out] = new Linear(new pytorch.LinearImpl(in.size, out.size)).to(dtype)
+  class Apply[T <: DType](dtype: T)(using rnd: RandomSource) {
+    def apply[In <: Dim, Out <: Dim](in: In, out: Out): Linear[In, Out] = rnd(new Linear(new pytorch.LinearImpl(in.size, out.size)).to(dtype))
   }
 
 }
