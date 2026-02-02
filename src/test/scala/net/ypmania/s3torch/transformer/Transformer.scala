@@ -40,8 +40,8 @@ class Transformer[
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
     val position = Tensor.arangeOf(seqLen).unsqueezeAfter(Last)
-    val indices = Tensor.arangeOf(dModel).floor_divide(2)
-    val phase_offset = Tensor.arangeOf(dModel).remainder(2) * (Math.PI * 0.5)
+    val indices = Tensor.arangeOf(dModel) /|/ 2
+    val phase_offset = (Tensor.arangeOf(dModel) % 2) * (Math.PI * 0.5)
     val div_term = exp(indices * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 

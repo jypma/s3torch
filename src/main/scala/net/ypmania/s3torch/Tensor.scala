@@ -12,6 +12,7 @@ import internal.ToScala
 import internal.Flatten
 import internal.Broadcast
 import internal.TensorOperand
+import internal.TensorOperandApply
 import internal.TensorOperandBool
 import internal.UpdateSource
 import internal.ReduceOperand
@@ -153,12 +154,22 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   // --- Binary operands ----
 
-  def floor_divide[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.floor_divide(_), _.floor_divide(_))
-  def remainder[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.remainder(_), _.remainder(_))
+  /** Computes the division of this tensor with [value], elementwise, and takes floor() of the result. This is floor_divide in libtorch. */
+  def /|/[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.floor_divide(_), _.floor_divide(_))
+  /** Computes the division of this tensor with [value], elementwise, takes floor() of the result, and reassigns to this tensor. This is floor_divide in libtorch. */
+  def /|/=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.floor_divide_(_), _.floor_divide_(_))
+  /** Calculates the remainder of division with the given value. */
+  def %[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.remainder(_), _.remainder(_))
+  /** Calculates the remainder of division with the given value, and reassigns to this tensor. */
+  def %=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.remainder_(_), _.remainder_(_))
   def +[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.add(_), _.add(_))
+  def +=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.add_(_), _.add_(_))
   def -[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.sub(_), _.sub(_))
+  def -=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.sub_(_), _.sub_(_))
   def *[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.mul(_), _.mul(_))
+  def *=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.mul_(_), _.mul_(_))
   def /[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.div(_), _.div(_))
+  def /=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.div_(_), _.div_(_))
 
   private[Tensor] def unsafeWithShape[S1 <: Tuple]: Tensor[S1, T] = this.asInstanceOf[Tensor[S1, T]]
 }
