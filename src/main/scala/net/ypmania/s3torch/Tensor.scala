@@ -89,6 +89,11 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
+  val softmax = new DimOperator.Of1Tensor[S, T] {
+    type Out[Idx <: Int] = S
+    def run[Idx <: Int](idx: Idx) = new Tensor(native.softmax(idx))
+  }
+
   /** Transforms a split version of this tensor, split across dimension D in N parts, using the given function, while retaining the original
     type once computation is complete. */
   val split = new DimOperator.Of1[S, T] {

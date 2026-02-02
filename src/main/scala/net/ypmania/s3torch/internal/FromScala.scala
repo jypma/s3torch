@@ -110,7 +110,9 @@ object FromScala {
 
     override def apply[T <: DType](value: S): Tensor[OutputShape, T] = {
       val seq = toSeq(value)
-      val tensor = torch.from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(defaultDType))
+      val tensor = torch
+        .from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(defaultDType))
+        .clone() // from_blob, if running on CPU, retains a reference to the original ByteBuffer, which might be GC'ed.
       new Tensor(tensor)
     }
   }

@@ -93,10 +93,15 @@ class Transformer[
       val v = value ~> valueWeights.apply ~> splitHeads
 
       // "attention" method of the original video starts here
-      val attention_scores = q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads) // 37:00
+      // TODO rewrite as val
+      var attention_scores = q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads)
       // Set the attention scores to a very low value wherever the mask is zero.
-      mask.foreach(m => attention_scores.maskedFill(m #== 0, 1e-9))
+      for (m <- mask) {
+        attention_scores.maskedFill(m #== 0, 1e-9)
+      }
 
+      // Take the softmax of the last dimension of AttentionScores (which is a SeqLen, but we have two, so we use Last)
+      attention_scores = attention_scores.softmax(Last)
       ???
     }
   }
