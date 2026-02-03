@@ -80,4 +80,23 @@ class TransformerSpec extends UnitSpec {
       ))
     }
   }
+
+  describe("MultiHeadAttention") {
+    val mh = new transformer.MultiHeadAttention(0.5)
+
+    it("should apply key and value to the batch") {
+      val in = Tensor.zeros(BatchSize, SeqLen, DModel)
+      val key = Tensor.zeros(BatchSize, SeqLen, DModel)
+      val value = Tensor.zeros(BatchSize, SeqLen, DModel)
+      val res = mh(in, key, value)
+
+      assert(res.value === Seq(
+        Seq(
+          Seq(0.5045, 0.2997, -0.2170, -0.4354),
+          Seq(0.4513, 0.2983, -0.2376, -0.3063),
+          Seq(0.5574, 0.2168, -0.2085, -0.5011)
+        )
+      ))
+    }
+  }
 }

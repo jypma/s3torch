@@ -87,6 +87,14 @@ class Transformer[
     private def splitHeads(b: Batch): Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] =
       b.split[DModel].into[NHeads].transpose[SeqLen, Static[NHeads]]
 
+    private def joinHeads(h: Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T]) = {
+      // FIXME the original video needed a ".contiguous()" before the unsplit (.view) here, but
+      // we apparently don't need that...
+      h.transpose[Static[NHeads], SeqLen].unsplit[Divided[DModel]]
+    }
+
+    def apply(query: Batch, key: Batch, value: Batch): Batch = apply[(SeqLen, SeqLen)](query, key, value, None.asInstanceOf[Option[Tensor[(SeqLen, SeqLen), T]]])
+
     def apply[M <: Tuple](query: Batch, key: Batch, value: Batch, mask: Option[Tensor[M, T]])(using Broadcastable[AttentionScores, M]): Batch = {
       val q = query ~> queryWeights.apply ~> splitHeads
       val k = key ~> keyWeights.apply ~> splitHeads
@@ -102,7 +110,14 @@ class Transformer[
 
       // Take the softmax of the last dimension of AttentionScores (which is a SeqLen, but we have two, so we use Last)
       attention_scores = attention_scores.softmax(Last)
-      ???
+
+      attention_scores = dropout(attention_scores) // the dropout is Option in the original "attention" method
+      // TODO store "attention_scores" somehow (self.attention_scores = attention_scores)
+
+      val x = attention_scores `@` v
+      val x2 = joinHeads(x)
+
+      outputWeights(x2)
     }
   }
 }
