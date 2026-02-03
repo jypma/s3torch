@@ -157,6 +157,9 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def value(using toScala: ToScala[S, T]) = toScala(native)
 
+  /** Applies [f] to [this] and the [opt] (if defined), or just returns [this] (if empty) */
+  def when[A](opt: Option[A])(f: (Tensor[S, T], A) => Tensor[S, T]) = opt.map(a => f(this, a)).getOrElse(this)
+
   // --- Binary operands ----
 
   /** Computes the division of this tensor with [value], elementwise, and takes floor() of the result. This is floor_divide in libtorch. */
