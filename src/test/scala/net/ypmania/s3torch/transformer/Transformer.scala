@@ -85,7 +85,7 @@ class Transformer[
       * and NHeads dimensions, so each head looks at a sequence of
       * vectors with that head's part of the original DModel. */
     private def splitHeads(b: Batch): Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] =
-      b.split[DModel].into[NHeads].transpose[SeqLen, Static[NHeads]]
+      b.split[DModel].into[NHeads].transpose[Static[NHeads], SeqLen]
 
     private def joinHeads(h: Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T]) = {
       // FIXME the original video needed a ".contiguous()" before the unsplit (.view) here, but
