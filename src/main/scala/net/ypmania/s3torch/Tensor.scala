@@ -44,6 +44,8 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 
   def dtype: T = DType.of(native.dtype().toScalarType()).asInstanceOf[T]
 
+  def deviceType: DeviceType = DeviceType.of(native.device().`type`())
+
   /** Computes element-wise equality. We don't define pytorch's "eq" or "==", since those have a different meaning in Scala. */
   def #==[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.eq(_), _.eq(_))
   /** Computes element-wise nonequality. We don't define pytorch's "eq" or "!=" since those have a different meaning in Scala. */
@@ -115,7 +117,9 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     }
   }
 
-  def to[T1 <: DType](dtype: T1): Tensor[S, T1] = new Tensor(native.to(dtype.scalarType))
+  def to(device: Device[?]): Tensor[S, T] = new Tensor(native.to(device.toNative, dtype.native))
+
+  def to[T1 <: DType](dtype: T1): Tensor[S, T1] = new Tensor(native.to(dtype.native))
 
   /** Swaps the given two dimensions. */
   val transpose = new DimOperator.Of2Tensor[S, T] {
@@ -127,6 +131,7 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   def t[R <: Tuple](using Transpose[S, R]): Tensor[R, T] = {
     new Tensor(native.transpose(-2L, -1L))
    }
+
 
   def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): Unit = {
     updateSource(native, idx.toNative(indices), value)

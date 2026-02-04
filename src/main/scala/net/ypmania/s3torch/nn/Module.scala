@@ -44,7 +44,7 @@ abstract class AbstractModule(private[AbstractModule] val native: pytorch.Module
   }
 
   private[nn] def to(dtype: DType): this.type = {
-    native.to(dtype.scalarType, false)
+    native.to(dtype.native, false)
     this
   }
 
@@ -60,13 +60,14 @@ abstract class AbstractModule(private[AbstractModule] val native: pytorch.Module
   /** Loads pytorch "pt" formst, by repeatedly calling [read] with a target byte buffer to fill, and how many bytes to set there for that call. */
   def load(size: Long, read: (ByteBuffer, Long) => Unit): this.type = {
     Using(new pytorch.InputArchive) { archive =>
-      archive.load_from(new pytorch.Reader() {
+      // for pytorch 2.7.1+ : Reader() and SizeTSupplier() have moved from pytorch.functions to pytorch.
+      archive.load_from(new pytorch.functions.Reader() {
         override def call(pos: Long, buf: Pointer, nbytes: Long): Long = {
           buf.limit(nbytes)
           read(buf.asByteBuffer, pos)
           nbytes
         }
-      }, new pytorch.SizeTSupplier() {
+      }, new pytorch.functions.SizeTSupplier() {
         override def call = size
       })
       native.load(archive)
@@ -104,7 +105,8 @@ abstract class AbstractModule(private[AbstractModule] val native: pytorch.Module
   def save(fn: ByteBuffer => Unit) = {
     Using(new pytorch.OutputArchive) { archive =>
       native.save(archive)
-      archive.save_to(new pytorch.ArchiveWriter() {
+      // for pytorch 2.7.1+ : ArchiveWriter() has moved from pytorch.functions to pytorch.
+      archive.save_to(new pytorch.functions.ArchiveWriter() {
         override def call(buf: Pointer, nbytes: Long) = {
           buf.limit(nbytes)
           fn(buf.asByteBuffer)

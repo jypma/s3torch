@@ -5,8 +5,9 @@ import org.bytedeco.pytorch.global.torch
 import scala.compiletime.erasedValue
 
 // This can't be an enum, since then "val t = Int8 is typed DType, not Int8.type"
-sealed abstract class DType(private[s3torch] val scalarType: torch.ScalarType) {
-  DType.fromNative = DType.fromNative + (scalarType.value -> this)
+/** The data type for a tensor, e.g. 32-bit float or 8-bit integer. */
+sealed abstract class DType(private[s3torch] val native: torch.ScalarType) {
+  DType.fromNative = DType.fromNative + (native.value -> this)
 }
 
 object DType {
