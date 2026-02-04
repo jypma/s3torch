@@ -10,20 +10,34 @@ import net.ypmania.s3torch.Shape
 import org.bytedeco.javacpp.Pointer
 import java.nio.ByteBuffer
 import net.ypmania.s3torch.Default
+import org.bytedeco.pytorch
 
 /** The base class for all nn modules */
 abstract class AbstractModule(private[AbstractModule] val native: pytorch.Module) {
 
+  /** Registers the given module as a sub-module (so its state is loaded/saved together), and returns it. */
   protected def addModule[M <: AbstractModule](name: String, child: M): M = {
     native.register_module(name, child.native)
     child
   }
 
+  /** Registers the given modules as a sub-module list (so their state is loaded/saved together), and returns the same list. */
+  protected def addModules[M <: AbstractModule](name: String, children: Seq[M]): Seq[M] = {
+    val list = new pytorch.ModuleListImpl
+    for (child <- children) {
+      list.push_back(child.native)
+    }
+    native.register_module(name, list)
+    children
+  }
+
+  /** Registers the given buffer (so its state is loaded/saved together), and returns it. */
   protected def addBuffer[S <: Shape, T <: DType](name: String, buffer: Tensor[S, T]): Tensor[S, T] = {
     native.register_buffer(name, buffer.native)
     buffer
   }
 
+  /** Registers the given parameter (so its state is loaded/saved together), and returns it. */
   protected def addParameter[S <: Shape, T <: DType](name: String, parameter: Tensor[S, T]): Tensor[S, T] = {
     native.register_parameter(name, parameter.native)
     parameter

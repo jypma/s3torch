@@ -62,7 +62,7 @@ class Transformer[
     }
   }
 
-  class FeedForward[Dff <: Dim, SeqLen <: Dim](dff: Dff, seqLen: SeqLen, dropoutProb: Double) extends Module {
+  class FeedForward[Dff <: Dim](dff: Dff, seqLen: SeqLen, dropoutProb: Double) extends Module {
     val l1 = addModule("l1", Linear(dModel, dff))
     val dropout = addModule("dropout", Dropout(dropoutProb))
     val l2 = addModule("l2", Linear(dff, dModel))
@@ -110,6 +110,31 @@ class Transformer[
         `@` v
         ~> joinHeads.apply
         ~> outputWeights.apply
+    }
+  }
+
+  /** Applies an input through LayerNormalization, then into a
+    * sub-layer, and then through a dropout, adding the result to the
+    * original input. */
+  class ResidualConnection(dropoutProb: Double) extends Module {
+    val dropout = addModule("dropout", Dropout(dropoutProb))
+    val norm = addModule("norm", new LayerNormalization)
+
+    def apply(sublayer: Batch => Batch): Batch => Batch =
+      in => (in ~> norm.apply ~> sublayer ~> dropout.apply) + in
+  }
+
+  // TODO get rid of Dff ?
+  // TODO just pass constructor args for [att] and [ff] instead of direct types
+  class Encoder[Dff <: Dim](att: => MultiHeadAttention, ff: => FeedForward[Dff], dropoutProb: Double) extends Module {
+    val attention = addModule("attention", att)
+    val feedForward = addModule("feedForward", ff)
+    val residual = addModules("residual", Seq.fill(2)(new ResidualConnection(dropoutProb)))
+
+    def apply[M <: Tuple](in: Batch, mask: Tensor[M, T])(using Broadcastable[AttentionScores, M]): Batch = {
+      in
+        ~> residual(0)(x => attention(x, x, x, Some(mask)))
+        ~> residual(1)(feedForward.apply)
     }
   }
 }
