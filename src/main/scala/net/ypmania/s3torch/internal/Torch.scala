@@ -18,7 +18,19 @@ object Torch {
       .TensorOptions()
       .dtype(ScalarTypeOptional(dtype.native))
       .layout(LayoutOptional(Layout.Strided.toNative))
-      .device(DeviceOptional(Device.CPU.toNative))
+      .device(DeviceOptional(Device.CPU.native))
+      .requires_grad(BoolOptional(false))
+      .pinned_memory(BoolOptional(false))
+
+  def tensorOptions(
+    dtype: DType,
+    device: Device
+  ): pytorch.TensorOptions =
+    pytorch
+      .TensorOptions()
+      .dtype(ScalarTypeOptional(dtype.native))
+      .layout(LayoutOptional(Layout.Strided.toNative))
+      .device(DeviceOptional(device.native))
       .requires_grad(BoolOptional(false))
       .pinned_memory(BoolOptional(false))
 }

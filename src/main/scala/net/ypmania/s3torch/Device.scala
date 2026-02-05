@@ -18,8 +18,8 @@ object DeviceType {
   case object CUDA extends DeviceType(torch.DeviceType.CUDA)
 }
 
-abstract class Device[D <: DeviceType](val deviceType: D, val index: Byte = -1) {
-  def toNative: pytorch.Device = pytorch.Device(deviceType.native.value, index)
+abstract class Device(val deviceType: DeviceType, val index: Byte = -1) {
+  def native: pytorch.Device = pytorch.Device(deviceType.native.value, index)
 }
 
 object Device {

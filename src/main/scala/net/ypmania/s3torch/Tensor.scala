@@ -31,67 +31,75 @@ import net.ypmania.s3torch.Dim.*
 import net.ypmania.s3torch.Shape.*
 import DType.*
 import org.bytedeco.pytorch.ScalarTypeOptional
+import Device.CPU
 
-class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
+class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   type shape = S
   type dType = T
   type IdFn[T] = T => T
+  /** A differently-shaped tensor with the same DType and Device */
+  type Shaped[S1 <: Tuple] = Tensor[S1, T, D]
+  /** A differently-shaped tensor, with different DType, on the same Device */
+  type ShapedT[S1 <: Tuple, T1 <: DType] = Tensor[S1, T1, D]
+  type This = Tensor[S, T, D]
 
   import Tensor.*
   import Tuple.:*
 
-  def ~>[U](f: Tensor[S,T] => U) = f(this)
+  def ~>[U](f: This => U) = f(this)
 
   def dtype: T = DType.of(native.dtype().toScalarType()).asInstanceOf[T]
 
   def deviceType: DeviceType = DeviceType.of(native.device().`type`())
 
+  private type BoolOp[V] = TensorOperandBool[S, T, D, V]
   /** Computes element-wise equality. We don't define pytorch's "eq" or "==", since those have a different meaning in Scala. */
-  def #==[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.eq(_), _.eq(_))
+  def #==[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.eq(_), _.eq(_))
   /** Computes element-wise nonequality. We don't define pytorch's "eq" or "!=" since those have a different meaning in Scala. */
-  def #!=[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.ne(_), _.ne(_))
+  def #!=[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.ne(_), _.ne(_))
   /** Computes element-wise greater than. */
-  def >[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.greater(_), _.greater(_))
+  def >[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.greater(_), _.greater(_))
   /** Computes element-wise less than. */
-  def <[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.less(_), _.less(_))
+  def <[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.less(_), _.less(_))
   /** Computes element-wise greater than or equal. */
-  def >=[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.greater_equal(_), _.greater_equal(_))
+  def >=[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.greater_equal(_), _.greater_equal(_))
   /** Computes element-wise less than or equal. */
-  def <=[V](value: V)(using op:TensorOperandBool[S, T, V]): op.Out = op(this, value, _.less_equal(_), _.less_equal(_))
+  def <=[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.less_equal(_), _.less_equal(_))
 
   /** True if `other` has the same size and elements as this tensor, false otherwise. */
-  def equal[S2 <: Tuple](that: Tensor[S2, T])(using SameSize[S, S2]): Boolean = native.equal(that.native)
+  def equal[S2 <: Tuple](that: Shaped[S2])(using SameSize[S, S2]): Boolean = native.equal(that.native)
 
   override def equals(that: Any): Boolean = that match {
-    case other: Tensor[?, ?] if dtype == other.dtype =>
+    // TODO investigate if this should just be .equal
+    case other: Tensor[?, ?, ?] if dtype == other.dtype =>
       native.equal(other.native)
     case _ =>
       false
   }
 
-  def flatten: Tensor[Flatten.All[S], T] = new Tensor[Flatten.All[S], T](native.flatten())
+  def flatten: Shaped[Flatten.All[S]] = new Tensor(native.flatten())
 
-  def floor: Tensor[S, T] = new Tensor(native.floor())
+  def floor: This = new Tensor(native.floor())
 
   /** Fills elements of self tensor with value where mask is true. */
-  def maskedFill[S2 <: Tuple, V](mask: Tensor[S2, DType.Bool.type], value: V)(using Broadcast[S, S2, S])(using toScalar:FromScala.ToScalar[V]): Unit = {
+  def maskedFill[S2 <: Tuple, V](mask: ShapedT[S2, DType.Bool.type], value: V)(using Broadcast[S, S2, S])(using toScalar:FromScala.ToScalar[V]): Unit = {
     // Any [V] is indeed correct here, pytorch accepts doubles for int vectors.
     native.masked_fill_(mask.native, toScalar(value))
   }
   /** Returns copy that fills elements of self tensor with value where mask is true. */
-  def maskedFilled[S2 <: Tuple, V, R <: Tuple](b: Tensor[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Tensor[R,T] = {
+  def maskedFilled[S2 <: Tuple, V, R <: Tuple](b: ShapedT[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Shaped[R] = {
     new Tensor(native.masked_fill(b.native, toScalar(value)))
   }
 
   /** Matrix multiplication */
-  def matmul[S2 <: Tuple, T2 <: DType, R <: Tuple](b: Tensor[S2, T2])(using MatMul[S, S2, R]): Tensor[R, Promoted[T, T2]] =
+  def matmul[S2 <: Tuple, T2 <: DType, R <: Tuple](b: ShapedT[S2, T2])(using MatMul[S, S2, R]): ShapedT[R, Promoted[T, T2]] =
     new Tensor(native.matmul(b.native))
   /** Matrix multiplication, alias for .matmul */
-  def `@`[S2 <: Tuple, T2 <: DType, R <: Tuple](b: Tensor[S2, T2])(using MatMul[S, S2, R]): Tensor[R, Promoted[T, T2]] = matmul(b)
+  def `@`[S2 <: Tuple, T2 <: DType, R <: Tuple](b: ShapedT[S2, T2])(using MatMul[S, S2, R]): ShapedT[R, Promoted[T, T2]] = matmul(b)
 
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
-  val softmax = new DimOperator.Of1Tensor[S, T] {
+  val softmax = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = S
     def run[Idx <: Int](idx: Idx) = new Tensor(native.softmax(idx))
   }
@@ -105,11 +113,11 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   class SplitApply[Idx <: Int, D](idx: Idx) {
     /** Splits the selected dimension into N parts. */
     def into[N <: Long & Singleton](nn: N)(using dv: D |/ N, n: ValueOf[N]):
-        Tensor[Shape.ReplaceWithTuple[S, (Dim.Static[N], Shape.Elem[S, Idx] / N), Idx], T] = into
+        Shaped[Shape.ReplaceWithTuple[S, (Dim.Static[N], Shape.Elem[S, Idx] / N), Idx]] = into
 
     /** Splits the selected dimension into N parts. */
     def into[N <: Long & Singleton](using dv: D |/ N, n: ValueOf[N]):
-        Tensor[Shape.ReplaceWithTuple[S, (Dim.Static[N], Shape.Elem[S, Idx] / N), Idx], T] = {
+        Shaped[Shape.ReplaceWithTuple[S, (Dim.Static[N], Shape.Elem[S, Idx] / N), Idx]] = {
       val (before, after) = size.splitAt(idx)
       val dimsize = after.head
       val sizes = before :+ n.value :+ (dimsize / n.value) :++ after.tail
@@ -117,29 +125,28 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
     }
   }
 
-  def to(device: Device[?]): Tensor[S, T] = new Tensor(native.to(device.toNative, dtype.native))
+  def to[D1 <: Device](device: D1): Tensor[S, T, D1] = new Tensor(native.to(device.native, dtype.native))
 
-  def to[T1 <: DType](dtype: T1): Tensor[S, T1] = new Tensor(native.to(dtype.native))
+  def to[T1 <: DType](dtype: T1): Tensor[S, T1, D] = new Tensor(native.to(dtype.native))
 
   /** Swaps the given two dimensions. */
-  val transpose = new DimOperator.Of2Tensor[S, T] {
+  val transpose = new DimOperator.Of2Tensor[S, T, D] {
     type Out[I1 <: Int, I2 <: Int] = Shape.Swap[S, I1, I2]
     def run[I1 <: Int, I2 <: Int](i1: I1, i2: I2) = new Tensor(native.transpose(i1, i2))
   }
 
   /** Swaps the last two dimensions. Tensor must have >= 2 dimensions. */
-  def t[R <: Tuple](using Transpose[S, R]): Tensor[R, T] = {
+  def t[R <: Tuple](using Transpose[S, R]): Shaped[R] = {
     new Tensor(native.transpose(-2L, -1L))
    }
 
-
-  def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V]): Unit = {
+  def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V, D]): Unit = {
     updateSource(native, idx.toNative(indices), value)
   }
 
   /** Merges two dimensions that have previously been split off using split(). The selected dimension must be of type DividedDim, and must have a preceding
     * dimension with the remainder of the division. */
-  val unsplit = new DimOperator.Of1Tensor[S, T] {
+  val unsplit = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = Unsplit[S, Idx]
     def run[Idx <: Int](idx: Idx) = {
       val (before, after) = size.splitAt(idx - 1)
@@ -149,42 +156,44 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
   }
 
   /** Inserts a dimension of One after D */
-  val unsqueezeAfter = new DimOperator.Of1Tensor[S, T] {
+  val unsqueezeAfter = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = Shape.InsertAfter[S, Dim.One, Idx]
     def run[Idx <: Int](idx: Idx) = new Tensor(native.unsqueeze(idx + 1))
   }
 
   /** Inserts a dimension of One before D */
-  val unsqueezeBefore = new DimOperator.Of1Tensor[S, T] {
+  val unsqueezeBefore = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = Shape.InsertBefore[S, Dim.One, Idx]
     def run[Idx <: Int](idx: Idx) = new Tensor(native.unsqueeze(idx))
   }
 
-  def value(using toScala: ToScala[S, T]) = toScala(native)
+  def value(using toScala: ToScala[S, T])(using D =:= CPU.type) = toScala(native)
 
   /** Applies [f] to [this] and the [opt] (if defined), or just returns [this] (if empty) */
-  def when[A](opt: Option[A])(f: (Tensor[S, T], A) => Tensor[S, T]) = opt.map(a => f(this, a)).getOrElse(this)
+  def when[A](opt: Option[A])(f: (This, A) => This): This = opt.map(a => f(this, a)).getOrElse(this)
 
   // --- Binary operands ----
 
+  private type TensOp[V] = TensorOperand[S, T, D, V]
+  private type ApplOp[V] = TensorOperandApply[S, T, D, V]
   /** Computes the division of this tensor with [value], elementwise, and takes floor() of the result. This is floor_divide in libtorch. */
-  def /|/[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.floor_divide(_), _.floor_divide(_))
+  def /|/[V](value: V)(using op: TensOp[V]): op.Out = op(this, value, _.floor_divide(_), _.floor_divide(_))
   /** Computes the division of this tensor with [value], elementwise, takes floor() of the result, and reassigns to this tensor. This is floor_divide in libtorch. */
-  def /|/=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.floor_divide_(_), _.floor_divide_(_))
+  def /|/=[V](value: V)(using op: ApplOp[V]): Unit = op(this, value, _.floor_divide_(_), _.floor_divide_(_))
   /** Calculates the remainder of division with the given value. */
-  def %[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.remainder(_), _.remainder(_))
+  def %[V](value: V)(using op: TensOp[V]): op.Out = op(this, value, _.remainder(_), _.remainder(_))
   /** Calculates the remainder of division with the given value, and reassigns to this tensor. */
-  def %=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.remainder_(_), _.remainder_(_))
-  def +[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.add(_), _.add(_))
-  def +=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.add_(_), _.add_(_))
-  def -[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.sub(_), _.sub(_))
-  def -=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.sub_(_), _.sub_(_))
-  def *[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.mul(_), _.mul(_))
-  def *=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.mul_(_), _.mul_(_))
-  def /[V](value: V)(using op: TensorOperand[S, T, V]): op.Out = op(this, value, _.div(_), _.div(_))
-  def /=[V](value: V)(using op: TensorOperandApply[S, T, V]): Unit = op(this, value, _.div_(_), _.div_(_))
+  def %=[V](value: V)(using op: ApplOp[V]): Unit = op(this, value, _.remainder_(_), _.remainder_(_))
+  def +[V](value: V)(using op: TensOp[V]): op.Out = op(this, value, _.add(_), _.add(_))
+  def +=[V](value: V)(using op: ApplOp[V]): Unit = op(this, value, _.add_(_), _.add_(_))
+  def -[V](value: V)(using op: TensOp[V]): op.Out = op(this, value, _.sub(_), _.sub(_))
+  def -=[V](value: V)(using op: ApplOp[V]): Unit = op(this, value, _.sub_(_), _.sub_(_))
+  def *[V](value: V)(using op: TensOp[V]): op.Out = op(this, value, _.mul(_), _.mul(_))
+  def *=[V](value: V)(using op: ApplOp[V]): Unit = op(this, value, _.mul_(_), _.mul_(_))
+  def /[V](value: V)(using op: TensOp[V]): op.Out = op(this, value, _.div(_), _.div(_))
+  def /=[V](value: V)(using op: ApplOp[V]): Unit = op(this, value, _.div_(_), _.div_(_))
 
-  private[Tensor] def unsafeWithShape[S1 <: Tuple]: Tensor[S1, T] = this.asInstanceOf[Tensor[S1, T]]
+  private[Tensor] def unsafeWithShape[S1 <: Tuple]: Shaped[S1] = this.asInstanceOf
 }
 
 /** Math functions like sin, exp, are definied here, since "sin(x)"
@@ -193,69 +202,46 @@ class Tensor[S <: Tuple, T <: DType](val native: pytorch.Tensor) {
 object Tensor {
   val KeepDim = ReduceOperand.KeepDim
 
-  def apply[V](value: V)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, fromScala.DefaultDType] =
-    fromScala(value)
-  def apply[V, T <: DType](value: V, dtype: T)(using fromScala: FromScala[V]): Tensor[fromScala.OutputShape, T] =
-    fromScala(value).to(dtype)
+  // TODO Revisit this, just always make the DType from a Default given.
+  def apply[V, D <: Device](value: V)(using fromScala: FromScala[V], device: Default[D]): Tensor[fromScala.OutputShape, fromScala.DefaultDType, D] =
+    fromScala(value, device.value)
+  def apply[V, T <: DType, D <: Device](value: V, dtype: T)(using fromScala: FromScala[V], device: Default[D]): Tensor[fromScala.OutputShape, T, D] =
+    fromScala(value, device.value).to(dtype)
 
-  def arangeOf[D <: Dim, T <: DType](dim: D)(using dtype: Default[T]): Tensor[Tuple1[D], T] = arange(0L, dim.size, 1L, dtype.value).unsafeWithShape
-  def arangeOf[D <: Dim, T <: DType](dim: D, dtype: T): Tensor[Tuple1[D], T] = arange(0L, dim.size, 1L, dtype).unsafeWithShape
+  def arangeOf[D <: Dim, T <: DType, Dv <: Device](dim: D)(using dtype: Default[T], dv: Default[Dv]): Tensor[Tuple1[D], T, Dv] = arange(0L, dim.size, 1L, dtype.value).unsafeWithShape
+  def arangeOf[D <: Dim, T <: DType, Dv <: Device](dim: D, dtype: T)(using Default[Dv]): Tensor[Tuple1[D], T, Dv] = arange(0L, dim.size, 1L, dtype).unsafeWithShape
 
-  def arange[V](start: V, end: V, step: V)(using toScalar: ToScalar[V], fromScala: FromScala[V]): Tensor[Tuple1[Dim.Dynamic], fromScala.DefaultDType] = {
-    new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(fromScala.defaultDType)))
+  def arange[V, Dv <: Device](start: V, end: V, step: V)(using toScalar: ToScalar[V], fromScala: FromScala[V], dv: Default[Dv]): Tensor[Tuple1[Dim.Dynamic], fromScala.DefaultDType, Dv] = {
+    new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(fromScala.defaultDType, dv.value)))
   }
-  def arange[V, T <: DType](start: V, end: V, step: V, dtype: T)(using toScalar: ToScalar[V]): Tensor[Tuple1[Dim.Dynamic], T] = {
-    new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(dtype)))
+  def arange[V, T <: DType, Dv <: Device](start: V, end: V, step: V, dtype: T)(using toScalar: ToScalar[V], dv:Default[Dv]): Tensor[Tuple1[Dim.Dynamic], T, Dv] = {
+    new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(dtype, dv.value)))
   }
 
     // TODO consider a FunctionApply abstraction, to clean up duplication here
-  def cos[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.cos)
-  def exp[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.exp)
-  def relu[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.relu)
-  def sin[S <: Tuple, T <: DType](t: Tensor[S, T]): Tensor[S, T] = new Tensor(t.native.sin)
+  def cos[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.cos)
+  def exp[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.exp)
+  def relu[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.relu)
+  def sin[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.sin)
 
-  def ones[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value, torch.torch_ones(_, _))
-  def zeros[T <: DType](using dtype: Default[T]) = new ZerosApply(dtype.value, torch.torch_zeros(_, _))
-  def rand[T <: DType](using dtype: Default[T], rnd:RandomSource) = rnd(new ZerosApply(dtype.value, torch.torch_rand(_, _)))
+  def ones[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
+    new ZerosApply(dtype.value, device.value, torch.torch_ones(_, _))
+  def zeros[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
+    new ZerosApply(dtype.value, device.value, torch.torch_zeros(_, _))
+  def rand[T <: DType, D <: Device](using dtype: Default[T], device: Default[D], rnd:RandomSource) =
+    rnd(new ZerosApply(dtype.value, device.value, torch.torch_rand(_, _)))
 
   // ---- Methods on Tensor that require floats
-  extension[S <: Shape, T <: DType.Floaty](t: Tensor[S, T]) {
+  extension[S <: Shape, T <: DType.Floaty, Dv <: Device](t: Tensor[S, T, Dv]) {
     // TODO consider a  ReduceOperandApply abstraction, in 0 and 1 arity, to clean up duplication here
-    def stdBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D, correction: Double = 1.0)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): Tensor[op.Out, T] =
+    def stdBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D, correction: Double = 1.0)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): t.Shaped[op.Out] =
       new Tensor(t.native.std(Array(op.index), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), op.keep))
-    def meanBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): Tensor[op.Out, T] =
+    def meanBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): t.Shaped[op.Out] =
       new Tensor(t.native.mean(Array(op.index), op.keep, new ScalarTypeOptional))
   }
 
   // ---- Methods on Tensor that only exist on scalars
-  extension[T <: DType](t: Tensor[Scalar, T]) {
+  extension[T <: DType, D <: Device](t: Tensor[Scalar, T, D]) {
     def backward(): Unit = t.native.backward()
-  }
-
-  // TODO refactor or remove
-  trait Squeeze[S <: Tuple] {
-    type OutputShape <: Tuple
-  }
-
-  given [D1 <: Dim.One]: Squeeze[Tuple1[D1]] with {
-    type OutputShape = Scalar
-  }
-
-  given squeezeD1ab[D1 <: Dim.One, D2 <: Dim.One]: Squeeze[(D1, D2)] with {
-    type OutputShape = Scalar
-  }
-
-  given squeezeD2a[D1 <: Dim.One, D2 <: Dim]: Squeeze[(D1, D2)] with {
-    type OutputShape = Tuple1[D2]
-  }
-
-  given squeezeD2b[D1 <: Dim, D2 <: Dim.One]: Squeeze[(D1, D2)] with {
-    type OutputShape = Tuple1[D1]
-  }
-
-  extension [S <: Tuple, T <: DType](t: Tensor[S, T])(using sq:Squeeze[S]) {
-    def squeeze: Tensor[sq.OutputShape, T] = {
-      ???
-    }
   }
 }
