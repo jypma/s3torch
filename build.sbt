@@ -1,4 +1,4 @@
-scalaVersion := "3.7.4"
+scalaVersion := "3.8.1"
 organization := "ypmania.net"
 version := "0.0.1-SNAPSHOT"
 

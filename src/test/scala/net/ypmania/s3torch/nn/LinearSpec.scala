@@ -3,6 +3,7 @@ package net.ypmania.s3torch.nn
 import net.ypmania.s3torch.UnitSpec
 import net.ypmania.s3torch.Dim.Static
 import net.ypmania.s3torch.Tensor
+import net.ypmania.s3torch.Device.CPU
 import net.ypmania.s3torch.DType.Float32
 
 class LinearSpec extends UnitSpec {
@@ -16,7 +17,7 @@ class LinearSpec extends UnitSpec {
     it("Turns the last dimension from In to Out") {
       val in = Tensor.zeros(BatchSize, In)
       val out = lin(in)
-      val outType: Tensor[(BatchSize.type, Out.type), Float32.type] = out
+      val outType: Tensor[(BatchSize.type, Out.type), Float32.type, CPU.type] = out
       assert(out.value === Seq(Seq(-0.0140, 0.5606, -0.0627)))
     }
   }

@@ -21,19 +21,20 @@ import net.ypmania.s3torch.internal.Broadcastable
 
 // Plain pytorch source: https://www.youtube.com/watch?v=ISNdQcPhsts
 class Transformer[
+  D <: Device,
   NHeads <: Long & Singleton,
   DModelN <: Long & Singleton,
   DModel <: Dim.Static[DModelN],
   VocabSize <: Dim,
   SeqLen <: Dim,
   BatchSize <: Dim,
-  T <: DType.Floaty](dModel: DModel, vocabSize: VocabSize, seqLen: SeqLen, batchSize: BatchSize, nHeads: NHeads)(using Default[T], DModelN |/ NHeads, RandomSource, ValueOf[NHeads], ValueOf[DModelN]) {
-  type Batch = Tensor[(BatchSize, SeqLen, DModel), T]
+  T <: DType.Floaty](dModel: DModel, vocabSize: VocabSize, seqLen: SeqLen, batchSize: BatchSize, nHeads: NHeads)(using Default[T], Default[D], DModelN |/ NHeads, RandomSource, ValueOf[NHeads], ValueOf[DModelN]) {
+  type Batch = Tensor[(BatchSize, SeqLen, DModel), T, D]
 
   class InputEmbeddings extends Module {
     val embedding = addModule("embedding", Embedding(vocabSize, dModel))
 
-    def apply[S <: Shape](in: Tensor[S, Int32.type]): Tensor[Append[S, DModel], T] = embedding(in) * Math.sqrt(dModel.size.toDouble)
+    def apply[S <: Shape](in: Tensor[S, Int32.type, D]): Tensor[Append[S, DModel], T, D] = embedding(in) * Math.sqrt(dModel.size.toDouble)
   }
 
   class PositionalEncoding(dropoutProb: Double) extends Module {
@@ -84,18 +85,18 @@ class Transformer[
     /** Splits the dModel dimension into NHeads heads, and swap the SeqLen
       * and NHeads dimensions, so each head looks at a sequence of
       * vectors with that head's part of the original DModel. */
-    private def splitHeads(b: Batch): Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T] =
+    private def splitHeads(b: Batch): Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T, D] =
       b.split[DModel].into[NHeads].transpose[SeqLen, Static[NHeads]]
 
-    private def joinHeads(h: Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T]) = {
-      // FIXME the original video needed a ".contiguous()" before the unsplit (.view) here, but
+    private def joinHeads(h: Tensor[(BatchSize, Static[NHeads], SeqLen, DModel / NHeads), T, D]) = {
+      // TODO the original video needed a ".contiguous()" before the unsplit (.view) here, buta
       // we apparently don't need that...
       h.transpose[Static[NHeads], SeqLen].unsplit[Divided[DModel]]
     }
 
-    def apply(query: Batch, key: Batch, value: Batch): Batch = apply[(SeqLen, SeqLen)](query, key, value, None.asInstanceOf[Option[Tensor[(SeqLen, SeqLen), T]]])
+    def apply(query: Batch, key: Batch, value: Batch): Batch = apply[(SeqLen, SeqLen)](query, key, value, None.asInstanceOf[Option[Tensor[(SeqLen, SeqLen), T, D]]])
 
-    def apply[M <: Tuple](query: Batch, key: Batch, value: Batch, mask: Option[Tensor[M, T]])(using Broadcastable[AttentionScores, M]): Batch = {
+    def apply[M <: Tuple](query: Batch, key: Batch, value: Batch, mask: Option[Tensor[M, T, D]])(using Broadcastable[AttentionScores, M]): Batch = {
       val q = query ~> queryWeights.apply ~> splitHeads
       val k = key ~> keyWeights.apply ~> splitHeads
       val v = value ~> valueWeights.apply ~> splitHeads
@@ -131,7 +132,7 @@ class Transformer[
     val feedForward = addModule("feedForward", ff)
     val residual = addModules("residual", Seq.fill(2)(new ResidualConnection(dropoutProb)))
 
-    def apply[M <: Tuple](in: Batch, mask: Tensor[M, T])(using Broadcastable[AttentionScores, M]): Batch = {
+    def apply[M <: Tuple](in: Batch, mask: Tensor[M, T, D])(using Broadcastable[AttentionScores, M]): Batch = {
       in
         ~> residual(0)(x => attention(x, x, x, Some(mask)))
         ~> residual(1)(feedForward.apply)

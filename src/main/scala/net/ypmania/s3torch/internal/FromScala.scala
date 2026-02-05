@@ -10,6 +10,7 @@ import java.nio.DoubleBuffer
 import net.ypmania.s3torch.*
 import net.ypmania.s3torch.Tensor.*
 import net.ypmania.s3torch.Shape.*
+import Device.CPU
 
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
@@ -29,7 +30,7 @@ import net.ypmania.s3torch.DType.*
 trait FromScala[V] {
   type OutputShape <: Tuple
   type DefaultDType <: DType
-  def apply[T <: DType](value: V): Tensor[OutputShape, T]
+  def apply[T <: DType, D <: Device](value: V, device: D): Tensor[OutputShape, T, D]
   def defaultDType: DefaultDType
 }
 
@@ -82,10 +83,10 @@ object FromScala {
   abstract class FromPrimitive[V](using toScalar: ToScalar[V]) extends FromScala[V] {
     type OutputShape = Scalar
 
-    override def apply[T <: DType](value: V): Tensor[Scalar, T] = {
+    override def apply[T <: DType, D <: Device](value: V, device: D): Tensor[Scalar, T, D] = {
       val tensor = torch.scalar_tensor(
         toScalar(value),
-        Torch.tensorOptions(defaultDType)
+        Torch.tensorOptions(defaultDType, device)
       )
       new Tensor(tensor)
     }
@@ -108,10 +109,11 @@ object FromScala {
   abstract class FromSeq[S, V](toPointer: Seq[V] => Pointer)(using toSeq: ToSeq[S, V]) extends FromScala[S] {
     type OutputShape = ToShape[S]
 
-    override def apply[T <: DType](value: S): Tensor[OutputShape, T] = {
+    override def apply[T <: DType, D <: Device](value: S, device: D): Tensor[OutputShape, T, D] = {
       val seq = toSeq(value)
       val tensor = torch
-        .from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(defaultDType))
+        .from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(defaultDType, device))
+      // FIXME only .clone() if running on CPU
         .clone() // from_blob, if running on CPU, retains a reference to the original ByteBuffer, which might be GC'ed.
       new Tensor(tensor)
     }
@@ -134,10 +136,10 @@ object FromScala {
   abstract class FromSeq2D[S1, S2, V](using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, V], fromScala: FromScala[Seq[V]]) extends FromScala[S1] {
     type OutputShape = ToShape[S1]
 
-    override def apply[T <: DType](value: S1): Tensor[OutputShape, T] = {
+    override def apply[T <: DType, D <: Device](value: S1, device: D): Tensor[OutputShape, T, D] = {
       val seqs1 = toSeq1(value)
       val seq = seqs1.map(s => toSeq2(s)).flatten
-      new Tensor(fromScala(seq).native.view(seqs1.size, seq.length / seqs1.size))
+      new Tensor(fromScala(seq, device).native.view(seqs1.size, seq.length / seqs1.size))
     }
   }
 
@@ -153,9 +155,9 @@ object FromScala {
   abstract class FromSeq3D[S1, S2, S3, V](using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, S3], toSeq3: ToSeq[S3, V], fromScala: FromScala[Seq[V]]) extends FromScala[S1] {
     type OutputShape = ToShape[S1]
 
-    override def apply[T <: DType](value: S1): Tensor[OutputShape, T] = {
+    override def apply[T <: DType, D <: Device](value: S1, device: D): Tensor[OutputShape, T, D] = {
       val seq = toSeq1(value).map(s2 => toSeq2(s2).map(s3 => toSeq3(s3)))
-      new Tensor(fromScala(seq.flatten.flatten).native.view(seq.size, seq.head.size, seq.head.head.size))
+      new Tensor(fromScala(seq.flatten.flatten, device).native.view(seq.size, seq.head.size, seq.head.head.size))
     }
   }
 

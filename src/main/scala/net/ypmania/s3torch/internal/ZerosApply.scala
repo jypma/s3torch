@@ -6,25 +6,27 @@ import net.ypmania.s3torch.*
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
 
-class ZerosApply[T <: DType](dtype: T, mkTensor: (Array[Long], pytorch.TensorOptions) => pytorch.Tensor) {
-  def apply[D1 <: Dim](d1: D1): Tensor[Tuple1[D1], T] = {
+import Device.CPU
+
+class ZerosApply[T <: DType, D <: Device](dtype: T, device: D, mkTensor: (Array[Long], pytorch.TensorOptions) => pytorch.Tensor) {
+  def apply[D1 <: Dim](d1: D1): Tensor[Tuple1[D1], T, D] = {
     zeros(Seq(d1.size))
   }
 
-  def apply[D1 <: Dim, D2 <: Dim](d1: D1, d2: D2): Tensor[(D1, D2), T] = {
+  def apply[D1 <: Dim, D2 <: Dim](d1: D1, d2: D2): Tensor[(D1, D2), T, D] = {
     zeros(Seq(d1.size, d2.size))
   }
 
-  def apply[D1 <: Dim, D2 <: Dim, D3 <: Dim](d1: D1, d2: D2, d3: D3): Tensor[(D1, D2, D3), T] = {
+  def apply[D1 <: Dim, D2 <: Dim, D3 <: Dim](d1: D1, d2: D2, d3: D3): Tensor[(D1, D2, D3), T, D] = {
     zeros(Seq(d1.size, d2.size, d3.size))
   }
 
-  def apply[S <: Shape](s: S)(using sizes: Shape.Sizes[S]): Tensor[S, T] = zeros(sizes.value(s))
+  def apply[S <: Shape](s: S)(using sizes: Shape.Sizes[S]): Tensor[S, T, D] = zeros(sizes.value(s))
 
-  private def zeros[S <: Tuple](size: Seq[Long]): Tensor[S,T] = new Tensor(
+  private def zeros[S <: Tuple](size: Seq[Long]): Tensor[S, T, D] = new Tensor(
     mkTensor(
       size.toArray,
-      Torch.tensorOptions(dtype)
+      Torch.tensorOptions(dtype, device)
     )
   )
 }
