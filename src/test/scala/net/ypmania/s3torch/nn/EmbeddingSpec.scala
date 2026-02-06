@@ -23,6 +23,13 @@ class EmbeddingSpec extends UnitSpec {
       val resType: Tensor[(Static[3L], EmbeddingDim.type), Float32.type] = res
     }
 
+    it("can change to a different DType") {
+      val emb = Embedding(NumEmbeddings, EmbeddingDim).to(Float64)
+      val in = Tensor((1, 2, 1))
+      val res = emb(in)
+      val resType: Tensor[(Static[3L], EmbeddingDim.type), Float64.type] = res
+    }
+
     it("can apply to a 2D batch") {
       val emb = Embedding(NumEmbeddings, EmbeddingDim)
       val in = Tensor((((1, 2, 3)), ((4,5,6))))

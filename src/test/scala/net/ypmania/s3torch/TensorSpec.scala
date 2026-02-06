@@ -91,6 +91,16 @@ class TensorSpec extends UnitSpec {
         assert(t.value == Seq(Seq(1,2,3), Seq(4,5,6)))
       }
 
+      it("can create a static byte matrix") {
+        val t = Tensor((
+          ((1,2,3)),
+          ((4,5,6))
+        )).to(Int8)
+        val tType: Tensor[(Static[2L], Static[3L]), Int8.type] = t
+        assert(t.size == Seq(2L, 3L))
+        assert(t.value == Seq(Seq(1,2,3), Seq(4,5,6)))
+      }
+
       it("can create a dynamic matrix") {
         val t = Tensor(Seq(
           Seq(1,2,3),

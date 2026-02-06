@@ -13,16 +13,17 @@ import net.ypmania.s3torch.Default
 import org.bytedeco.pytorch
 
 /** The base class for all nn modules */
-abstract class AbstractModule(private[AbstractModule] val native: pytorch.Module) {
+abstract class AbstractModule[T <: DType](private[AbstractModule] val native: pytorch.Module) {
+  type This[T <: DType]
 
   /** Registers the given module as a sub-module (so its state is loaded/saved together), and returns it. */
-  protected def addModule[M <: AbstractModule](name: String, child: M): M = {
+  protected def addModule[M <: AbstractModule[T]](name: String, child: M): M = {
     native.register_module(name, child.native)
     child
   }
 
   /** Registers the given modules as a sub-module list (so their state is loaded/saved together), and returns the same list. */
-  protected def addModules[M <: AbstractModule](name: String, children: Seq[M]): Seq[M] = {
+  protected def addModules[M <: AbstractModule[T]](name: String, children: Seq[M]): Seq[M] = {
     val list = new pytorch.ModuleListImpl
     for (child <- children) {
       list.push_back(child.native)
@@ -43,10 +44,16 @@ abstract class AbstractModule(private[AbstractModule] val native: pytorch.Module
     parameter
   }
 
-  private[nn] def to(dtype: DType): this.type = {
+  /** Converts all sub-modules, parameters and buffers to the given target DType. This is a mutable operation, so only the
+    * returned type and instance should be used. The source object (and its type )is no longer valid after this operation.
+    * Since most module calculate gradients on their content, the target DType must be "Floaty", i.e. float or complex. */
+  def to[T1 <: DType.Floaty](dtype: T1): This[T1] = {
     native.to(dtype.native, false)
-    this
+    this.asInstanceOf[This[T1]]
   }
+
+  /** Alias for .to(dtype) where the dtype of type T is available as a given of Default[T]. */
+  def toDType[T1 <: DType.Floaty](using d:Default[T1]) = to(d.value)
 
   /** Loads from the given file in pytorch "pt" format */
   def load(filename: String): this.type = {
@@ -118,6 +125,8 @@ abstract class AbstractModule(private[AbstractModule] val native: pytorch.Module
 }
 
 object AbstractModule {
+  /** The default DType for which all pytorch modules are created (at least in the CPP variant). */
+  type CreationDType = DType.Float32.type
 }
 
 /** The base class for user-defined nn modules */

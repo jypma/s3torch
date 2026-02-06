@@ -70,6 +70,8 @@ object DType {
     case _                                         => DType
   }
 
-  /** A floating-point or complex type (which is required for operations like mean, std and others) */
+  /** A floating-point or complex type (which is required for operations
+    * like mean, std and others, and which is required where gradients
+    * are calculated.) */
   type Floaty = BFloat16.type | Float16.type | Float32.type | Float64.type
 }

@@ -107,8 +107,23 @@ object ToScala {
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Byte]): ToScala[S, Int8.type] with {
+    type OutputType = MkOutputType[S, Byte]
+    def apply(native: pytorch.Tensor) = toSeq(native)
+  }
+
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Short]): ToScala[S, Int16.type] with {
+    type OutputType = MkOutputType[S, Short]
+    def apply(native: pytorch.Tensor) = toSeq(native)
+  }
+
   given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Int]): ToScala[S, Int32.type] with {
     type OutputType = MkOutputType[S, Int]
+    def apply(native: pytorch.Tensor) = toSeq(native)
+  }
+
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Long]): ToScala[S, Int64.type] with {
+    type OutputType = MkOutputType[S, Long]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 

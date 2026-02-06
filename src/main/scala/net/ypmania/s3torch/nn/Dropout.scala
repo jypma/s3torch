@@ -7,6 +7,8 @@ import net.ypmania.s3torch.*
 import Tuple.:*
 
 class Dropout private (native: pytorch.DropoutImpl)(using RandomSource) extends AbstractModule(native) {
+  type This[T <: DType] = Dropout
+
   private val rnd = summon[RandomSource].fork // Fork, so subsequent invocations of apply() have different results, but still reproducable.
 
   def apply[S <: Shape, T <: DType](in: Tensor[S,T]): Tensor[S,T] = rnd(new Tensor(native.forward(in.native)))
