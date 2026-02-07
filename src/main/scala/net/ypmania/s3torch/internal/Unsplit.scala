@@ -1,10 +1,9 @@
 package net.ypmania.s3torch.internal
 
+import net.ypmania.s3torch.Dim._
+import net.ypmania.s3torch._
+
 import scala.compiletime.ops.int.-
-import scala.compiletime.ops.int.>
-import Tuple.*
-import net.ypmania.s3torch.*
-import net.ypmania.s3torch.Dim.*
 
 type Unsplit[S <: Shape, Idx <: Int] <: Shape = (S, Idx) match {
   case (EmptyTuple, 0) => EmptyTuple

@@ -1,17 +1,15 @@
 package net.ypmania.s3torch.nn
 
-import scala.util.Using
-
-import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.DType
-
-import org.bytedeco.pytorch
-import net.ypmania.s3torch.Shape
-import org.bytedeco.javacpp.Pointer
-import java.nio.ByteBuffer
 import net.ypmania.s3torch.Default
-import org.bytedeco.pytorch
 import net.ypmania.s3torch.Device
+import net.ypmania.s3torch.Shape
+import net.ypmania.s3torch.Tensor
+import org.bytedeco.javacpp.Pointer
+import org.bytedeco.pytorch
+
+import java.nio.ByteBuffer
+import scala.util.Using
 
 /** The base class for all nn modules */
 abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] val native: pytorch.Module) {

@@ -1,6 +1,6 @@
 package net.ypmania.s3torch.internal
 
-import scala.compiletime.ops.long.*
+
 
 trait ToSeq[-T, +A] {
   def apply(t: T): Seq[A]

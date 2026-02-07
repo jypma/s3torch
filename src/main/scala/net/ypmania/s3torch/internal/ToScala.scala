@@ -1,17 +1,18 @@
 package net.ypmania.s3torch.internal
 
+import net.ypmania.s3torch._
 import org.bytedeco.pytorch
-import net.ypmania.s3torch.*
+
 import java.nio.ByteBuffer
-import java.nio.ShortBuffer
+import java.nio.DoubleBuffer
+import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import java.nio.LongBuffer
-import java.nio.FloatBuffer
-import java.nio.DoubleBuffer
-import java.nio.Buffer
-import scala.reflect.ClassTag
+import java.nio.ShortBuffer
 import scala.collection.immutable.ArraySeq
-import DType.*
+import scala.reflect.ClassTag
+
+import DType._
 
 trait ToScala[-S <: Tuple, +T <: DType] {
   type OutputType

@@ -1,36 +1,18 @@
 package net.ypmania.s3torch
 
+import net.ypmania.s3torch.Dim.{ |/, / }
+import net.ypmania.s3torch.Shape.{SameSize, Elem}
+import net.ypmania.s3torch.internal.FromScala.ToScalar
+import net.ypmania.s3torch.internal.Torch
 import org.bytedeco.pytorch
+import org.bytedeco.pytorch.ScalarTypeOptional
 import org.bytedeco.pytorch.global.torch
-
-import org.bytedeco.javacpp.DoublePointer
-import java.nio.DoubleBuffer
-
-import internal.ZerosApply
-import internal.FromScala
-import internal.ToScala
-import internal.Flatten
-import internal.Broadcast
-import internal.TensorOperand
-import internal.TensorOperandApply
-import internal.TensorOperandBool
-import internal.UpdateSource
-import internal.ReduceOperand
-import internal.Unsplit
-import internal.VerifyShape
-import internal.DimOperator
-import internal.MatMul
-import internal.Transpose
 
 import scala.collection.immutable.ArraySeq
 
+import internal._
 import Shape.Scalar
-import net.ypmania.s3torch.internal.FromScala.ToScalar
-import net.ypmania.s3torch.internal.Torch
-import net.ypmania.s3torch.Dim.*
-import net.ypmania.s3torch.Shape.*
-import DType.*
-import org.bytedeco.pytorch.ScalarTypeOptional
+import DType._
 import Device.CPU
 
 class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
@@ -43,8 +25,6 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   type ShapedT[S1 <: Tuple, T1 <: DType] = Tensor[S1, T1, D]
   type This = Tensor[S, T, D]
 
-  import Tensor.*
-  import Tuple.:*
 
   def ~>[U](f: This => U) = f(this)
 

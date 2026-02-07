@@ -1,9 +1,9 @@
 package net.ypmania.s3torch.internal
 
-import net.ypmania.s3torch.Shape
 import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.Device
+import net.ypmania.s3torch.Shape
+import net.ypmania.s3torch.Tensor
 
 object DimOperator {
   /** A method that operates on a single dimension, which can be

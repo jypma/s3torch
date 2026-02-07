@@ -1,18 +1,15 @@
 package net.ypmania.s3torch.nn
 
-import org.bytedeco.pytorch
-import net.ypmania.s3torch.Dim
-import net.ypmania.s3torch.Shape
 import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.Default
-
-import Tuple.*
-import Shape.*
-import scala.compiletime.ops.int.*
-import net.ypmania.s3torch.RandomSource
-import AbstractModule.CreationDType
 import net.ypmania.s3torch.Device
+import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.RandomSource
+import net.ypmania.s3torch.Shape
+import net.ypmania.s3torch.Tensor
+import org.bytedeco.pytorch
+
+import Shape._
 
 class Linear[In <: Dim, Out <: Dim, D <: Device, T <: DType] private (native: pytorch.LinearImpl) extends AbstractModule[D, T](native) {
   type This[D <: Device, T <: DType] = Linear[In, Out, D, T]

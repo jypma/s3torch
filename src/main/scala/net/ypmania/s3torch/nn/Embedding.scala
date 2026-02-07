@@ -1,12 +1,10 @@
 package net.ypmania.s3torch.nn
 
+import net.ypmania.s3torch._
 import org.bytedeco.pytorch
 
-import net.ypmania.s3torch.*
-import DType.*
-
+import DType._
 import Tuple.:*
-import AbstractModule.CreationDType
 
 class Embedding[D <: Device, OutT <: DType, Num <: Dim, Emb <: Dim] (native: pytorch.EmbeddingImpl) extends AbstractModule[D, OutT](native) {
   type This[D <: Device, T <: DType] = Embedding[D, T, Num, Emb]

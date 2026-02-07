@@ -1,13 +1,12 @@
 package net.ypmania.s3torch.internal
 
-import scala.compiletime.ops.int.-
 import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Shape
-import Tuple.*
-import net.ypmania.s3torch.Shape.Widen
-import net.ypmania.s3torch.Shape.BatchOf
 import net.ypmania.s3torch.Shape.AOf
 import net.ypmania.s3torch.Shape.BOf
+import net.ypmania.s3torch.Shape.BatchOf
+
+import Tuple._
 
 trait MatMul[S1 <: Tuple, S2 <: Tuple, R <: Tuple]
 

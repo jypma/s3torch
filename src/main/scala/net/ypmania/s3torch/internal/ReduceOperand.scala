@@ -1,11 +1,7 @@
 package net.ypmania.s3torch.internal
 
-import org.bytedeco.pytorch
-
-import net.ypmania.s3torch.Shape
-import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.Shape
 
 trait ReduceOperand[S <: Shape, D, Idx <: Int, K <: ReduceOperand.Variant] {
   type Out <: Shape

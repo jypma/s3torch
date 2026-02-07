@@ -1,11 +1,8 @@
 package net.ypmania.s3torch.internal
-import org.bytedeco.pytorch
-import net.ypmania.s3torch.Tensor
-import net.ypmania.s3torch.Shape
 import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.DType.Promoted
-import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Device
+import net.ypmania.s3torch.Tensor
+import org.bytedeco.pytorch
 
 /** Type class that exists for V where V can be the operand to an operation on a tensor with either a scalar (resulting in the same shaped tensor), or another tensor (resulting in Broadcast being applied), with the result being a DType of Bool. */
 trait TensorOperandBool[S <: Tuple, T <: DType, D <: Device, V] {

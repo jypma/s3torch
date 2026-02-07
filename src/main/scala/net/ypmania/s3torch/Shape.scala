@@ -1,8 +1,10 @@
 package net.ypmania.s3torch
 
-import scala.compiletime.ops.int.*
-import Tuple.*
 import net.ypmania.s3torch.Dim.DividedDim
+
+import scala.compiletime.ops.int._
+
+import Tuple._
 
 type Shape = Tuple
 

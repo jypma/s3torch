@@ -1,11 +1,10 @@
 package net.ypmania.s3torch.internal
 
-import org.bytedeco.pytorch
-import org.bytedeco.pytorch.*
-
 import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.Layout
 import net.ypmania.s3torch.Device
+import net.ypmania.s3torch.Layout
+import org.bytedeco.pytorch
+import org.bytedeco.pytorch._
 
 object Torch {
   def manualSeed(seed: Long): Unit = pytorch.global.torch.manual_seed(seed)

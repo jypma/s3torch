@@ -1,11 +1,10 @@
 package net.ypmania.s3torch.internal
 
+import net.ypmania.s3torch.DType
+import net.ypmania.s3torch.Device
+import net.ypmania.s3torch.Tensor
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
-
-import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.Tensor
-import net.ypmania.s3torch.Device
 
 trait UpdateSource[V, D <: Device] {
   def apply(tensor: pytorch.Tensor, idx: pytorch.TensorIndexArrayRef, value: V): Unit

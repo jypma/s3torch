@@ -1,6 +1,5 @@
 package net.ypmania.s3torch
 
-import scala.compiletime.ops.long.*
 import org.bytedeco.pytorch
 
 trait Index[D <: Dim, T] {

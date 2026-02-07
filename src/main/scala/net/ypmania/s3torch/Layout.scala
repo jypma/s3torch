@@ -15,7 +15,7 @@
  */
 
 package net.ypmania.s3torch
-import org.bytedeco.pytorch.global.torch as torchNative
+import org.bytedeco.pytorch.global.{torch => torchNative}
 
 /** A `torch.layout` is an object that represents the memory layout of a torch.Tensor.
   *

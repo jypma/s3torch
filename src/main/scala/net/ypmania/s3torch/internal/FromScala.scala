@@ -1,31 +1,27 @@
 package net.ypmania.s3torch.internal
 
-import java.nio.ByteBuffer
-import java.nio.ShortBuffer
-import java.nio.IntBuffer
-import java.nio.LongBuffer
-import java.nio.FloatBuffer
-import java.nio.DoubleBuffer
-
-import net.ypmania.s3torch.*
-import net.ypmania.s3torch.Tensor.*
-import net.ypmania.s3torch.Shape.*
-import Device.CPU
-
-import org.bytedeco.pytorch
-import org.bytedeco.pytorch.global.torch
-import org.bytedeco.javacpp.Pointer
+import net.ypmania.s3torch.DType._
+import net.ypmania.s3torch.Shape._
+import net.ypmania.s3torch._
+import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
-import org.bytedeco.javacpp.ShortPointer
+import org.bytedeco.javacpp.DoublePointer
+import org.bytedeco.javacpp.FloatPointer
 import org.bytedeco.javacpp.IntPointer
 import org.bytedeco.javacpp.LongPointer
-import org.bytedeco.javacpp.BoolPointer
-import org.bytedeco.javacpp.FloatPointer
-import org.bytedeco.javacpp.DoublePointer
+import org.bytedeco.javacpp.Pointer
+import org.bytedeco.javacpp.ShortPointer
+import org.bytedeco.pytorch
+import org.bytedeco.pytorch.global.torch
+
+import java.nio.ByteBuffer
+import java.nio.DoubleBuffer
+import java.nio.FloatBuffer
+import java.nio.IntBuffer
+import java.nio.LongBuffer
+import java.nio.ShortBuffer
 
 import compiletime.ops.int.ToLong
-
-import net.ypmania.s3torch.DType.*
 
 trait FromScala[V] {
   type OutputShape <: Tuple

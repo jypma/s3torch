@@ -1,10 +1,7 @@
 package net.ypmania.s3torch.nn
 
+import net.ypmania.s3torch._
 import org.bytedeco.pytorch
-
-import net.ypmania.s3torch.*
-
-import Tuple.:*
 
 class Dropout[D <: Device, T <: DType] private (native: pytorch.DropoutImpl)(using RandomSource) extends AbstractModule[D, T](native) {
   type This[D <: Device, T <: DType] = Dropout[D, T]

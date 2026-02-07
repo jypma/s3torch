@@ -1,12 +1,13 @@
 package net.ypmania.s3torch.internal
 
-import  scala.compiletime.ops.long.*
-import net.ypmania.s3torch.*
-import Shape.Widen
-import net.ypmania.s3torch.Dim.Static
-import net.ypmania.s3torch.Dim.One
 import net.ypmania.s3torch.Dim.Dynamic
+import net.ypmania.s3torch.Dim.One
+import net.ypmania.s3torch.Dim.Static
+import net.ypmania.s3torch._
+
 import scala.util.NotGiven
+
+import Shape.Widen
 
 /** Given that shows that S1 and S2 are broadcastable, with shape R as result. */
 trait Broadcast[S1 <: Tuple, S2 <: Tuple, R <: Tuple]

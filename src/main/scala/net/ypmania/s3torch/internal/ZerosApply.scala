@@ -1,12 +1,7 @@
 package net.ypmania.s3torch.internal
 
-import net.ypmania.s3torch.Tensor.*
-import net.ypmania.s3torch.*
-
+import net.ypmania.s3torch._
 import org.bytedeco.pytorch
-import org.bytedeco.pytorch.global.torch
-
-import Device.CPU
 
 class ZerosApply[T <: DType, D <: Device](dtype: T, device: D, mkTensor: (Array[Long], pytorch.TensorOptions) => pytorch.Tensor) {
   def apply[D1 <: Dim](d1: D1): Tensor[Tuple1[D1], T, D] = {

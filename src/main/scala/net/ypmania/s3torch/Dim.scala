@@ -1,6 +1,6 @@
 package net.ypmania.s3torch
 
-import  scala.compiletime.ops.long.*
+import scala.compiletime.ops.long._
 
 trait Dim {
   def size: Long

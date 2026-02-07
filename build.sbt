@@ -7,9 +7,18 @@ scalacOptions ++= Seq(
   "-explain-cyclic",
   "-feature",
   "-deprecation",
-  "-language:implicitConversions"
+  "-language:implicitConversions",
+  "-Wunused:imports"
 )
 
+// Enable scalafix:
+inThisBuild(
+  List(
+    scalaVersion := "3.8.1",
+    semanticdbEnabled := true,
+    semanticdbVersion := scalafixSemanticdb.revision
+  )
+)
 /* new
  This somehow fails to run the GPU code:
 

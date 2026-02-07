@@ -1,8 +1,6 @@
 package net.ypmania.s3torch
 
-import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
-import scala.compiletime.erasedValue
 
 // This can't be an enum, since then "val t = Int8 is typed DType, not Int8.type"
 /** The data type for a tensor, e.g. 32-bit float or 8-bit integer. */
@@ -31,7 +29,6 @@ object DType {
     fromNative.getOrElse(native.value, Undefined)
   }
 
-  import DType.*
 
   type Promoted[T <: DType, U <: DType] <: DType = (T, U) match {
     case (T, T)                                    => T
