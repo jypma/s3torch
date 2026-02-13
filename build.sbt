@@ -11,6 +11,9 @@ scalacOptions ++= Seq(
   "-Wunused:imports"
 )
 
+// Scaladoc has bugs that surface on our code
+Compile/packageDoc/publishArtifact := false
+
 // Enable scalafix:
 inThisBuild(
   List(
