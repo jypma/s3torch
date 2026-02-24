@@ -92,14 +92,13 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
   /** Loads pytorch "pt" formst, by repeatedly calling [read] with a target byte buffer to fill, and how many bytes to set there for that call. */
   def load(size: Long, read: (ByteBuffer, Long) => Unit): this.type = {
     Using(new pytorch.InputArchive) { archive =>
-      // for pytorch 2.7.1+ : Reader() and SizeTSupplier() have moved from pytorch.functions to pytorch.
-      archive.load_from(new pytorch.functions.Reader() {
+      archive.load_from(new pytorch.Reader() {
         override def call(pos: Long, buf: Pointer, nbytes: Long): Long = {
           buf.limit(nbytes)
           read(buf.asByteBuffer, pos)
           nbytes
         }
-      }, new pytorch.functions.SizeTSupplier() {
+      }, new pytorch.SizeTSupplier() {
         override def call = size
       })
       native.load(archive)
@@ -137,8 +136,7 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
   def save(fn: ByteBuffer => Unit) = {
     Using(new pytorch.OutputArchive) { archive =>
       native.save(archive)
-      // for pytorch 2.7.1+ : ArchiveWriter() has moved from pytorch.functions to pytorch.
-      archive.save_to(new pytorch.functions.ArchiveWriter() {
+      archive.save_to(new pytorch.ArchiveWriter() {
         override def call(buf: Pointer, nbytes: Long) = {
           buf.limit(nbytes)
           fn(buf.asByteBuffer)
