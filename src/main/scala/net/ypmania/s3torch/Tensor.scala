@@ -61,6 +61,11 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   def floor: This = new Tensor(native.floor())
 
+  val log_softmax = new DimOperator.Of1Tensor[S, T, D] {
+    type Out[Idx <: Int] = S
+    def run[Idx <: Int](idx: Idx) = new Tensor(native.log_softmax(idx))
+  }
+
   /** Fills elements of self tensor with value where mask is true. */
   def maskedFill[S2 <: Tuple, V](mask: ShapedT[S2, DType.Bool.type], value: V)(using Broadcast[S, S2, S])(using toScalar:FromScala.ToScalar[V]): Unit = {
     // Any [V] is indeed correct here, pytorch accepts doubles for int vectors.
@@ -72,6 +77,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   }
 
   /** Matrix multiplication */
+  // TODO double-check if this actually promotes the DType, or if it fails e.g. with Long times Float
   def matmul[S2 <: Tuple, T2 <: DType, R <: Tuple](b: ShapedT[S2, T2])(using MatMul[S, S2, R]): ShapedT[R, Promoted[T, T2]] =
     new Tensor(native.matmul(b.native))
   /** Matrix multiplication, alias for .matmul */
@@ -84,8 +90,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     def run[Idx <: Int](idx: Idx) = new Tensor(native.softmax(idx))
   }
 
-  /** Transforms a split version of this tensor, split across dimension D in N parts, using the given function, while retaining the original
-    type once computation is complete. */
+  /** Transforms a split version of this tensor, split across dimension D in N parts. */
   val split = new DimOperator.Of1[S, T] {
     type Out[Idx <: Int] = SplitApply[Idx, Elem[S, Idx]]
     def run[Idx <: Int](idx: Idx) = new SplitApply(idx)
@@ -198,7 +203,7 @@ object Tensor {
     new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(dtype, dv.value)))
   }
 
-    // TODO consider a FunctionApply abstraction, to clean up duplication here
+  // TODO consider a FunctionApply abstraction, to clean up duplication here
   def cos[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.cos)
   def exp[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.exp)
   def relu[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.relu)

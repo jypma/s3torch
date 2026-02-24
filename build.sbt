@@ -45,6 +45,6 @@ libraryDependencies ++= Seq(
   "org.bytedeco" % "cuda" % cudaVer classifier "linux-x86_64",
   // new "org.bytedeco" % "cuda-redist" % cudaVer classifier "linux-x86_64",
   "org.bytedeco" % "cuda" % cudaVer classifier "linux-x86_64-redist",
-  "org.scalatest" %% "scalatest" % "3.2.19" % "test"
+  "org.scalatest" %% "scalatest" % "3.2.19" % "test",
+  "io.github.json4s" %% "json4s-native" % "4.2.0-M3"
 )
-

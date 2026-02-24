@@ -43,7 +43,12 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
     parameter
   }
 
-  /** Converts all sub-modules, parameters and buffers to the given target DType. This is a mutable operation, so only the
+  /** Returns all parameters registered by this module or any child module. */
+  def parameters: Seq[Tensor[?, T, D]] = {
+    native.parameters().get().toVector.map(new Tensor(_))
+  }
+
+  /** converts all sub-modules, parameters and buffers to the given target DType. This is a mutable operation, so only the
     * returned type and instance should be used. The source object (and its type )is no longer valid after this operation.
     * Since most module calculate gradients on their content, the target DType must be "Floaty", i.e. float or complex. */
   def to[T1 <: DType.Floaty](dtype: T1): This[D, T1] = {
