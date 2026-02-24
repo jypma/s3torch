@@ -4,6 +4,7 @@ import net.ypmania.s3torch.Dim.{ |/, / }
 import net.ypmania.s3torch.Shape.{SameSize, Elem}
 import net.ypmania.s3torch.internal.FromScala.ToScalar
 import net.ypmania.s3torch.internal.Torch
+import net.ypmania.s3torch.internal.Untyped
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.ScalarTypeOptional
 import org.bytedeco.pytorch.global.torch
@@ -123,7 +124,12 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Swaps the last two dimensions. Tensor must have >= 2 dimensions. */
   def t[R <: Tuple](using Transpose[S, R]): Shaped[R] = {
     new Tensor(native.transpose(-2L, -1L))
-   }
+  }
+
+  /** Returns a view of this Tensor with just "Dim" as type for each
+    * dimension. This makes it easier to create collections of
+    * same-dimension but different length tensors. */
+  def untyped(using ut: Untyped[S]): Shaped[ut.Out] = new Tensor(native)
 
   def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V, D]): Unit = {
     updateSource(native, idx.toNative(indices), value)
