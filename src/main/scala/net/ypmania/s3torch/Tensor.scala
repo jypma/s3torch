@@ -33,6 +33,8 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   def deviceType: DeviceType = DeviceType.of(native.device().`type`())
 
+  def device: Device = new Device(deviceType, native.device().index()) {}
+
   private type BoolOp[V] = TensorOperandBool[S, T, D, V]
   /** Computes element-wise equality. We don't define pytorch's "eq" or "==", since those have a different meaning in Scala. */
   def #==[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.eq(_), _.eq(_))
@@ -215,12 +217,14 @@ object Tensor {
   def relu[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.relu)
   def sin[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.sin)
 
+  def full[T <: DType, D <: Device, V](value: V)(using dtype: Default[T], device: Default[D], toScalar: ToScalar[V]) =
+    new ZerosApply(dtype.value, device.value, torch.full(_, toScalar(value), _))
   def ones[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
     new ZerosApply(dtype.value, device.value, torch.torch_ones(_, _))
-  def zeros[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
-    new ZerosApply(dtype.value, device.value, torch.torch_zeros(_, _))
   def rand[T <: DType, D <: Device](using dtype: Default[T], device: Default[D], rnd:RandomSource) =
     rnd(new ZerosApply(dtype.value, device.value, torch.torch_rand(_, _)))
+  def zeros[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
+    new ZerosApply(dtype.value, device.value, torch.torch_zeros(_, _))
 
   // ---- Methods on Tensor that require floats
   extension[S <: Shape, T <: DType.Floaty, Dv <: Device](t: Tensor[S, T, Dv]) {

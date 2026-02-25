@@ -1,13 +1,10 @@
 package net.ypmania.s3torch
 
-import org.scalatest.Assertions._
-
 import Device.CUDA
 import Index.Slice
 import Dim.Static
 import Dim.Dynamic
 import scala.reflect.ClassTag
-import net.ypmania.s3torch.Shape.Widen
 import DType.*
 import Tensor.KeepDim
 import net.ypmania.s3torch.Dim.*
@@ -16,7 +13,6 @@ import net.ypmania.s3torch.Shape.Select
 import net.ypmania.s3torch.Shape.Scalar
 import net.ypmania.s3torch.internal.Broadcast
 import internal.MatMul
-import scala.Tuple.Concat
 import Device.CPU
 
 class TensorSpec extends UnitSpec {
@@ -187,6 +183,14 @@ class TensorSpec extends UnitSpec {
         val tType: Tensor[Tuple1[ExampleStatic.type], Float32.type, CPU.type] = t
         assert(t.size == Seq(10L))
         assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
+      }
+    }
+
+    describe("full") {
+      it("can fill a vector with a value") {
+        val t = Tensor.full(5.0)(ExampleStatic)
+        assert(t.size == Seq(10L))
+        assert(t.value.toSeq == Seq(5, 5, 5, 5, 5, 5, 5, 5, 5, 5))
       }
     }
 
