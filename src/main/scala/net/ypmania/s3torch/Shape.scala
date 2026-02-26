@@ -13,6 +13,8 @@ object Shape {
 
   type Elem[X <: Shape, N <: Int] = Tuple.Elem[X, N]
 
+  type Size[X <: Shape] = Tuple.Size[X]
+
   /** The shape of S is widened to accomodate the dimensions of To, by prepending static dimensions of one. */
   type Widen[S <: Tuple, To <: Tuple] <: Tuple = Size[S] < Size[To] match {
     case true => Widen[Dim.One *: S, To]
@@ -66,15 +68,6 @@ object Shape {
       case _ =>
         Take[S, I1] ++ (Elem[S, I2] *: Replace[Drop[S, I1 + 1], Elem[S, I1], I2 - I1 - 1])
     }
-  }
-
-  trait Is2D[S <: Shape] {
-    type D1 <: Dim
-    type D2 <: Dim
-  }
-  given [A <: Dim, B <: Dim]: Is2D[(A, B)] with {
-    type D1 = A
-    type D2 = B
   }
 
   trait Sizes[S <: Shape] {

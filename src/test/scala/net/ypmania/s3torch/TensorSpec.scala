@@ -545,6 +545,16 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("padTo") {
+      it("can pad a vector to a higher length") {
+        case object DimA extends Dim.Static[4L]
+        val r = Tensor((1, 2)).padTo(DimA)(9, PaddingMode.Append)
+        val rType: Tensor[DimA.type *: EmptyTuple, Int32.type, CPU.type] = r
+        assert(r.size == Seq(4L))
+        assert(r.value.toSeq == Seq(1, 2, 9, 9))
+      }
+    }
+
     describe("plus") {
       it("can add a primitive") {
         val t = Tensor((1, 2, 3))

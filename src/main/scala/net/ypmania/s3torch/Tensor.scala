@@ -1,5 +1,7 @@
 package net.ypmania.s3torch
 
+import scala.compiletime.ops.int.>=
+
 import net.ypmania.s3torch.Dim.{ |/, / }
 import net.ypmania.s3torch.Shape.{SameSize, Elem}
 import net.ypmania.s3torch.internal.FromScala.ToScalar
@@ -26,7 +28,9 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   type ShapedT[S1 <: Tuple, T1 <: DType] = Tensor[S1, T1, D]
   type This = Tensor[S, T, D]
 
-
+  /** Experimental syntax: returns the result of applying the given function to this tensor. This allows us
+    * to write nested function applications as arrows instead. This is particularly expressive when
+    * writing several layers of neural network transformations calling into each other. */
   def ~>[U](f: This => U) = f(this)
 
   def dtype: T = DType.of(native.dtype().toScalarType()).asInstanceOf[T]
@@ -48,6 +52,10 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   def >=[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.greater_equal(_), _.greater_equal(_))
   /** Computes element-wise less than or equal. */
   def <=[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.less_equal(_), _.less_equal(_))
+  /** Computes element-wise logical AND, interpreting both sides as a boolean. */
+  def &&[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.__and__(_), _.__and__(_))
+  /** Computes element-wise logical OR, interpreting both sides as a boolean. */
+  def ||[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.__or__(_), _.__or__(_))
 
   /** True if `other` has the same size and elements as this tensor, false otherwise. */
   def equal[S2 <: Tuple](that: Shaped[S2])(using SameSize[S, S2]): Boolean = native.equal(that.native)
@@ -86,6 +94,18 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Matrix multiplication, alias for .matmul */
   def `@`[S2 <: Tuple, T2 <: DType, R <: Tuple](b: ShapedT[S2, T2])(using MatMul[S, S2, R]): ShapedT[R, Promoted[T, T2]] = matmul(b)
 
+  /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
+  def padTo[D <: Dim](dim: D)(value: Double, mode: PaddingMode): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
+    val n = dim.size - size.last
+    assert(n > 0, s"Can't pad dimension of size ${size.last} to lower size ${dim.size}")
+
+    val padding = mode match {
+      case PaddingMode.Append => Array(0L, n)
+      case PaddingMode.Prepend => Array(n, 0L)
+    }
+    new Tensor(torch.pad(native, padding, "constant", new pytorch.DoubleOptional(value)))
+  }
+
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
 
   val softmax = new DimOperator.Of1Tensor[S, T, D] {
@@ -116,6 +136,9 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   def to[D1 <: Device](device: D1): Tensor[S, T, D1] = new Tensor(native.to(device.native, dtype.native))
 
   def to[T1 <: DType](dtype: T1): Tensor[S, T1, D] = new Tensor(native.to(dtype.native))
+
+  def tril(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.tril(diagonal))
+  def triu(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.triu(diagonal))
 
   /** Swaps the given two dimensions. */
   val transpose = new DimOperator.Of2Tensor[S, T, D] {

@@ -5,7 +5,7 @@ import net.ypmania.s3torch.Dim.Static
 import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.Device.CPU
 import net.ypmania.s3torch.DType.Int32
-import net.ypmania.s3torch.nn.rnn.PaddingSide
+import net.ypmania.s3torch.PaddingMode
 
 class RnnSpec extends UnitSpec {
   describe("batchPadSequences") {
@@ -17,7 +17,7 @@ class RnnSpec extends UnitSpec {
         Tensor((1, 2)).untyped,
         Tensor((1, 2, 3)).untyped,
         Tensor((1, 2, 3, 4)).untyped
-       ), 0, PaddingSide.Right)
+       ), 0, PaddingMode.Append)
       val rType: Tensor[(BatchSize.type, SequenceLength.type), Int32.type, CPU.type] = r
 
       assert(r.value.toSeq === Seq(

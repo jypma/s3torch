@@ -1,6 +1,7 @@
 package net.ypmania.s3torch.transformer
 
 trait Tokenizer() {
+  def max: Int
   def tokenize(in: String): Seq[Int]
 }
 
@@ -14,6 +15,7 @@ object Tokenizer {
 case class WordTokenizer(known: Map[String, Int]) extends Tokenizer {
   import WordTokenizer._
 
+  val max = known.values.max
   def tokenize(in: String) = split(in).map(s => known.getOrElse(s, 0))
 }
 
