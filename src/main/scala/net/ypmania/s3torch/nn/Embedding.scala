@@ -9,7 +9,7 @@ import Tuple.:*
 class Embedding[D <: Device, OutT <: DType, Num <: Dim, Emb <: Dim] (native: pytorch.EmbeddingImpl) extends AbstractModule[D, OutT](native) {
   type This[D <: Device, T <: DType] = Embedding[D, T, Num, Emb]
 
-  def apply[S <: Shape, T <: (Int64.type | Int32.type)](in: Tensor[S, T, D]): Tensor[S :* Emb, OutT, D] =
+  def apply[S <: Shape, T <: (Int64 | Int32)](in: Tensor[S, T, D]): Tensor[S :* Emb, OutT, D] =
     new Tensor(native.forward(in.native))
 }
 

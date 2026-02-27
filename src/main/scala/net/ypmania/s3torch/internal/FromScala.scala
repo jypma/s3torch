@@ -33,38 +33,38 @@ trait FromScala[V] {
 object FromScala {
   // We need to explicitly extend these traits directly for each given. If we pull them in using givens, the types don't resolve.
   trait ToBool {
-    type DefaultDType = Bool.type
-    def defaultDType = Bool
+    type DefaultDType = Bool
+    def defaultDType = bool
   }
 
   trait ToInt8 {
-    type DefaultDType = Int8.type
-    def defaultDType = Int8
+    type DefaultDType = Int8
+    def defaultDType = int8
   }
 
   trait ToInt16 {
-    type DefaultDType = Int16.type
-    def defaultDType = Int16
+    type DefaultDType = Int16
+    def defaultDType = int16
   }
 
   trait ToInt32 {
-    type DefaultDType = Int32.type
-    def defaultDType = Int32
+    type DefaultDType = Int32
+    def defaultDType = int32
   }
 
   trait ToInt64 {
-    type DefaultDType = Int64.type
-    def defaultDType = Int64
+    type DefaultDType = Int64
+    def defaultDType = int64
   }
 
   trait ToFloat32 {
-    type DefaultDType = Float32.type
-    def defaultDType = Float32
+    type DefaultDType = Float32
+    def defaultDType = float32
   }
 
   trait ToFloat64 {
-    type DefaultDType = Float64.type
-    def defaultDType = Float64
+    type DefaultDType = Float64
+    def defaultDType = float64
   }
 
   trait ToScalar[V] extends (V => pytorch.Scalar)

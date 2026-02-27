@@ -18,7 +18,7 @@ class RnnSpec extends UnitSpec {
         Tensor((1, 2, 3)).untyped,
         Tensor((1, 2, 3, 4)).untyped
        ), 0, PaddingMode.Append)
-      val rType: Tensor[(BatchSize.type, SequenceLength.type), Int32.type, CPU.type] = r
+      val rType: Tensor[(BatchSize.type, SequenceLength.type), Int32, CPU.type] = r
 
       assert(r.value.toSeq === Seq(
         Seq(1, 2, 0, 0, 0),

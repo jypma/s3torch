@@ -149,7 +149,7 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
 
 object AbstractModule {
   /** The default DType for which all pytorch modules are created */
-  type CreationDType = DType.Float32.type
+  type CreationDType = DType.Float32
 }
 
 /** The base class for user-defined nn modules */

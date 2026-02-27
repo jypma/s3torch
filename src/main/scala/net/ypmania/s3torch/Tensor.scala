@@ -18,6 +18,17 @@ import Shape.Scalar
 import DType._
 import Device.CPU
 
+/**
+  * A tensor is a multidimensional structure of values, wrapping pytorch's tensor. A tensor has the following properties, all of
+  * which are tracked compile time by this Scala library (in addition to at runtime by pytorch itself):
+  *
+  * - Shape [S] (a Tuple of sub-types of Dim), which represent the dimensions of this tensor
+  * - Data type [T], which represents the storage type for the values of this tensor
+  * - Device [D], which represents the physical device on which the tensor is stored (e.g. the main CPU and memory, or a graphics card)
+  *
+  * All methods on Tensor guarantee that the types accurately reflect the tensor, so that any incompatibilities always
+  * result in compile-time errors, rather than runtime discoveries.
+  */
 class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   type shape = S
   type dType = T
@@ -33,7 +44,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     * writing several layers of neural network transformations calling into each other. */
   def ~>[U](f: This => U) = f(this)
 
-  def dtype: T = DType.of(native.dtype().toScalarType()).asInstanceOf[T]
+  def dtype: DType = DType.of(native.dtype().toScalarType())
 
   def deviceType: DeviceType = DeviceType.of(native.device().`type`())
 
@@ -78,12 +89,12 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   }
 
   /** Fills elements of self tensor with value where mask is true. */
-  def maskedFill[S2 <: Tuple, V](mask: ShapedT[S2, DType.Bool.type], value: V)(using Broadcast[S, S2, S])(using toScalar:FromScala.ToScalar[V]): Unit = {
+  def maskedFill[S2 <: Tuple, V](mask: ShapedT[S2, DType.Bool], value: V)(using Broadcast[S, S2, S])(using toScalar:FromScala.ToScalar[V]): Unit = {
     // Any [V] is indeed correct here, pytorch accepts doubles for int vectors.
     native.masked_fill_(mask.native, toScalar(value))
   }
   /** Returns copy that fills elements of self tensor with value where mask is true. */
-  def maskedFilled[S2 <: Tuple, V, R <: Tuple](b: ShapedT[S2, DType.Bool.type], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Shaped[R] = {
+  def maskedFilled[S2 <: Tuple, V, R <: Tuple](b: ShapedT[S2, DType.Bool], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Shaped[R] = {
     new Tensor(native.masked_fill(b.native, toScalar(value)))
   }
 

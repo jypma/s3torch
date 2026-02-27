@@ -12,12 +12,12 @@ trait TensorOperandBool[S <: Tuple, T <: DType, D <: Device, V] {
 
 object TensorOperandBool {
   given scalar[S <: Tuple, T <: DType, D <: Device, V](using toScalar: FromScala.ToScalar[V]): TensorOperandBool[S, T, D, V] with {
-    type Out = Tensor[S, DType.Bool.type, D]
+    type Out = Tensor[S, DType.Bool, D]
     override def apply(t: Tensor[S, T, D], v: V, withScalar: (pytorch.Tensor, pytorch.Scalar) => pytorch.Tensor, withTensor: (pytorch.Tensor, pytorch.Tensor) => pytorch.Tensor) = new Tensor(withScalar(t.native, toScalar(v)))
   }
 
   given tensor[S <: Tuple, T <: DType, S2 <: Tuple, T2 <: DType, D <: Device, R <: Tuple](using Broadcast[S, S2, R]): TensorOperandBool[S, T, D, Tensor[S2, T2, D]] with {
-    type Out = Tensor[R, DType.Bool.type, D]
+    type Out = Tensor[R, DType.Bool, D]
     override def apply(t: Tensor[S, T, D], v: Tensor[S2, T2, D], withScalar: (pytorch.Tensor, pytorch.Scalar) => pytorch.Tensor, withTensor: (pytorch.Tensor, pytorch.Tensor) => pytorch.Tensor) = new Tensor(withTensor(t.native, v.native))
   }
 }

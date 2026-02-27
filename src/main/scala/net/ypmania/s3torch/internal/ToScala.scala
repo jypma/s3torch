@@ -25,13 +25,13 @@ object ToScala {
     def apply(native: pytorch.Tensor) = get(native)
   }
 
-  given ItemTo[Boolean](_.item_bool) with ToScala[EmptyTuple, Bool.type] with {}
-  given ItemTo[Byte](_.item_byte) with ToScala[EmptyTuple, Int8.type] with {}
-  given ItemTo[Short](_.item_short) with ToScala[EmptyTuple, Int16.type] with {}
-  given ItemTo[Int](_.item_int) with ToScala[EmptyTuple, Int32.type] with {}
-  given ItemTo[Long](_.item_long) with ToScala[EmptyTuple, Int64.type] with {}
-  given ItemTo[Float](_.item_float) with ToScala[EmptyTuple, Float32.type] with {}
-  given ItemTo[Double](_.item_double) with ToScala[EmptyTuple, Float64.type] with {}
+  given ItemTo[Boolean](_.item_bool) with ToScala[EmptyTuple, Bool] with {}
+  given ItemTo[Byte](_.item_byte) with ToScala[EmptyTuple, Int8] with {}
+  given ItemTo[Short](_.item_short) with ToScala[EmptyTuple, Int16] with {}
+  given ItemTo[Int](_.item_int) with ToScala[EmptyTuple, Int32] with {}
+  given ItemTo[Long](_.item_long) with ToScala[EmptyTuple, Int64] with {}
+  given ItemTo[Float](_.item_float) with ToScala[EmptyTuple, Float32] with {}
+  given ItemTo[Double](_.item_double) with ToScala[EmptyTuple, Float64] with {}
 
   abstract class ContiguousToArray[V: ClassTag](get: (pytorch.Tensor, Array[V]) => Unit) {
     type OutputType = Array[V]
@@ -57,13 +57,13 @@ object ToScala {
       result(i) = buf.get(i) != 0
       i += 1
     }
-  }) with ToScala[Tuple1[D], Bool.type] with {}
-  given [D <: Dim]: ContiguousToArray[Byte](_.createBuffer[ByteBuffer].get(_)) with ToScala[Tuple1[D], Int8.type] with {}
-  given [D <: Dim]: ContiguousToArray[Short](_.createBuffer[ShortBuffer].get(_)) with ToScala[Tuple1[D], Int16.type] with {}
-  given [D <: Dim]: ContiguousToArray[Int](_.createBuffer[IntBuffer].get(_)) with ToScala[Tuple1[D], Int32.type] with {}
-  given [D <: Dim]: ContiguousToArray[Long](_.createBuffer[LongBuffer].get(_)) with ToScala[Tuple1[D], Int64.type] with {}
-  given [D <: Dim]: ContiguousToArray[Float](_.createBuffer[FloatBuffer].get(_)) with ToScala[Tuple1[D], Float32.type] with {}
-  given [D <: Dim]: ContiguousToArray[Double](_.createBuffer[DoubleBuffer].get(_)) with ToScala[Tuple1[D], Float64.type] with {}
+  }) with ToScala[Tuple1[D], Bool] with {}
+  given [D <: Dim]: ContiguousToArray[Byte](_.createBuffer[ByteBuffer].get(_)) with ToScala[Tuple1[D], Int8] with {}
+  given [D <: Dim]: ContiguousToArray[Short](_.createBuffer[ShortBuffer].get(_)) with ToScala[Tuple1[D], Int16] with {}
+  given [D <: Dim]: ContiguousToArray[Int](_.createBuffer[IntBuffer].get(_)) with ToScala[Tuple1[D], Int32] with {}
+  given [D <: Dim]: ContiguousToArray[Long](_.createBuffer[LongBuffer].get(_)) with ToScala[Tuple1[D], Int64] with {}
+  given [D <: Dim]: ContiguousToArray[Float](_.createBuffer[FloatBuffer].get(_)) with ToScala[Tuple1[D], Float32] with {}
+  given [D <: Dim]: ContiguousToArray[Double](_.createBuffer[DoubleBuffer].get(_)) with ToScala[Tuple1[D], Float64] with {}
 
   type MkOutputType[S <: Tuple, ElemType] = S match {
     case EmptyTuple => ElemType
@@ -103,37 +103,37 @@ object ToScala {
     }
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Boolean]): ToScala[S, Bool.type] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Boolean]): ToScala[S, Bool] with {
     type OutputType = MkOutputType[S, Boolean]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Byte]): ToScala[S, Int8.type] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Byte]): ToScala[S, Int8] with {
     type OutputType = MkOutputType[S, Byte]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Short]): ToScala[S, Int16.type] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Short]): ToScala[S, Int16] with {
     type OutputType = MkOutputType[S, Short]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Int]): ToScala[S, Int32.type] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Int]): ToScala[S, Int32] with {
     type OutputType = MkOutputType[S, Int]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Long]): ToScala[S, Int64.type] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Long]): ToScala[S, Int64] with {
     type OutputType = MkOutputType[S, Long]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Float]): ToScala[S, Float32.type] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Float]): ToScala[S, Float32] with {
     type OutputType = MkOutputType[S, Float]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
 
-  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Double]): ToScala[S, Float64.type] with {
+  given [S <: Tuple](using toSeq: ToMultiDimSeq[S, Double]): ToScala[S, Float64] with {
     type OutputType = MkOutputType[S, Double]
     def apply(native: pytorch.Tensor) = toSeq(native)
   }
