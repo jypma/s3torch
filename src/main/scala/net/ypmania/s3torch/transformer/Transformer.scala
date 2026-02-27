@@ -36,7 +36,7 @@ class Transformer[
   class InputEmbeddings[VocabSize <: Dim](vocabSize: VocabSize) extends Module {
     val embedding = addModule("embedding", Embedding(vocabSize, dModel))
 
-    def apply[S <: Shape](in: Tensor[S, Int32.type, D]): Tn[Append[S, DModel]] = embedding(in) * Math.sqrt(dModel.size.toDouble)
+    def apply[S <: Shape](in: Tensor[S, Int32, D]): Tn[Append[S, DModel]] = embedding(in) * Math.sqrt(dModel.size.toDouble)
   }
 
   class PositionalEncoding[SeqLen <: Dim](seqLen: SeqLen, dropoutProb: Double) extends Module {
@@ -217,12 +217,12 @@ class Transformer[
 
     parameters.foreach(init.xavier_uniform)
 
-    def encode[M <: Tuple](src: Tensor[(BatchSize, SrcSeqLen), Int32.type, D], srcMask: Tn[M])(using Broadcastable[AttentionScores[SrcSeqLen, SrcSeqLen], M]): Batch[SrcSeqLen] = {
+    def encode[M <: Tuple](src: Tensor[(BatchSize, SrcSeqLen), Int32, D], srcMask: Tn[M])(using Broadcastable[AttentionScores[SrcSeqLen, SrcSeqLen], M]): Batch[SrcSeqLen] = {
       src ~> sourceEmb.apply ~> sourcePos.apply ~> encoder(srcMask)
     }
 
     def decode[EM <: Tuple, DM <: Tuple]
-      (encoderOutput: Batch[SrcSeqLen], encoderMask: Tn[EM], decoderMask: Tn[DM])(tgt: Tensor[(BatchSize, TgtSeqLen), Int32.type, D])
+      (encoderOutput: Batch[SrcSeqLen], encoderMask: Tn[EM], decoderMask: Tn[DM])(tgt: Tensor[(BatchSize, TgtSeqLen), Int32, D])
       (using Broadcastable[AttentionScores[TgtSeqLen, TgtSeqLen], DM], Broadcastable[AttentionScores[TgtSeqLen, SrcSeqLen], EM])
         : Batch[TgtSeqLen] = {
       tgt ~> targetEmb.apply ~> targetPos.apply ~> decoder(encoderOutput, encoderMask, decoderMask)
