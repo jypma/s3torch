@@ -7,23 +7,9 @@ import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.internal.FromScala
 import net.ypmania.s3torch.internal.FromScala.ToScalar
-
-/*
-trait Token {
-  case object DType extends s3torch.DType.Int32
-  opaque type SType = Int
-  def toInt(s: SType): Int = s
-  def unknown: SType
-  def next(t: SType): SType
-  def max(ts: Iterable[SType]): SType
-
-  given ToScalar[SType] = summon[ToScalar[Int]]
-}
- */
+import net.ypmania.s3torch.PaddingMode
 
 trait Token[T] {
-  //type DType <: s3torch.DType
-  //def dType: DType
   def unknown: T
   def next(t: T): T
   def max(ts: Iterable[T]): T
@@ -35,8 +21,6 @@ object Token {
 }
 
 trait IntToken extends Token[Int] {
-//  type DType = s3torch.DType.Int32
-//  def dType = s3torch.DType.int32
   def unknown = 0
   def next(t: Int) = t + 1
   def max(ts: Iterable[Int]) = ts.max
@@ -45,18 +29,26 @@ trait IntToken extends Token[Int] {
 
 trait TokenType {
   opaque type T = Int
+  /*
+  extension (t: T) {
+    def toDouble: Double = t.toDouble
+   }
+   */
   given Token[T] = new IntToken {}
   given ToScalar[T] = summon[ToScalar[Int]]
+
   abstract class DType extends s3torch.DType.Int32
   val dType = new DType {}
-}
 
-class Vectorizer[A: Token, T <: s3torch.DType](tk: Tokenizer[A], dtype: T) {
-  private val t = summon[Token[A]]
+  /** Turns the given tokens into a tensor */
+  def toTensor[Dv <: Device](tokens: Seq[T])(using Default[Dv]): Tensor[Dim.Dynamic *: EmptyTuple, DType, Dv] = {
+    val ints = tokens.asInstanceOf[Seq[Int]] // Safe, because of opaque type
+    Tensor(ints, dType)
+  }
 
-  def toTensor[Dv <: Device](prefix: Seq[A], in: String, postfix: Seq[A])(using Default[Dv]): Tensor[Dim.Dynamic *: EmptyTuple, T, Dv] = {
-    // TODO consider just .asInstanceOf, since we know t.toInt is just t
-    Tensor((prefix ++ tk.tokenize(in) ++ postfix).map(t.toInt), dtype)
+  /** Turns the given tokens into a tensor, padded up to [D] with [pad], or None if the source is too long. */
+  def toTensor[Dv <: Device, D <: Dim](tokens: Seq[T], dim: D, pad: T)(using Default[Dv]): Option[Tensor[D *: EmptyTuple, DType, Dv]] = {
+    toTensor(tokens).padToOption(dim)(pad, PaddingMode.Append)
   }
 }
 
@@ -64,6 +56,7 @@ abstract class Tokenizer[A: Token] {
   private val t = summon[Token[A]]
 
   def max: A
+  def size: Int = t.toInt(max)
   def tokenize(in: String): Seq[A]
 
 }

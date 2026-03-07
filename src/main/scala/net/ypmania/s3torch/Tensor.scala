@@ -108,13 +108,20 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
   def padTo[D <: Dim](dim: D)(value: Double, mode: PaddingMode): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
     val n = dim.size - size.last
-    assert(n > 0, s"Can't pad dimension of size ${size.last} to lower size ${dim.size}")
+    if (n == 0) new Tensor(native) else {
+      assert(n > 0, s"Can't pad dimension of size ${size.last} to lower size ${dim.size}")
 
-    val padding = mode match {
-      case PaddingMode.Append => Array(0L, n)
-      case PaddingMode.Prepend => Array(n, 0L)
+      val padding = mode match {
+        case PaddingMode.Append => Array(0L, n)
+        case PaddingMode.Prepend => Array(n, 0L)
+      }
+      new Tensor(torch.pad(native, padding, "constant", new pytorch.DoubleOptional(value)))
     }
-    new Tensor(torch.pad(native, padding, "constant", new pytorch.DoubleOptional(value)))
+  }
+
+  /** Returns a new tensor with the last dimension padded to [dim]. If the source is bigger than [dim], returns None. */
+  def padToOption[D <: Dim](dim: D)(value: Double, mode: PaddingMode): Option[Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]]] = {
+    Option.when(dim.size - size.last >= 0)(padTo(dim)(value, mode))
   }
 
   def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)

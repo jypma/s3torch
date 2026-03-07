@@ -233,9 +233,33 @@ class Transformer[
 }
 
 object Transformer {
+  case object DefaultDModel extends Dim.Static[512L]
+  case object DefaultDFF extends Dim.Static[2048L]
+
   def apply[
     D <: Device,
     T <: DType.Floaty,
+    BatchSize <: Dim,
+    SrcVocabSize <: Dim,
+    TgtVocabSize <: Dim,
+    SrcSeqLen <: Dim,
+    TgtSeqLen <: Dim
+  ](
+    batchSize: BatchSize,
+    srcVocabSize: SrcVocabSize,
+    tgtVocabSize: TgtVocabSize,
+    srcSeqLen: SrcSeqLen,
+    tgtSeqLen: TgtSeqLen,
+  )(using
+    Default[T], Default[D], RandomSource
+  ): Transformer[D, 8L, 512L, DefaultDModel.type, BatchSize, DefaultDFF.type, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
+    apply(batchSize, srcVocabSize, tgtVocabSize, srcSeqLen, tgtSeqLen, DefaultDModel, DefaultDFF, 8L, 6, 0.1)
+  }
+
+  def apply[
+    D <: Device,
+    T <: DType.Floaty,
+    BatchSize <: Dim,
     SrcVocabSize <: Dim,
     TgtVocabSize <: Dim,
     SrcSeqLen <: Dim,
@@ -243,14 +267,14 @@ object Transformer {
     DModelN <: Long & Singleton,
     DModel <: Dim.Static[DModelN],
     NHeads <: Long & Singleton,
-    DFF <: Dim,
-    BatchSize <: Dim
+    DFF <: Dim
   ](
     batchSize: BatchSize,
     srcVocabSize: SrcVocabSize,
     tgtVocabSize: TgtVocabSize,
     srcSeqLen: SrcSeqLen,
     tgtSeqLen: TgtSeqLen,
+    /** Number of dimensions for each embedding in the model, defaults to 512 */
     dModel: DModel,
     /** Size of the hidden feed-forward layer, default to 2048 */
     dFF: DFF,
@@ -261,7 +285,7 @@ object Transformer {
     dropoutProb: Double // default to 0.1
   )(using
     Default[T], Default[D], DModelN |/ NHeads, RandomSource, ValueOf[NHeads], ValueOf[DModelN]
-  ) = {
+  ): Transformer[D, NHeads, DModelN, DModel, BatchSize, DFF, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
     val t = new Transformer[D, NHeads, DModelN, DModel, BatchSize, DFF, T](dModel, batchSize, dFF, nHeads)
     val srcEmbed = new t.InputEmbeddings(srcVocabSize)
     val tgtEmbed = new t.InputEmbeddings(tgtVocabSize)

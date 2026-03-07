@@ -14,7 +14,7 @@ trait RandomSource() {
 
 object RandomSource {
   /** The default random source does not impose any explicit behavior. */
-  val live = new  RandomSource {
+  given live: RandomSource = new  RandomSource {
     def apply[T](fn: => T) = fn
   }
 }

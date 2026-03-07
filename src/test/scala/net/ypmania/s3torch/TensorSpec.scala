@@ -553,6 +553,14 @@ class TensorSpec extends UnitSpec {
         assert(r.size == Seq(4L))
         assert(r.value.toSeq == Seq(1, 2, 9, 9))
       }
+
+      it("can pad a vector to the same length") {
+        case object DimA extends Dim.Static[2L]
+        val r = Tensor((1, 2)).padTo(DimA)(9, PaddingMode.Append)
+        val rType: Tensor[DimA.type *: EmptyTuple, Int32, CPU.type] = r
+        assert(r.size == Seq(2L))
+        assert(r.value.toSeq == Seq(1, 2))
+      }
     }
 
     describe("plus") {
