@@ -48,6 +48,17 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
     native.parameters().get().toVector.map(new Tensor(_))
   }
 
+  /** Returns all named parameters registered by this module or any child module. */
+  def namedParameters: Map[String, Tensor[?, T, D]] = {
+    var res = Map.empty[String, Tensor[?, T, D]]
+    val items = native.named_parameters().items()
+    for (i <- 0L.until(items.size())) {
+      val pair = items.get(i).pair()
+      res += pair.first().getString() -> new Tensor(pair.second())
+    }
+    res
+  }
+
   /** converts all sub-modules, parameters and buffers to the given target DType. This is a mutable operation, so only the
     * returned type and instance should be used. The source object (and its type )is no longer valid after this operation.
     * Since most module calculate gradients on their content, the target DType must be "Floaty", i.e. float or complex. */

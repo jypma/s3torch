@@ -215,7 +215,7 @@ class Transformer[
     addModule("targetPos", targetPos)
     addModule("projection", projection)
 
-    parameters.foreach(init.xavier_uniform)
+    parameters.flatMap(_.untyped2D).foreach(init.xavier_uniform)
 
     def encode[M <: Tuple](src: Tensor[(BatchSize, SrcSeqLen), Int32, D], srcMask: Tn[M])(using Broadcastable[AttentionScores[SrcSeqLen, SrcSeqLen], M]): Batch[SrcSeqLen] = {
       src ~> sourceEmb.apply ~> sourcePos.apply ~> encoder(srcMask)

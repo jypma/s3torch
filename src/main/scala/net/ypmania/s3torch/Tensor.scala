@@ -124,7 +124,10 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     Option.when(dim.size - size.last >= 0)(padTo(dim)(value, mode))
   }
 
-  def size: Seq[Long] = ArraySeq.unsafeWrapArray(native.sizes.vec.get)
+  def size: Seq[Long] = {
+    // Don't use unsafeWrapArray, since the returned array might be freed after returning.
+    native.sizes.vec.get.toVector
+  }
 
   val softmax = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = S
@@ -173,6 +176,24 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     * dimension. This makes it easier to create collections of
     * same-dimension but different length tensors. */
   def untyped(using ut: Untyped[S]): Shaped[ut.Out] = new Tensor(native)
+
+  /** Returns a view of this Tensor with 0 dimensions, or None if the tensor has a different number of dimensions. */
+  def untyped0D: Option[Shaped[EmptyTuple]] = Option.when(size.length == 0)(new Tensor(native))
+
+  /** Returns a view of this Tensor with 1 dimension, or None if the tensor has a different number of dimensions. */
+  def untyped1D: Option[Shaped[Dim *: EmptyTuple]] = Option.when(size.length == 1)(new Tensor(native))
+
+  /** Returns a view of this Tensor with 2 dimensions, or None if the tensor has a different number of dimensions. */
+  def untyped2D: Option[Shaped[(Dim, Dim)]] = Option.when(size.length == 2)(new Tensor(native))
+
+  /** Returns a view of this Tensor with 3 dimensions, or None if the tensor has a different number of dimensions. */
+  def untyped3D: Option[Shaped[(Dim, Dim, Dim)]] = Option.when(size.length == 3)(new Tensor(native))
+
+  /** Returns a view of this Tensor with 4 dimensions, or None if the tensor has a different number of dimensions. */
+  def untyped4D: Option[Shaped[(Dim, Dim, Dim, Dim)]] = Option.when(size.length == 4)(new Tensor(native))
+
+  /** Returns a view of this Tensor with 5 dimensions, or None if the tensor has a different number of dimensions. */
+  def untyped5D: Option[Shaped[(Dim, Dim, Dim, Dim, Dim)]] = Option.when(size.length == 5)(new Tensor(native))
 
   def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V, D]): Unit = {
     updateSource(native, idx.toNative(indices), value)

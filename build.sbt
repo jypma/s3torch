@@ -3,6 +3,10 @@ scalaVersion := "3.8.1"
 organization := "ypmania.net"
 version := "0.0.1-SNAPSHOT"
 
+javaOptions ++= Seq(
+  "--enable-native-access=ALL-UNNAMED"
+)
+
 scalacOptions ++= Seq(
   "-explain",
   "-explain-cyclic",
