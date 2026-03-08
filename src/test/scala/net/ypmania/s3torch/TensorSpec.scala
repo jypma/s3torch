@@ -194,6 +194,21 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("stack") {
+      it("can combine two tensors into a batch") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((4, 5, 6))
+        trait Batch extends Dim
+        val c = Tensor.stack[Batch](Seq(a, b))
+        val cType: Tensor[(Batch, Static[3L]), Int32, CPU.type] = c
+        assert(c.size == Seq(2L, 3L))
+        assert(c.value.toSeq == Seq(
+          Seq(1, 2, 3),
+          Seq(4, 5, 6)
+        ))
+      }
+    }
+
     describe("rand") {
       it("can generate random numbers using fixed seed") {
         // Seed provided by given RandomSource in UnitTest.scala

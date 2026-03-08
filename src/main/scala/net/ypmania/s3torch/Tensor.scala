@@ -288,6 +288,14 @@ object Tensor {
   def zeros[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
     new ZerosApply(dtype.value, device.value, torch.torch_zeros(_, _))
 
+  /** Concatenates a sequence of tensors along a new dimension. */
+  def stack[B <: Dim] = new StackApply[B]
+  class StackApply[B <: Dim] {
+    def apply[S <: Tuple, T <: DType, D <: Device](tensors: Iterable[Tensor[S, T, D]]): Tensor[B *: S, T, D] = {
+      new Tensor(torch.stack(new pytorch.TensorVector(tensors.map(_.native).toArray*)))
+    }
+  }
+
   // ---- Methods on Tensor that require floats
   extension[S <: Shape, T <: DType.Floaty, Dv <: Device](t: Tensor[S, T, Dv]) {
     // TODO consider a  ReduceOperandApply abstraction, in 0 and 1 arity, to clean up duplication here
