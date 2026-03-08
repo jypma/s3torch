@@ -91,6 +91,11 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
   /** Alias for .to(device, dtype) where the dtype of type T, and the device of type D, are available as a given of Default[T] and Default[D]. */
   def toDeviceDType[D <: Device, T1 <: DType.Floaty](using d: Default[D], t:Default[T1]) = to(d.value, t.value)
 
+  /** Switches the module between training mode (true) or evaluation mode (false) */
+  def train(trainingMode: Boolean = true): Unit = {
+    native.train(trainingMode)
+  }
+
   /** Loads from the given file in pytorch "pt" format */
   def load(filename: String): this.type = {
     Using(new pytorch.InputArchive) { archive =>

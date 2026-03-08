@@ -29,11 +29,11 @@ trait IntToken extends Token[Int] {
 
 trait TokenType {
   opaque type T = Int
-  /*
+
   extension (t: T) {
-    def toDouble: Double = t.toDouble
-   }
-   */
+    def toInt: Int = t
+  }
+
   given Token[T] = new IntToken {}
   given ToScalar[T] = summon[ToScalar[Int]]
 

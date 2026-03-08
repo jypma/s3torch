@@ -13,6 +13,8 @@ import net.ypmania.s3torch.DType
 import net.ypmania.s3torch.DType.Bool
 import net.ypmania.s3torch.internal.FromScala.ToScalar
 import scala.annotation.nowarn
+import net.ypmania.s3torch.optim.Adam
+import net.ypmania.s3torch.nn.CrossEntropyLoss
 
 case object Src extends TokenType
 case object Dst extends TokenType
@@ -55,7 +57,6 @@ class Translator[
   def causalMask[D <: Dim](dim: D): Tensor[(D, D), Bool, Dv] = {
     Tensor.ones(using Default(DType.int32))(dim, dim).triu(1) #== 0
   }
-
 }
 
 object Translator {
@@ -63,6 +64,8 @@ object Translator {
 
   @main def run(): Unit = {
     val en_nl = translations("en", "nl")
+    // TODO save and auto-load tokenizers
+    // TODO investigate tokenizer lack of performance
     val translator = new Translator(SequenceLength,
       WordTokenizer.train[Src.T](en_nl.map(_._1)),
       WordTokenizer.train[Dst.T](en_nl.map(_._2))
@@ -71,7 +74,15 @@ object Translator {
     case object BatchSize extends Dim.Static[1L]
     case object SrcVocabSize extends Dim.Dynamic(translator.src.size)
     case object DstVocabSize extends Dim.Dynamic(translator.dst.size)
-    val transformer = Transformer(BatchSize, SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength)
+    val model = Transformer(BatchSize, SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength)
+    val optimizer = Adam(model.parameters, learningRate = 1e-4, eps = 1e-9)
+    val loss = CrossEntropyLoss.indexesReduce(ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
+
+    // TODO save after each epoch, resume
+    for (epoch <- 0.until(20)) {
+      model.train(true)
+
+    }
   }
 
   @nowarn // https://github.com/json4s/json4s/issues/982
