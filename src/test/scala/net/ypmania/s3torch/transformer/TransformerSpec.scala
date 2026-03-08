@@ -14,7 +14,7 @@ class TransformerSpec extends UnitSpec {
   case object Dff extends Dim.Static[5L]
   case object BatchSize extends Dim.Static[1L]
 
-  val transformer = new Transformer(DModel, BatchSize, Dff, 4L)
+  val transformer = new Transformer(DModel, Dff, 4L)
 
   describe("Transformer.InputEmbedding") {
     val inputEmb = new transformer.InputEmbeddings(VocabSize)

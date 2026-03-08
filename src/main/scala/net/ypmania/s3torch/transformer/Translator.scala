@@ -74,7 +74,7 @@ object Translator {
     case object BatchSize extends Dim.Static[1L]
     case object SrcVocabSize extends Dim.Dynamic(translator.src.size)
     case object DstVocabSize extends Dim.Dynamic(translator.dst.size)
-    val model = Transformer(BatchSize, SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength)
+    val model = Transformer(SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength)
     val optimizer = Adam(model.parameters, learningRate = 1e-4, eps = 1e-9)
     val loss = CrossEntropyLoss.indexesReduce(ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
 

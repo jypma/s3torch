@@ -24,14 +24,13 @@ class Transformer[
   NHeads <: Long & Singleton,
   DModelN <: Long & Singleton,
   DModel <: Dim.Static[DModelN],
-  BatchSize <: Dim,
   Dff <: Dim,
   T <: DType.Floaty]
-  (dModel: DModel, batchSize: BatchSize, dff: Dff, nHeads: NHeads)
+  (dModel: DModel, dff: Dff, nHeads: NHeads)
   (using Default[T], Default[D], DModelN |/ NHeads, RandomSource, ValueOf[NHeads], ValueOf[DModelN]) {
 
-  type Tn[S <: Tuple] = Tensor[S, T, D]
-  type Batch[SeqLen <: Dim] = Tn[(BatchSize, SeqLen, DModel)]
+  type Tn[S <: Shape] = Tensor[S, T, D]
+  type Batch[B <: Dim, SeqLen <: Dim] = Tn[(B, SeqLen, DModel)]
 
   class InputEmbeddings[VocabSize <: Dim](vocabSize: VocabSize) extends Module {
     val embedding = addModule("embedding", Embedding(vocabSize, dModel))
@@ -48,7 +47,7 @@ class Transformer[
     val div_term = exp(indices * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 
-    def apply(in: Batch[SeqLen]): Batch[SeqLen] = {
+    def apply[B <: Dim](in: Batch[B, SeqLen]): Batch[B, SeqLen] = {
       dropout(in + positionalEncodingDeltas)
     }
   }
@@ -57,7 +56,7 @@ class Transformer[
     val alpha = addParameter("alpha", Tensor.ones(1L))
     val bias = addParameter("bias", Tensor.zeros(1L))
 
-    def apply[SeqLen <: Dim](in: Batch[SeqLen]): Batch[SeqLen] = {
+    def apply[B <: Dim, SeqLen <: Dim](in: Batch[B, SeqLen]): Batch[B, SeqLen] = {
       val mean = in.meanBy(Last)(using KeepDim) // FIXME verify this, video says "everything after batch" but picks last.
       val std = in.stdBy(Last)(using KeepDim)
 
@@ -70,16 +69,14 @@ class Transformer[
     val dropout = addModule("dropout", Dropout(dropoutProb))
     val l2 = addModule("l2", Linear(dff, dModel))
 
-    def apply[SeqLen <: Dim](in: Batch[SeqLen]): Batch[SeqLen] = {
+    def apply[B <: Dim, SeqLen <: Dim](in: Batch[B, SeqLen]): Batch[B, SeqLen] = {
       in ~> l1.apply ~> relu ~> dropout.apply ~> l2.apply
     }
   }
 
-  type AttentionScores[QSeqLen <: Dim, KVSeqLen <: Dim] = (BatchSize, Static[NHeads], QSeqLen, KVSeqLen)
+  type AttentionScores[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim] = (B, Static[NHeads], QSeqLen, KVSeqLen)
 
   class MultiHeadAttention[QSeqLen <: Dim, KVSeqLen <: Dim](dropoutProb: Double) extends Module {
-    type B = Batch[QSeqLen]
-
     val queryWeights = addModule("queryWeights", Linear(dModel, dModel)) // FIXME Maybe there should be no bias here if it's just a mul.
     val keyWeights = addModule("keyWeights", Linear(dModel, dModel))
     val valueWeights = addModule("valueWeights", Linear(dModel, dModel))
@@ -89,18 +86,20 @@ class Transformer[
     /** Splits the dModel dimension into NHeads heads, and swap the SeqLen
       * and NHeads dimensions, so each head looks at a sequence of
       * vectors with that head's part of the original DModel. */
-    private def splitHeads[SL <: Dim](b: Batch[SL]): Tn[(BatchSize, Static[NHeads], SL, DModel / NHeads)] =
-      b.split[DModel].into[NHeads].transpose[SL, Static[NHeads]]
+    private def splitHeads[B <: Dim, SeqLen <: Dim](b: Batch[B, SeqLen]): Tn[(B, Static[NHeads], SeqLen, DModel / NHeads)] =
+      b.split[DModel].into[NHeads].transpose[SeqLen, Static[NHeads]]
 
-    private def joinHeads(h: Tn[(BatchSize, Static[NHeads], QSeqLen, DModel / NHeads)]) = {
+    private def joinHeads[B <: Dim](h: Tn[(B, Static[NHeads], QSeqLen, DModel / NHeads)]) = {
       // TODO the original video needed a ".contiguous()" before the unsplit (.view) here, buta
       // we apparently don't need that...
       h.transpose[Static[NHeads], QSeqLen].unsplit[Divided[DModel]]
     }
 
-    def apply(query: B, key: Batch[KVSeqLen], value: Batch[KVSeqLen]): Batch[QSeqLen] = apply[(QSeqLen, KVSeqLen)](query, key, value, None.asInstanceOf[Option[Tn[(QSeqLen, KVSeqLen)]]])
+    def apply[B <: Dim](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen]): Batch[B, QSeqLen] =
+      apply(query, key, value, None.asInstanceOf[Option[Tn[(QSeqLen, KVSeqLen)]]])
 
-    def apply[M <: Tuple](query: B, key: Batch[KVSeqLen], value: Batch[KVSeqLen], mask: Option[Tn[M]])(using Broadcastable[AttentionScores[QSeqLen, KVSeqLen], M]): B = {
+    def apply[B <: Dim, M <: Shape](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen], mask: Option[Tn[M]])
+      (using Broadcastable[AttentionScores[B, QSeqLen, KVSeqLen], M]): Batch[B, QSeqLen] = {
       val q = query ~> queryWeights.apply ~> splitHeads
       val k = key ~> keyWeights.apply ~> splitHeads
       val v = value ~> valueWeights.apply ~> splitHeads
@@ -113,7 +112,7 @@ class Transformer[
       // TODO save the attention scores somehow, they're apparently needed for visualization later.
       attentionScores
         `@` v
-        ~> joinHeads.apply
+        ~> joinHeads[B].apply
         ~> outputWeights.apply
     }
   }
@@ -125,7 +124,7 @@ class Transformer[
     val dropout = addModule("dropout", Dropout(dropoutProb))
     val norm = addModule("norm", new LayerNormalization)
 
-    def apply[SeqLen <: Dim](sublayer: Batch[SeqLen] => Batch[SeqLen]): Batch[SeqLen] => Batch[SeqLen] =
+    def apply[B <: Dim, SeqLen <: Dim](sublayer: Batch[B, SeqLen] => Batch[B, SeqLen]): Batch[B, SeqLen] => Batch[B, SeqLen] =
       in => (in ~> norm.apply ~> sublayer ~> dropout.apply) + in
   }
 
@@ -134,7 +133,7 @@ class Transformer[
     addModule("feedForward", feedForward)
     val residual = addModules("residual", Seq.fill(2)(new ResidualConnection(dropoutProb)))
 
-    def apply[M <: Tuple](mask: Tn[M])(in: Batch[SeqLen])(using Broadcastable[AttentionScores[SeqLen, SeqLen], M]): Batch[SeqLen] = {
+    def apply[B <: Dim, M <: Shape](mask: Tn[M])(in: Batch[B, SeqLen])(using Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]): Batch[B, SeqLen] = {
       in
         ~> residual(0)(x => attention(x, x, x, Some(mask)))
         ~> residual(1)(feedForward.apply)
@@ -145,7 +144,7 @@ class Transformer[
     addModules("blocks", blocks)
     val norm = addModule("norm", new LayerNormalization)
 
-    def apply[M <: Tuple](mask: Tn[M])(in: Batch[SeqLen])(using Broadcastable[AttentionScores[SeqLen, SeqLen], M]): Batch[SeqLen] = {
+    def apply[B <: Dim, M <: Shape](mask: Tn[M])(in: Batch[B, SeqLen])(using Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]): Batch[B, SeqLen] = {
       blocks.foldLeft(in)(_ ~> _(mask)) ~> norm.apply
     }
   }
@@ -161,10 +160,12 @@ class Transformer[
     addModule("feedForward", feedForward)
     val residual = addModules("residual", Seq.fill(3)(new ResidualConnection(dropoutProb)))
 
-    def apply[EM <: Tuple, DM <: Tuple]
-      (encoderOutput: Batch[SrcSeqLen], encoderMask: Tn[EM], decoderMask: Tn[DM])(in: Batch[TgtSeqLen])
-      (using Broadcastable[AttentionScores[TgtSeqLen, TgtSeqLen], DM], Broadcastable[AttentionScores[TgtSeqLen, SrcSeqLen], EM])
-        : Batch[TgtSeqLen] = {
+    def apply[B <: Dim, EncoderMask <: Shape, DecoderMask <: Shape] (
+      encoderOutput: Batch[B, SrcSeqLen], encoderMask: Tn[EncoderMask], decoderMask: Tn[DecoderMask])(in: Batch[B, TgtSeqLen]
+    )(using
+      Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DecoderMask],
+      Broadcastable[AttentionScores[B, TgtSeqLen, SrcSeqLen], EncoderMask]
+    ): Batch[B, TgtSeqLen] = {
       in
         ~> residual(0)(x => selfAttention(x, x, x, Some(decoderMask)))
         ~> residual(1)(x => crossAttention(x, encoderOutput, encoderOutput, Some(encoderMask)))
@@ -176,11 +177,12 @@ class Transformer[
     addModules("blocks", blocks)
     val norm = addModule("norm", new LayerNormalization)
 
-    def apply[EM <: Tuple, DM <: Tuple]
-      (encoderOutput: Batch[SrcSeqLen], encoderMask: Tn[EM], decoderMask: Tn[DM])(in: Batch[TgtSeqLen])
-      (using Broadcastable[AttentionScores[TgtSeqLen, TgtSeqLen], DM], Broadcastable[AttentionScores[TgtSeqLen, SrcSeqLen], EM])
-        : Batch[TgtSeqLen] = {
-//    def apply[M <: Tuple](encoderOutput: Batch[SeqLen], encoderMask: Tn[M], decoderMask: Tn[M])(in: Batch[SeqLen])(using Broadcastable[AttentionScores[SeqLen], M]): Batch[SeqLen] = {
+    def apply[B <: Dim, EncoderMask <: Shape, DecoderMask <: Shape](
+      encoderOutput: Batch[B, SrcSeqLen], encoderMask: Tn[EncoderMask], decoderMask: Tn[DecoderMask])(in: Batch[B, TgtSeqLen]
+    )(using
+      Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DecoderMask],
+      Broadcastable[AttentionScores[B, TgtSeqLen, SrcSeqLen], EncoderMask]
+    ): Batch[B, TgtSeqLen] = {
       blocks.foldLeft(in)(_ ~> _(encoderOutput, encoderMask, decoderMask)) ~> norm.apply
     }
   }
@@ -188,7 +190,7 @@ class Transformer[
   class Projection[VocabSize <: Dim](vocabSize: VocabSize) extends Module {
     val proj = addModule("proj", Linear(dModel, vocabSize))
 
-    def apply[SeqLen <: Dim](in: Batch[SeqLen]): Tn[(BatchSize, SeqLen, VocabSize)] = {
+    def apply[B <: Dim, SeqLen <: Dim](in: Batch[B, SeqLen]): Tn[(B, SeqLen, VocabSize)] = {
       proj(in).log_softmax[VocabSize]
     }
   }
@@ -217,18 +219,18 @@ class Transformer[
 
     parameters.flatMap(_.untyped2D).foreach(init.xavier_uniform)
 
-    def encode[M <: Tuple](src: Tensor[(BatchSize, SrcSeqLen), Int32, D], srcMask: Tn[M])(using Broadcastable[AttentionScores[SrcSeqLen, SrcSeqLen], M]): Batch[SrcSeqLen] = {
+    def encode[B <: Dim, M <: Shape](src: Tensor[(B, SrcSeqLen), Int32, D], srcMask: Tn[M])(using Broadcastable[AttentionScores[B, SrcSeqLen, SrcSeqLen], M]): Batch[B, SrcSeqLen] = {
       src ~> sourceEmb.apply ~> sourcePos.apply ~> encoder(srcMask)
     }
 
-    def decode[EM <: Tuple, DM <: Tuple]
-      (encoderOutput: Batch[SrcSeqLen], encoderMask: Tn[EM], decoderMask: Tn[DM])(tgt: Tensor[(BatchSize, TgtSeqLen), Int32, D])
-      (using Broadcastable[AttentionScores[TgtSeqLen, TgtSeqLen], DM], Broadcastable[AttentionScores[TgtSeqLen, SrcSeqLen], EM])
-        : Batch[TgtSeqLen] = {
+    def decode[B <: Dim, EM <: Shape, DM <: Shape]
+      (encoderOutput: Batch[B, SrcSeqLen], encoderMask: Tn[EM], decoderMask: Tn[DM])(tgt: Tensor[(B, TgtSeqLen), Int32, D])
+      (using Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DM], Broadcastable[AttentionScores[B, TgtSeqLen, SrcSeqLen], EM])
+        : Batch[B, TgtSeqLen] = {
       tgt ~> targetEmb.apply ~> targetPos.apply ~> decoder(encoderOutput, encoderMask, decoderMask)
     }
 
-    def project(x: Batch[TgtSeqLen]): Tn[(BatchSize, TgtSeqLen, TgtVocabSize)] = projection(x)
+    def project[B <: Dim](x: Batch[B, TgtSeqLen]): Tn[(B, TgtSeqLen, TgtVocabSize)] = projection(x)
   }
 }
 
@@ -239,27 +241,24 @@ object Transformer {
   def apply[
     D <: Device,
     T <: DType.Floaty,
-    BatchSize <: Dim,
     SrcVocabSize <: Dim,
     TgtVocabSize <: Dim,
     SrcSeqLen <: Dim,
     TgtSeqLen <: Dim
   ](
-    batchSize: BatchSize,
     srcVocabSize: SrcVocabSize,
     tgtVocabSize: TgtVocabSize,
     srcSeqLen: SrcSeqLen,
     tgtSeqLen: TgtSeqLen,
   )(using
     Default[T], Default[D], RandomSource
-  ): Transformer[D, 8L, 512L, DefaultDModel.type, BatchSize, DefaultDFF.type, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
-    apply(batchSize, srcVocabSize, tgtVocabSize, srcSeqLen, tgtSeqLen, DefaultDModel, DefaultDFF, 8L, 6, 0.1)
+  ): Transformer[D, 8L, 512L, DefaultDModel.type, DefaultDFF.type, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
+    apply(srcVocabSize, tgtVocabSize, srcSeqLen, tgtSeqLen, DefaultDModel, DefaultDFF, 8L, 6, 0.1)
   }
 
   def apply[
     D <: Device,
     T <: DType.Floaty,
-    BatchSize <: Dim,
     SrcVocabSize <: Dim,
     TgtVocabSize <: Dim,
     SrcSeqLen <: Dim,
@@ -269,7 +268,6 @@ object Transformer {
     NHeads <: Long & Singleton,
     DFF <: Dim
   ](
-    batchSize: BatchSize,
     srcVocabSize: SrcVocabSize,
     tgtVocabSize: TgtVocabSize,
     srcSeqLen: SrcSeqLen,
@@ -285,8 +283,8 @@ object Transformer {
     dropoutProb: Double // default to 0.1
   )(using
     Default[T], Default[D], DModelN |/ NHeads, RandomSource, ValueOf[NHeads], ValueOf[DModelN]
-  ): Transformer[D, NHeads, DModelN, DModel, BatchSize, DFF, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
-    val t = new Transformer[D, NHeads, DModelN, DModel, BatchSize, DFF, T](dModel, batchSize, dFF, nHeads)
+  ): Transformer[D, NHeads, DModelN, DModel, DFF, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
+    val t = new Transformer[D, NHeads, DModelN, DModel, DFF, T](dModel, dFF, nHeads)
     val srcEmbed = new t.InputEmbeddings(srcVocabSize)
     val tgtEmbed = new t.InputEmbeddings(tgtVocabSize)
 
