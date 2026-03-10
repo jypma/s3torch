@@ -296,6 +296,22 @@ object Tensor {
     }
   }
 
+  /** Creates a "batcher" utility object, that can create ad-hoc batches by invoking ".stack" on transformed values of [T], e.g.
+    * val batcher = Tensor.batcher[BatchSize](myCollection)
+    * val inputs = batcher(_.input) // Combines the "input" tensors into a batch of the size of "myCollection", typed BatchSize
+    * val outputs = batcher(_.output)
+    */
+  def batcher[B <: Dim] = new BatcherApply[B]
+  class BatcherApply[B <: Dim] {
+    def apply[A](collection: Iterable[A]) = new Applied(collection)
+
+    class Applied[A](collection: Iterable[A]) {
+      def apply[S <: Tuple, T <: DType, D <: Device](getTensor: A => Tensor[S, T, D]): Tensor[B *: S, T, D] = {
+        Tensor.stack[B](collection.map(getTensor))
+      }
+    }
+  }
+
   // ---- Methods on Tensor that require floats
   extension[S <: Shape, T <: DType.Floaty, Dv <: Device](t: Tensor[S, T, Dv]) {
     // TODO consider a  ReduceOperandApply abstraction, in 0 and 1 arity, to clean up duplication here

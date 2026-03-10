@@ -98,6 +98,7 @@ class Transformer[
     def apply[B <: Dim](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen]): Batch[B, QSeqLen] =
       apply(query, key, value, None.asInstanceOf[Option[Tn[(QSeqLen, KVSeqLen)]]])
 
+    // TODO Just make the mask a tensor of Bool instead?
     def apply[B <: Dim, M <: Shape](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen], mask: Option[Tn[M]])
       (using Broadcastable[AttentionScores[B, QSeqLen, KVSeqLen], M]): Batch[B, QSeqLen] = {
       val q = query ~> queryWeights.apply ~> splitHeads
@@ -219,6 +220,7 @@ class Transformer[
 
     parameters.flatMap(_.untyped2D).foreach(init.xavier_uniform)
 
+    // TODO Allow T <: Int32 instead of only Int32
     def encode[B <: Dim, M <: Shape](src: Tensor[(B, SrcSeqLen), Int32, D], srcMask: Tn[M])(using Broadcastable[AttentionScores[B, SrcSeqLen, SrcSeqLen], M]): Batch[B, SrcSeqLen] = {
       src ~> sourceEmb.apply ~> sourcePos.apply ~> encoder(srcMask)
     }

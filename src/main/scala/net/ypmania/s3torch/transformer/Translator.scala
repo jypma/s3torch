@@ -10,11 +10,12 @@ import net.ypmania.s3torch.DType.Int32
 import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.PaddingMode.Append
 import net.ypmania.s3torch.DType
+import net.ypmania.s3torch.Shape.Select.First
 import net.ypmania.s3torch.DType.Bool
 import net.ypmania.s3torch.internal.FromScala.ToScalar
 import scala.annotation.nowarn
 import net.ypmania.s3torch.optim.Adam
-import net.ypmania.s3torch.nn.CrossEntropyLoss
+import net.ypmania.s3torch.nn.CrossEntropy
 
 case object Src extends TokenType
 case object Dst extends TokenType
@@ -37,7 +38,7 @@ class Translator[
   type Tokens[T <: DType] = Tensor[SequenceLength *: EmptyTuple, T, Dv]
 
   case class Example(encoderInput: Tokens[Src.DType], decoderInput: Tokens[Dst.DType], label: Tokens[Dst.DType]) {
-    def encoderMask = encoderInput #!= src.pad // TODO investigate need for twice .unsqueeze(1) to add sequenceLength and batchSize
+    def encoderMask = (encoderInput #!= src.pad)
     def decoderMask = (decoderInput #!= dst.pad) && causalMask(sequenceLength) // TODO investigate need for .unsqueeze(1) to add batchSize
   }
 
@@ -70,18 +71,40 @@ object Translator {
       WordTokenizer.train[Src.T](en_nl.map(_._1)),
       WordTokenizer.train[Dst.T](en_nl.map(_._2))
     )
-    val trainingData = en_nl.flatMap(translator.Example(_, _))
-    case object BatchSize extends Dim.Static[1L]
+    val allExamples = en_nl.flatMap(translator.Example(_, _))
+    trait BatchSize extends Dim
     case object SrcVocabSize extends Dim.Dynamic(translator.src.size)
     case object DstVocabSize extends Dim.Dynamic(translator.dst.size)
     val model = Transformer(SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength)
     val optimizer = Adam(model.parameters, learningRate = 1e-4, eps = 1e-9)
-    val loss = CrossEntropyLoss.indexesReduce(ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
 
+    val trainingData = allExamples.take((allExamples.size * 0.9).toInt)
     // TODO save after each epoch, resume
     for (epoch <- 0.until(20)) {
       model.train(true)
 
+      for (batch <- trainingData.grouped(64).map(g => Tensor.batcher[BatchSize](g))) {
+        val encoderInput = batch(_.encoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.encode
+        val decoderInput = batch(_.decoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.decode
+        val label = batch(_.label)
+        val encoderMask = batch { x =>
+          // We need to add dimensions to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
+          val r = x.encoderMask.unsqueezeBefore(First).unsqueezeBefore(First)
+          // Somehow, doesn't compile when inlined.
+          r
+        }.to(DType.float32) // TODO investigate Bool for mask type
+        val decoderMask = batch { x =>
+          // We need to add dimensions to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
+          val r = x.decoderMask.unsqueezeBefore(First)
+          r
+        }.to(DType.float32)  // TODO investigate Bool for mask type
+
+        val encoderOutput = model.encode(encoderInput, encoderMask)
+        val decoderOutput = model.decode(encoderOutput, encoderMask, decoderMask)(decoderInput)
+        val projOutput = model.project(decoderOutput)
+
+        //val loss = CrossEntropy(ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
+      }
     }
   }
 
