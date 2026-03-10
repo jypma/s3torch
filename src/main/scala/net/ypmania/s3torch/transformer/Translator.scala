@@ -3,6 +3,7 @@ package net.ypmania.s3torch.transformer
 import org.json4s._
 import org.json4s.native.JsonMethods.parse
 import scala.io.Source
+import net.ypmania.s3torch.Batcher
 import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Tensor
@@ -72,7 +73,7 @@ object Translator {
       WordTokenizer.train[Dst.T](en_nl.map(_._2))
     )
     val allExamples = en_nl.flatMap(translator.Example(_, _))
-    trait BatchSize extends Dim
+    case class BatchSize(size: Long) extends Dim
     case object SrcVocabSize extends Dim.Dynamic(translator.src.size)
     case object DstVocabSize extends Dim.Dynamic(translator.dst.size)
     val model = Transformer(SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength)
@@ -83,7 +84,7 @@ object Translator {
     for (epoch <- 0.until(20)) {
       model.train(true)
 
-      for (batch <- trainingData.grouped(64).map(g => Tensor.batcher[BatchSize](g))) {
+      for (batch <- trainingData.grouped(64).map(g => Batcher(BatchSize(_), g))) {
         val encoderInput = batch(_.encoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.encode
         val decoderInput = batch(_.decoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.decode
         val label = batch(_.label)
