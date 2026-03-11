@@ -844,12 +844,12 @@ class TensorSpec extends UnitSpec {
       it("can split on specific dim and then unsplit") {
         val matrix = Tensor.zeros(DimA, DimB)
         matrix((1, 1)) = 1.0
-        val res = matrix.split(DimA).into(Dim.Static(2L))
+        val res = matrix.view.split(DimA).into(Dim.Static(2L))
         val resType: Tensor[(Static[2L], DimA.type / Dim.Static[2L], DimB.type), Float32, CPU.type] = res
         assert(res.size == Seq(2L, 3L, 3L))
         assert(res.value(0)(1)(1) == 1.0)
 
-        val un = res.unsplit[DimA.type / Dim.Static[2L]]
+        val un = res.view.merge[DimA.type / Dim.Static[2L]]
         assert(un.size == Seq(6L, 3L))
         assert(un.value(1)(1) == 1.0)
       }
@@ -857,7 +857,7 @@ class TensorSpec extends UnitSpec {
       it("can unsplit on a specific dim and then split") {
         val matrix = Tensor.zeros(DimA, DimB)
         matrix((1, 1)) = 1.0
-        val res = matrix.unsplit(DimB)
+        val res = matrix.view.merge(DimB)
         val resType: Tensor[ProductDim[DimA.type, DimB.type] *: EmptyTuple.type, Float32, CPU.type] = res
         assert(res.size == Seq(DimA.size * DimB.size))
         assert(res.value.toSeq == Seq(
@@ -869,12 +869,12 @@ class TensorSpec extends UnitSpec {
           0,0,0
         ).map(_.toFloat))
 
-        val spl = res.split[ProductDim[DimA.type, DimB.type]].into(DimA)
+        val spl = res.view.split[ProductDim[DimA.type, DimB.type]].into(DimA)
         val splType: Tensor[(DimA.type, DimB.type), Float32, CPU.type] = spl
         assert(spl.size == Seq(DimA.size, DimB.size))
 
         // Test that we can swap the dimensions by splitting into the other dimension
-        val spl2 = res.split[ProductDim[DimA.type, DimB.type]].into(DimB)
+        val spl2 = res.view.split[ProductDim[DimA.type, DimB.type]].into(DimB)
         val spl2Type: Tensor[(DimB.type, DimA.type), Float32, CPU.type] = spl2
         assert(spl2.size == Seq(DimB.size, DimA.size))
       }
@@ -882,11 +882,11 @@ class TensorSpec extends UnitSpec {
       it("can split on last") {
         case object DimC extends Static[4L]
         val t = Tensor.zeros(DimA, DimB, DimC)
-        val res = t.split(DimC).into(Dim.Static(4L))
+        val res = t.view.split(DimC).into(Dim.Static(4L))
         val resType: Tensor[(DimA.type, DimB.type, Static[4L], DimC.type / Dim.Static[4L]), Float32, CPU.type] = res
         assert(res.size == Seq(6L, 3L, 4L, 1L))
 
-        val un = res.unsplit[DimC.type / Dim.Static[4L]]
+        val un = res.view.merge[DimC.type / Dim.Static[4L]]
         assert(un.size == Seq(6L, 3L, 4L))
       }
     }

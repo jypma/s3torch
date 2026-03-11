@@ -130,21 +130,6 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     def run[Idx <: Int](idx: Idx) = new Tensor(native.softmax(idx))
   }
 
-  /** Transforms a split version of this tensor, split across dimension D in N parts. */
-  val split = new DimOperator.Of1[S, T] {
-    type Out[Idx <: Int] = SplitApply[Idx, Elem[S, Idx]]
-    def run[Idx <: Int](idx: Idx) = new SplitApply(idx)
-  }
-  class SplitApply[Idx <: Int, D](private[s3torch] val idx: Idx) {
-    /** Splits the selected dimension into N parts, i.e. the dimension D gets split into two dimensions (N, D / N) */
-    def into[N <: Dim](n: N)(using ev:Split[D, N]): Shaped[Shape.ReplaceWithTuple[S, ev.Out, Idx]] = {
-      val (before, after) = size.splitAt(idx)
-      val dimsize = after.head
-      val sizes = before :+ n.size :+ (dimsize / n.size) :++ after.tail
-      new Tensor(native.view(sizes.toArray*))
-    }
-  }
-
   def to[D1 <: Device](device: D1): Tensor[S, T, D1] = new Tensor(native.to(device.native, dtype.native))
 
   def to[T1 <: DType](dtype: T1): Tensor[S, T1, D] = new Tensor(native.to(dtype.native))
@@ -190,18 +175,6 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     updateSource(native, idx.toNative(indices), value)
   }
 
-  // FIXME update docs for generic unsplit
-  /** Merges two dimensions that have previously been split off using split(). The selected dimension must be of type DividedDim, and must have a preceding
-    * dimension with the remainder of the division. */
-  val unsplit = new DimOperator.Of1Tensor[S, T, D] {
-    type Out[Idx <: Int] = Unsplit[S, Idx]
-    def run[Idx <: Int](idx: Idx) = {
-      val (before, after) = size.splitAt(idx - 1)
-      val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
-      new Tensor(native.view(sizes.toArray*))
-    }
-  }
-
   /** Inserts a dimension of One after D */
   val unsqueezeAfter = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = Shape.InsertAfter[S, Dim.One, Idx]
@@ -212,6 +185,36 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   val unsqueezeBefore = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = Shape.InsertBefore[S, Dim.One, Idx]
     def run[Idx <: Int](idx: Idx) = new Tensor(native.unsqueeze(idx))
+  }
+
+  /** Provides alternative views to this Tensor, without changing the underlying storage. */
+  case object view {
+    /** Transforms a split version of this tensor, split across dimension D in N parts. */
+    val split = new DimOperator.Of1[S, T] {
+      type Out[Idx <: Int] = SplitApply[Idx, Elem[S, Idx]]
+      def run[Idx <: Int](idx: Idx) = new SplitApply(idx)
+    }
+    class SplitApply[Idx <: Int, D](private[s3torch] val idx: Idx) {
+      /** Splits the selected dimension into N parts, i.e. the dimension D gets split into two dimensions (N, D / N) */
+      def into[N <: Dim](n: N)(using ev:Split[D, N]): Shaped[Shape.ReplaceWithTuple[S, ev.Out, Idx]] = {
+        val (before, after) = size.splitAt(idx)
+        val dimsize = after.head
+        val sizes = before :+ n.size :+ (dimsize / n.size) :++ after.tail
+        new Tensor(native.view(sizes.toArray*))
+      }
+    }
+
+    /** Merges the selected dimension with the one before it, by
+      * multiplying the dimensions. If these have been previously split using
+      * split(), this operation performs the reverse. */
+    val merge = new DimOperator.Of1Tensor[S, T, D] {
+      type Out[Idx <: Int] = Unsplit[S, Idx]
+      def run[Idx <: Int](idx: Idx) = {
+        val (before, after) = size.splitAt(idx - 1)
+        val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
+        new Tensor(native.view(sizes.toArray*))
+      }
+    }
   }
 
   def value(using toScala: ToScala[S, T])(using D =:= CPU.type) = toScala(native)

@@ -86,12 +86,12 @@ class Transformer[
       * and NHeads dimensions, so each head looks at a sequence of
       * vectors with that head's part of the original DModel. */
     private def splitHeads[B <: Dim, SeqLen <: Dim](b: Batch[B, SeqLen]): Tn[(B, NHeads, SeqLen, DModel / NHeads)] =
-      b.split[DModel].into(nHeads).transpose[SeqLen, NHeads]
+      b.view.split[DModel].into(nHeads).transpose[SeqLen, NHeads]
 
     private def joinHeads[B <: Dim](h: Tn[(B, NHeads, QSeqLen, DModel / NHeads)]) = {
       // TODO the original video needed a ".contiguous()" before the unsplit (.view) here, buta
       // we apparently don't need that...
-      h.transpose[NHeads, QSeqLen].unsplit[DModel / NHeads]
+      h.transpose[NHeads, QSeqLen].view.merge[DModel / NHeads]
     }
 
     def apply[B <: Dim](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen]): Batch[B, QSeqLen] =

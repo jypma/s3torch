@@ -1,7 +1,5 @@
 package net.ypmania.s3torch
 
-import net.ypmania.s3torch.Dim.DividedDim
-
 import scala.compiletime.ops.int._
 
 import Tuple._
@@ -87,8 +85,6 @@ object Shape {
   type AOf[S <: Shape] = Last[Init[S]]
   /** The "B" matrix dimension, i.e. the second one */
   type BOf[S <: Shape] = Last[S]
-
-  // TODO ----------- move Select trait to its own file --------------
 
   /** Can be pulled in as a given to get "Idx" as the index of a selected dimension on a shape, by
     * the dimension's type, First or Last, or compile-time specific numeric index Idx. */
