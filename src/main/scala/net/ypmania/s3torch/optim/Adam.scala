@@ -1,8 +1,8 @@
 package net.ypmania.s3torch.optim
 
-import org.bytedeco.pytorch
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Tensor
+import org.bytedeco.pytorch
 
 class Adam(native: pytorch.Adam) {
   def step(): Unit = native.step()

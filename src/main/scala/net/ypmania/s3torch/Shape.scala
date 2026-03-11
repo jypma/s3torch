@@ -122,15 +122,6 @@ object Shape {
       def apply[D <: Dim](d: D): At[D] = new At {}
     }
     given atDim[S <: Shape, D <: Dim, Idx <: Int](using Select[S, D, Idx]): Select[S, At[D], Idx] with {}
-
-    /** Selects a dimension that's based on an earlier division (split) of another dimension */
-    trait Divided[D <: Dim]
-    object Divided {
-      def apply[D <: Dim]: Divided[D] = new Divided {}
-      def apply[D <: Dim](d: D): Divided[D] = new Divided {}
-    }
-    given dividedFound[D <: Dim, Tail <: Shape, L, R <: Long]: Select[DividedDim[D, L, R] *: Tail, Divided[D], 0] with {}
-    given dividedNotFound[Head <: Dim, Tail <: Shape, D <: Dim, Idx <: Int](using Select[Tail, Divided[D], Idx]): Select[Head *: Tail, Divided[D], Idx + 1] with {}
   }
 
 

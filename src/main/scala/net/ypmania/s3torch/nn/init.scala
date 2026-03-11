@@ -1,10 +1,11 @@
 package net.ypmania.s3torch.nn
 
-import org.bytedeco.pytorch.global.torch
-import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.RandomSource
 import net.ypmania.s3torch.Shape
 import net.ypmania.s3torch.Shape.Size
+import net.ypmania.s3torch.Tensor
+import org.bytedeco.pytorch.global.torch
+
 import scala.compiletime.ops.int.>=
 
 object init {

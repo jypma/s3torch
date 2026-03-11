@@ -1,17 +1,13 @@
 package net.ypmania.s3torch
 
-import scala.compiletime.ops.int.>=
-
-import net.ypmania.s3torch.Dim.{ |/, / }
-import net.ypmania.s3torch.Shape.{SameSize, Elem}
+import net.ypmania.s3torch.Shape.Elem
+import net.ypmania.s3torch.Shape.SameSize
 import net.ypmania.s3torch.internal.FromScala.ToScalar
-import net.ypmania.s3torch.internal.Torch
-import net.ypmania.s3torch.internal.Untyped
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.ScalarTypeOptional
 import org.bytedeco.pytorch.global.torch
 
-import scala.collection.immutable.ArraySeq
+import scala.compiletime.ops.int.>=
 
 import internal._
 import Shape.Scalar
@@ -139,17 +135,12 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     type Out[Idx <: Int] = SplitApply[Idx, Elem[S, Idx]]
     def run[Idx <: Int](idx: Idx) = new SplitApply(idx)
   }
-  class SplitApply[Idx <: Int, D](idx: Idx) {
-    /** Splits the selected dimension into N parts. */
-    def into[N <: Long & Singleton](nn: N)(using dv: D |/ N, n: ValueOf[N]):
-        Shaped[Shape.ReplaceWithTuple[S, (Dim.Static[N], Shape.Elem[S, Idx] / N), Idx]] = into
-
-    /** Splits the selected dimension into N parts. */
-    def into[N <: Long & Singleton](using dv: D |/ N, n: ValueOf[N]):
-        Shaped[Shape.ReplaceWithTuple[S, (Dim.Static[N], Shape.Elem[S, Idx] / N), Idx]] = {
+  class SplitApply[Idx <: Int, D](private[s3torch] val idx: Idx) {
+    /** Splits the selected dimension into N parts, i.e. the dimension D gets split into two dimensions (N, D / N) */
+    def into[N <: Dim](n: N)(using ev:Split[D, N]): Shaped[Shape.ReplaceWithTuple[S, ev.Out, Idx]] = {
       val (before, after) = size.splitAt(idx)
       val dimsize = after.head
-      val sizes = before :+ n.value :+ (dimsize / n.value) :++ after.tail
+      val sizes = before :+ n.size :+ (dimsize / n.size) :++ after.tail
       new Tensor(native.view(sizes.toArray*))
     }
   }
@@ -199,6 +190,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     updateSource(native, idx.toNative(indices), value)
   }
 
+  // FIXME update docs for generic unsplit
   /** Merges two dimensions that have previously been split off using split(). The selected dimension must be of type DividedDim, and must have a preceding
     * dimension with the remainder of the division. */
   val unsplit = new DimOperator.Of1Tensor[S, T, D] {

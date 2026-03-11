@@ -1,13 +1,13 @@
 package net.ypmania.s3torch.transformer
 
 import net.ypmania.s3torch
-import net.ypmania.s3torch.Dim
-import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Device
+import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.PaddingMode
+import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.internal.FromScala
 import net.ypmania.s3torch.internal.FromScala.ToScalar
-import net.ypmania.s3torch.PaddingMode
 
 trait Token[T] {
   def unknown: T

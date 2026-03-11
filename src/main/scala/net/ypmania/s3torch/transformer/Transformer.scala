@@ -1,33 +1,32 @@
 package net.ypmania.s3torch.transformer
 
-import net.ypmania.s3torch.nn.Module
-import net.ypmania.s3torch.*
-import net.ypmania.s3torch.DType.*
-import Tensor._
+import net.ypmania.s3torch.DType._
 import net.ypmania.s3torch.Default
-import net.ypmania.s3torch.Dim.Static
+import net.ypmania.s3torch.Dim._
 import net.ypmania.s3torch.Shape.Select.Last
-import scala.Tuple.Append
+import net.ypmania.s3torch._
+import net.ypmania.s3torch.internal.Broadcast
+import net.ypmania.s3torch.internal.Broadcastable
 import net.ypmania.s3torch.internal.ReduceOperand
 import net.ypmania.s3torch.nn.Dropout
 import net.ypmania.s3torch.nn.Embedding
 import net.ypmania.s3torch.nn.Linear
-import net.ypmania.s3torch.Dim.*
-import net.ypmania.s3torch.Shape.Select.Divided
-import net.ypmania.s3torch.internal.Broadcast
-import net.ypmania.s3torch.internal.Broadcastable
+import net.ypmania.s3torch.nn.Module
 import net.ypmania.s3torch.nn.init
+
+import scala.Tuple.Append
+
+import Tensor._
 
 // Plain pytorch source: https://www.youtube.com/watch?v=ISNdQcPhsts
 class Transformer[
   D <: Device,
-  NHeads <: Long & Singleton,
-  DModelN <: Long & Singleton,
-  DModel <: Dim.Static[DModelN],
+  NHeads <: Dim,
+  DModel <: Dim,
   Dff <: Dim,
   T <: DType.Floaty]
   (dModel: DModel, dff: Dff, nHeads: NHeads)
-  (using Default[T], Default[D], DModelN |/ NHeads, RandomSource, ValueOf[NHeads], ValueOf[DModelN]) {
+  (using Default[T], Default[D], DModel |/ NHeads, RandomSource) {
 
   type Tn[S <: Shape] = Tensor[S, T, D]
   type Batch[B <: Dim, SeqLen <: Dim] = Tn[(B, SeqLen, DModel)]
@@ -74,7 +73,7 @@ class Transformer[
     }
   }
 
-  type AttentionScores[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim] = (B, Static[NHeads], QSeqLen, KVSeqLen)
+  type AttentionScores[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim] = (B, NHeads, QSeqLen, KVSeqLen)
 
   class MultiHeadAttention[QSeqLen <: Dim, KVSeqLen <: Dim](dropoutProb: Double) extends Module {
     val queryWeights = addModule("queryWeights", Linear(dModel, dModel)) // FIXME Maybe there should be no bias here if it's just a mul.
@@ -86,13 +85,13 @@ class Transformer[
     /** Splits the dModel dimension into NHeads heads, and swap the SeqLen
       * and NHeads dimensions, so each head looks at a sequence of
       * vectors with that head's part of the original DModel. */
-    private def splitHeads[B <: Dim, SeqLen <: Dim](b: Batch[B, SeqLen]): Tn[(B, Static[NHeads], SeqLen, DModel / NHeads)] =
-      b.split[DModel].into[NHeads].transpose[SeqLen, Static[NHeads]]
+    private def splitHeads[B <: Dim, SeqLen <: Dim](b: Batch[B, SeqLen]): Tn[(B, NHeads, SeqLen, DModel / NHeads)] =
+      b.split[DModel].into(nHeads).transpose[SeqLen, NHeads]
 
-    private def joinHeads[B <: Dim](h: Tn[(B, Static[NHeads], QSeqLen, DModel / NHeads)]) = {
+    private def joinHeads[B <: Dim](h: Tn[(B, NHeads, QSeqLen, DModel / NHeads)]) = {
       // TODO the original video needed a ".contiguous()" before the unsplit (.view) here, buta
       // we apparently don't need that...
-      h.transpose[Static[NHeads], QSeqLen].unsplit[Divided[DModel]]
+      h.transpose[NHeads, QSeqLen].unsplit[DModel / NHeads]
     }
 
     def apply[B <: Dim](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen]): Batch[B, QSeqLen] =
@@ -105,7 +104,7 @@ class Transformer[
       val k = key ~> keyWeights.apply ~> splitHeads
       val v = value ~> valueWeights.apply ~> splitHeads
 
-      val attentionScores = (q `@` k.t / Math.sqrt(dModel.size.toDouble / summon[ValueOf[NHeads]].value))
+      val attentionScores = (q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.size))
         .when(mask.map(_ #== 0))(_.maskedFilled(_, 1e-9))
         .softmax(Last)
         ~> dropout.apply
@@ -239,6 +238,7 @@ class Transformer[
 object Transformer {
   case object DefaultDModel extends Dim.Static[512L]
   case object DefaultDFF extends Dim.Static[2048L]
+  case object DefaultNHeads extends Dim.Static[8L]
 
   def apply[
     D <: Device,
@@ -254,8 +254,8 @@ object Transformer {
     tgtSeqLen: TgtSeqLen,
   )(using
     Default[T], Default[D], RandomSource
-  ): Transformer[D, 8L, 512L, DefaultDModel.type, DefaultDFF.type, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
-    apply(srcVocabSize, tgtVocabSize, srcSeqLen, tgtSeqLen, DefaultDModel, DefaultDFF, 8L, 6, 0.1)
+  ): Transformer[D, DefaultNHeads.type, DefaultDModel.type, DefaultDFF.type, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize]  = {
+    apply(srcVocabSize, tgtVocabSize, srcSeqLen, tgtSeqLen, DefaultDModel, DefaultDFF, DefaultNHeads, 6, 0.1)
   }
 
   def apply[
@@ -265,9 +265,8 @@ object Transformer {
     TgtVocabSize <: Dim,
     SrcSeqLen <: Dim,
     TgtSeqLen <: Dim,
-    DModelN <: Long & Singleton,
-    DModel <: Dim.Static[DModelN],
-    NHeads <: Long & Singleton,
+    DModel <: Dim,
+    NHeads <: Dim,
     DFF <: Dim
   ](
     srcVocabSize: SrcVocabSize,
@@ -284,9 +283,9 @@ object Transformer {
     coderLayers: Int,
     dropoutProb: Double // default to 0.1
   )(using
-    Default[T], Default[D], DModelN |/ NHeads, RandomSource, ValueOf[NHeads], ValueOf[DModelN]
-  ): Transformer[D, NHeads, DModelN, DModel, DFF, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
-    val t = new Transformer[D, NHeads, DModelN, DModel, DFF, T](dModel, dFF, nHeads)
+    Default[T], Default[D], DModel |/ NHeads, RandomSource
+  ): Transformer[D, NHeads, DModel, DFF, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
+    val t = new Transformer[D, NHeads, DModel, DFF, T](dModel, dFF, nHeads)
     val srcEmbed = new t.InputEmbeddings(srcVocabSize)
     val tgtEmbed = new t.InputEmbeddings(tgtVocabSize)
 

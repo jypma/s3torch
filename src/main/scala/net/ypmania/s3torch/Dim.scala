@@ -36,42 +36,22 @@ object Dim extends DimLowPriorityGivens {
   /** A dimension known to be 1 at compile time */
   type One = Static[1L]
 
-  // TODO ---------------- move division stuff internals to different file under internal ----------------
-
-  type IsDivisibleByLong[A <: Long, B <: Long] = A % B match {
-      case 0L => true
-      case _ => false
-  }
-
-  type IsDivisibleBy[D, L <: Long] <: Boolean = D match {
-    case Long => IsDivisibleByLong[D, L]
-    case Dim.Static[v] => IsDivisibleByLong[v, L]
-    case _ => false
-  }
-
-  trait DivisibleBy[+D, +L <: Long] {
-    type Res <: Long
-  }
-
+  /** The statically-known size of a Dim */
   type StaticSize[D] <: Long = D match {
     case Dim.Static[size] => size
   }
 
-  object DivisibleBy {
-    given fromNums[A <: Long, B <: Long](using A % B =:= 0L): DivisibleBy[A, B] with {}
-    given fromNum[A <: Long, D <: Dim.Static[A], B <: Long](using DivisibleBy[A, B]): DivisibleBy[D, B] with {}
-    given fromDim[D, B <: Long](using StaticSize[D] % B =:= 0L): DivisibleBy[D, B] with {}
-  }
-  infix type |/[+D, +L <: Long] = DivisibleBy[D, L]
+  /** A Dim that is the result of multiplying two other Dims */
+  trait ProductDim[A <: Dim, B <: Dim] extends Dim
 
-  type DividedBy[D, L <: Long] <: Long = D match {
-    case Long => scala.compiletime.ops.long./[D, L]
-    case Dim.Static[v] => scala.compiletime.ops.long./[v, L]
+  /** Proof that D is divisible by L */
+  trait DivisibleBy[+D <: Dim, +L <: Dim] {}
+  object DivisibleBy {
+    given [A <: Dim, B <: Dim](using StaticSize[A] % StaticSize[B] =:= 0L): DivisibleBy[A, B] with {}
   }
-  abstract class DividedDim[D, L, R <: Long](using ValueOf[R]) extends Dim {
-    type Orig = D
-    type Divisor = L
-    override def size = valueOf[R]
-  }
-  infix type /[D, L <: Long] = DividedDim[D, L, DividedBy[D, L]]
+  infix type |/[+D <: Dim, +L <: Dim] = DivisibleBy[D, L]
+
+  /** A Dim that is the result of dividing two other Dims */
+  trait DividedDim[D <: Dim, L <: Dim] extends Dim {}
+  infix type /[D <: Dim, L <: Dim] = DividedDim[D, L]
 }

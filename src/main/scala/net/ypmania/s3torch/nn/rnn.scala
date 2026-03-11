@@ -1,14 +1,14 @@
 package net.ypmania.s3torch.nn
 
-import org.bytedeco.pytorch
-import org.bytedeco.pytorch.global.torch
 import net.ypmania.s3torch.DType
 import net.ypmania.s3torch.Device
-import net.ypmania.s3torch.Tensor
-import net.ypmania.s3torch.PaddingMode
 import net.ypmania.s3torch.Dim
-import net.ypmania.s3torch.internal.Torch
+import net.ypmania.s3torch.PaddingMode
+import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.internal.FromScala.ToScalar
+import net.ypmania.s3torch.internal.Torch
+import org.bytedeco.pytorch
+import org.bytedeco.pytorch.global.torch
 
 object rnn {
   /** Pads a batch of given sequences to the given length. The following must be true at runtime:

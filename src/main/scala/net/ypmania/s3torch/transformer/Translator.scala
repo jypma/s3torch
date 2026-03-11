@@ -1,22 +1,19 @@
 package net.ypmania.s3torch.transformer
 
+import net.ypmania.s3torch.Batcher
+import net.ypmania.s3torch.DType
+import net.ypmania.s3torch.DType.Bool
+import net.ypmania.s3torch.Default
+import net.ypmania.s3torch.Device
+import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.Shape.Select.First
+import net.ypmania.s3torch.Tensor
+import net.ypmania.s3torch.optim.Adam
 import org.json4s._
 import org.json4s.native.JsonMethods.parse
-import scala.io.Source
-import net.ypmania.s3torch.Batcher
-import net.ypmania.s3torch.Dim
-import net.ypmania.s3torch.Device
-import net.ypmania.s3torch.Tensor
-import net.ypmania.s3torch.DType.Int32
-import net.ypmania.s3torch.Default
-import net.ypmania.s3torch.PaddingMode.Append
-import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.Shape.Select.First
-import net.ypmania.s3torch.DType.Bool
-import net.ypmania.s3torch.internal.FromScala.ToScalar
+
 import scala.annotation.nowarn
-import net.ypmania.s3torch.optim.Adam
-import net.ypmania.s3torch.nn.CrossEntropy
+import scala.io.Source
 
 case object Src extends TokenType
 case object Dst extends TokenType
