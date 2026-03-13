@@ -13,6 +13,7 @@ import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 
 import DType._
+import net.ypmania.s3torch.Shape.Scalar
 
 trait ToScala[-S <: Tuple, +T <: DType] {
   type OutputType
@@ -25,13 +26,14 @@ object ToScala {
     def apply(native: pytorch.Tensor) = get(native)
   }
 
-  given ItemTo[Boolean](_.item_bool) with ToScala[EmptyTuple, Bool] with {}
-  given ItemTo[Byte](_.item_byte) with ToScala[EmptyTuple, Int8] with {}
-  given ItemTo[Short](_.item_short) with ToScala[EmptyTuple, Int16] with {}
-  given ItemTo[Int](_.item_int) with ToScala[EmptyTuple, Int32] with {}
-  given ItemTo[Long](_.item_long) with ToScala[EmptyTuple, Int64] with {}
-  given ItemTo[Float](_.item_float) with ToScala[EmptyTuple, Float32] with {}
-  given ItemTo[Double](_.item_double) with ToScala[EmptyTuple, Float64] with {}
+  given ItemTo[Boolean](_.item_bool) with ToScala[Scalar, Bool] with {}
+  given ItemTo[Byte](_.item_byte) with ToScala[Scalar, Int8] with {}
+  given ItemTo[Short](_.item_short) with ToScala[Scalar, Int16] with {}
+  given ItemTo[Int](_.item_int) with ToScala[Scalar, Int32] with {}
+  given ItemTo[Long](_.item_long) with ToScala[Scalar, Int64] with {}
+  given ItemTo[Float](_.item_float) with ToScala[Scalar, Float16] with {}
+  given ItemTo[Float](_.item_float) with ToScala[Scalar, Float32] with {}
+  given ItemTo[Double](_.item_double) with ToScala[Scalar, Float64] with {}
 
   abstract class ContiguousToArray[V: ClassTag](get: (pytorch.Tensor, Array[V]) => Unit) {
     type OutputType = Array[V]

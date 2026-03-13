@@ -9,9 +9,8 @@ import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
 
 object CrossEntropy {
-  // TODO verify that indeed the input DType is preserved as output
-  // pytorch: The target data type is required to be long when using class indices.
-  /** Cross entropy where the targets are indexes, and which reduces the loss to a single scalar value. */
+  /** Cross entropy where the targets are indexes, and which reduces the loss to a single scalar value.
+    * Pytorch only supports Int64 as the target tensor. */
   def apply[
     SI <: Tuple, ST <: Tuple, D <: Device, T <: DType
   ] (
