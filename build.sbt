@@ -4,7 +4,10 @@ organization := "ypmania.net"
 version := "0.0.1-SNAPSHOT"
 
 javaOptions ++= Seq(
-  "--enable-native-access=ALL-UNNAMED"
+  "--enable-native-access=ALL-UNNAMED",
+  "-Xmx256M",
+  "-Dorg.bytedeco.javacpp.maxbytes=10G",
+  "-Dorg.bytedeco.javacpp.maxPhysicalBytes=10G"
 )
 
 scalacOptions ++= Seq(

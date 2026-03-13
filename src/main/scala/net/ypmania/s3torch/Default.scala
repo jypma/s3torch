@@ -6,7 +6,11 @@ case class Default[+T](value: T) {
 
 }
 
-object Default {
+trait DefaultInactiveGivens {
+  given cuda: Default[Device.CUDA.type] = Default(Device.CUDA)
+}
+
+object Default extends DefaultInactiveGivens {
   /** Fallback default for DType. Define a given at local scope to override this. */
   given float32: Default[Float32] = Default(DType.float32)
 

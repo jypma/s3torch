@@ -89,9 +89,7 @@ class Transformer[
       b.view.split[DModel].into(nHeads).transpose[SeqLen, NHeads]
 
     private def joinHeads[B <: Dim](h: Tn[(B, NHeads, QSeqLen, DModel / NHeads)]) = {
-      // TODO the original video needed a ".contiguous()" before the unsplit (.view) here, buta
-      // we apparently don't need that...
-      h.transpose[NHeads, QSeqLen].view.merge[DModel / NHeads]
+      h.transpose[NHeads, QSeqLen].contiguous.view.merge[DModel / NHeads]
     }
 
     def apply[B <: Dim](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen]): Batch[B, QSeqLen] =
@@ -236,28 +234,6 @@ class Transformer[
 }
 
 object Transformer {
-  case object DefaultDModel extends Dim.Static[512L]
-  case object DefaultDFF extends Dim.Static[2048L]
-  case object DefaultNHeads extends Dim.Static[8L]
-
-  def apply[
-    D <: Device,
-    T <: DType.Floaty,
-    SrcVocabSize <: Dim,
-    TgtVocabSize <: Dim,
-    SrcSeqLen <: Dim,
-    TgtSeqLen <: Dim
-  ](
-    srcVocabSize: SrcVocabSize,
-    tgtVocabSize: TgtVocabSize,
-    srcSeqLen: SrcSeqLen,
-    tgtSeqLen: TgtSeqLen,
-  )(using
-    Default[T], Default[D], RandomSource
-  ): Transformer[D, DefaultNHeads.type, DefaultDModel.type, DefaultDFF.type, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize]  = {
-    apply(srcVocabSize, tgtVocabSize, srcSeqLen, tgtSeqLen, DefaultDModel, DefaultDFF, DefaultNHeads, 6, 0.1)
-  }
-
   def apply[
     D <: Device,
     T <: DType.Floaty,
@@ -281,10 +257,8 @@ object Transformer {
     nHeads: NHeads,
     /** Number of encoder and decoder layers (N), default to 6 */
     coderLayers: Int,
-    dropoutProb: Double // default to 0.1
-  )(using
-    Default[T], Default[D], DModel |/ NHeads, RandomSource
-  ): Transformer[D, NHeads, DModel, DFF, T]#Main[SrcSeqLen, TgtSeqLen, SrcVocabSize, TgtVocabSize] = {
+    dropoutProb: Double = 0.1
+  )(using Default[T], Default[D], DModel |/ NHeads, RandomSource) = {
     val t = new Transformer[D, NHeads, DModel, DFF, T](dModel, dFF, nHeads)
     val srcEmbed = new t.InputEmbeddings(srcVocabSize)
     val tgtEmbed = new t.InputEmbeddings(tgtVocabSize)

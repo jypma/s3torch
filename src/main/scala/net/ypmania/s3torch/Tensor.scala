@@ -40,6 +40,8 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     * writing several layers of neural network transformations calling into each other. */
   def ~>[U](f: This => U) = f(this)
 
+  def contiguous: This = new Tensor(native.contiguous())
+
   def dtype: DType = DType.of(native.dtype().toScalarType())
 
   def deviceType: DeviceType = DeviceType.of(native.device().`type`())

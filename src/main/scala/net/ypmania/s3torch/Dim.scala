@@ -1,6 +1,7 @@
 package net.ypmania.s3torch
 
 import scala.compiletime.ops.long._
+import scala.compiletime.ops.int.ToLong
 
 trait Dim {
   def size: Long
@@ -18,6 +19,7 @@ object Dim extends DimLowPriorityGivens {
   }
   object Static {
     def apply[L <: Long & Singleton](l: L)(using ValueOf[L]) = new Static[L] {}
+    def apply[I <: Int & Singleton](l: I) = new Static[ToLong[I]](using ValueOf(l.toLong.asInstanceOf[ToLong[I]])) {}
   }
 
   /** A dimension not known until runtime */
@@ -43,6 +45,7 @@ object Dim extends DimLowPriorityGivens {
 
   /** A Dim that is the result of multiplying two other Dims */
   trait ProductDim[A <: Dim, B <: Dim] extends Dim
+  infix type *[A <: Dim, B <: Dim] = ProductDim[A, B]
 
   /** Proof that D is divisible by L */
   trait DivisibleBy[+D <: Dim, +L <: Dim] {}

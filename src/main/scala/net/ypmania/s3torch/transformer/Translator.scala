@@ -8,12 +8,16 @@ import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Shape.Select.First
 import net.ypmania.s3torch.Tensor
+import net.ypmania.s3torch.HeapExternal.scoped
 import net.ypmania.s3torch.optim.Adam
 import org.json4s._
 import org.json4s.native.JsonMethods.parse
 
 import scala.annotation.nowarn
 import scala.io.Source
+import net.ypmania.s3torch.nn.CrossEntropy
+
+import net.ypmania.s3torch.Default.cuda
 
 case object Src extends TokenType
 case object Dst extends TokenType
@@ -60,6 +64,10 @@ class Translator[
 
 object Translator {
   case object SequenceLength extends Dim.Static[128L]
+  case object DModel extends Dim.Static[512L]
+  case object DFF extends Dim.Static[1024L]
+  case object NHeads extends Dim.Static[8L]
+  val layers = 6
 
   @main def run(): Unit = {
     val en_nl = translations("en", "nl")
@@ -73,35 +81,54 @@ object Translator {
     case class BatchSize(size: Long) extends Dim
     case object SrcVocabSize extends Dim.Dynamic(translator.src.size)
     case object DstVocabSize extends Dim.Dynamic(translator.dst.size)
-    val model = Transformer(SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength)
+    val model = Transformer(SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength, DModel, DFF, NHeads, layers)
     val optimizer = Adam(model.parameters, learningRate = 1e-4, eps = 1e-9)
 
     val trainingData = allExamples.take((allExamples.size * 0.9).toInt)
     // TODO save after each epoch, resume
     for (epoch <- 0.until(20)) {
+      println(s"Epoch ${epoch}")
       model.train(true)
 
-      for (batch <- trainingData.grouped(64).map(g => Batcher(BatchSize(_), g))) {
-        val encoderInput = batch(_.encoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.encode
-        val decoderInput = batch(_.decoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.decode
-        val label = batch(_.label)
-        val encoderMask = batch { x =>
-          // We need to add dimensions to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
-          val r = x.encoderMask.unsqueezeBefore(First).unsqueezeBefore(First)
-          // Somehow, doesn't compile when inlined.
-          r
-        }.to(DType.float32) // TODO investigate Bool for mask type
-        val decoderMask = batch { x =>
-          // We need to add dimensions to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
-          val r = x.decoderMask.unsqueezeBefore(First)
-          r
-        }.to(DType.float32)  // TODO investigate Bool for mask type
+      var count = 0
+      val batches = trainingData.grouped(16).toSeq.map(g => Batcher(BatchSize(_), g))
+      for (batch <- batches) {
+        scoped {
+          count += 1
+          val encoderInput = batch(_.encoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.encode
+          val decoderInput = batch(_.decoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.decode
+          val label = batch(_.label).to(DType.int64) // TODO allow CrossEntropy to take int64 subclasses, or even int32
+          val encoderMask = batch { x =>
+            // We need to add dimensions to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
+            val r = x.encoderMask.unsqueezeBefore(First).unsqueezeBefore(First)
+            // Somehow, doesn't compile when inlined.
+            r
+          }.to(DType.float32) // TODO investigate Bool for mask type
+          val decoderMask = batch { x =>
+            // We need to add dimensions to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
+            val r = x.decoderMask.unsqueezeBefore(First)
+            r
+          }.to(DType.float32)  // TODO investigate Bool for mask type
 
-        val encoderOutput = model.encode(encoderInput, encoderMask)
-        val decoderOutput = model.decode(encoderOutput, encoderMask, decoderMask)(decoderInput)
-        val projOutput = model.project(decoderOutput)
+          //println("  encoding.")
+          val encoderOutput = scoped { model.encode(encoderInput, encoderMask) }
+          //println("  decoding.")
+          val decoderOutput = scoped { model.decode(encoderOutput, encoderMask, decoderMask)(decoderInput) }
+          //println("  outputting.")
+          val projOutput = scoped { model.project(decoderOutput) }
 
-        //val loss = CrossEntropy(ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
+          // Let's merge the SequenceLength dimension into BatchSize, so we can do a cross entropy loss of
+          // all examples in the batch.
+          val expected = label.view.merge[SequenceLength.type]
+          val actual = projOutput.view.merge[SequenceLength.type]
+          val loss = CrossEntropy(actual, expected, ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
+
+          println(s"Batch ${count} of ${batches.size}:  loss is ${loss.to(Device.CPU).value}")
+          //println("  backward.")
+          loss.backward()
+          optimizer.step()
+          optimizer.zeroGrad()
+        }
       }
     }
   }

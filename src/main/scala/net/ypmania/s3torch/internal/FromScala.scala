@@ -107,10 +107,17 @@ object FromScala {
 
     override def apply[T <: DType, D <: Device](value: S, device: D): Tensor[OutputShape, T, D] = {
       val seq = toSeq(value)
-      val tensor = torch
-        .from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(defaultDType, device))
-      // FIXME only .clone() if running on CPU
-        .clone() // from_blob, if running on CPU, retains a reference to the original ByteBuffer, which might be GC'ed.
+      val tensor = device.deviceType match {
+        case DeviceType.CPU =>
+          torch
+            .from_blob(toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(defaultDType, device))
+            .clone() // from_blob, if running on CPU, retains a reference to the original ByteBuffer, which might be GC'ed.
+        case _ =>
+          val opts = Torch.tensorOptions(defaultDType, Device.CPU)
+          torch
+            .from_blob(toPointer(seq), Array(seq.length.toLong), opts)
+            .to(device.native, opts.dtype())
+      }
       new Tensor(tensor)
     }
   }

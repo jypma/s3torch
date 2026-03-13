@@ -5,9 +5,13 @@ import net.ypmania.s3torch.Tensor
 import org.bytedeco.pytorch
 
 class Adam(native: pytorch.Adam) {
+  /** Perform a single optimization step. */
   def step(): Unit = native.step()
 
-  def zeroGrad(): Unit = native.zero_grad()
+  /** Reset the gradients of all optimized tensors.
+    * @param setToNone Instead of setting to zero, set the grads to None.
+    */
+  def zeroGrad(setToNone: Boolean = false): Unit = native.zero_grad(setToNone)
 }
 
 object Adam {

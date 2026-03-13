@@ -858,7 +858,7 @@ class TensorSpec extends UnitSpec {
         val matrix = Tensor.zeros(DimA, DimB)
         matrix((1, 1)) = 1.0
         val res = matrix.view.merge(DimB)
-        val resType: Tensor[ProductDim[DimA.type, DimB.type] *: EmptyTuple.type, Float32, CPU.type] = res
+        val resType: Tensor[Tuple1[DimA.type * DimB.type], Float32, CPU.type] = res
         assert(res.size == Seq(DimA.size * DimB.size))
         assert(res.value.toSeq == Seq(
           0,0,0,
@@ -869,7 +869,7 @@ class TensorSpec extends UnitSpec {
           0,0,0
         ).map(_.toFloat))
 
-        val spl = res.view.split[ProductDim[DimA.type, DimB.type]].into(DimA)
+        val spl = res.view.split[DimA.type * DimB.type].into(DimA)
         val splType: Tensor[(DimA.type, DimB.type), Float32, CPU.type] = spl
         assert(spl.size == Seq(DimA.size, DimB.size))
 

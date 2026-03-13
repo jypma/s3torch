@@ -11,6 +11,6 @@ type Unsplit[S <: Shape, Idx <: Int] <: Shape = (S, Idx) match {
     next match {
       case divisor => originalDim *: tail
     }
-  case (a *: b *: tail, 1) => Dim.ProductDim[a, b] *: tail
+  case (a *: b *: tail, 1) => (a * b) *: tail
   case (head *: tail, idx) => head *: Unsplit[tail, idx - 1]
 }
