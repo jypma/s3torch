@@ -27,7 +27,14 @@ trait IntToken extends Token[Int] {
   def toInt(t: Int) = t
 }
 
-trait TokenType {
+trait LongToken extends Token[Long] {
+  def unknown = 0
+  def next(t: Long) = t + 1
+  def max(ts: Iterable[Long]) = ts.max
+  def toInt(t: Long) = t.toInt
+}
+
+trait IntTokenType {
   opaque type T = Int
 
   extension (t: T) {
@@ -52,11 +59,37 @@ trait TokenType {
   }
 }
 
+trait LongTokenType {
+  opaque type T = Long
+
+  extension (t: T) {
+    def toLong: Long = t
+  }
+
+  given Token[T] = new LongToken {}
+  given ToScalar[T] = summon[ToScalar[Long]]
+
+  abstract class DType extends s3torch.DType.Int64
+  val dType = new DType {}
+
+  /** Turns the given tokens into a tensor */
+  def toTensor[Dv <: Device](tokens: Seq[T])(using Default[Dv]): Tensor[Dim.Dynamic *: EmptyTuple, DType, Dv] = {
+    val ints = tokens.asInstanceOf[Seq[Long]] // Safe, because of opaque type
+    Tensor(ints, dType)
+  }
+
+  /** Turns the given tokens into a tensor, padded up to [D] with [pad], or None if the source is too long.
+    * This relies on pytorch's pad function, and hence may have errors for very large Long values.
+    */
+  def toTensor[Dv <: Device, D <: Dim](tokens: Seq[T], dim: D, pad: T)(using Default[Dv]): Option[Tensor[D *: EmptyTuple, DType, Dv]] = {
+    toTensor(tokens).padToOption(dim)(pad.toDouble, PaddingMode.Append)
+  }
+}
+
 abstract class Tokenizer[A: Token] {
   private val t = summon[Token[A]]
 
   def max: A
-  def size: Int = t.toInt(max)
   def tokenize(in: String): Seq[A]
 
 }

@@ -19,8 +19,8 @@ import net.ypmania.s3torch.nn.CrossEntropy
 
 import net.ypmania.s3torch.Default.cuda
 
-case object Src extends TokenType
-case object Dst extends TokenType
+case object Src extends IntTokenType
+case object Dst extends IntTokenType
 
 class Translator[
   SequenceLength <: Dim,
@@ -79,8 +79,8 @@ object Translator {
     )
     val allExamples = en_nl.flatMap(translator.Example(_, _))
     case class BatchSize(size: Long) extends Dim
-    case object SrcVocabSize extends Dim.Dynamic(translator.src.size)
-    case object DstVocabSize extends Dim.Dynamic(translator.dst.size)
+    case object SrcVocabSize extends Dim.Dynamic(translator.src.max.toInt)
+    case object DstVocabSize extends Dim.Dynamic(translator.dst.max.toInt)
     val model = Transformer(SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength, DModel, DFF, NHeads, layers)
     val optimizer = Adam(model.parameters, learningRate = 1e-4, eps = 1e-9)
 
@@ -97,7 +97,7 @@ object Translator {
           count += 1
           val encoderInput = batch(_.encoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.encode
           val decoderInput = batch(_.decoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.decode
-          val label = batch(_.label).to(DType.int64) // TODO allow CrossEntropy to take int64 subclasses, or even int32
+          val label = batch(_.label)
           val encoderMask = batch { x =>
             // We need to add dimensions to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
             val r = x.encoderMask.unsqueezeBefore(First).unsqueezeBefore(First)
@@ -121,7 +121,7 @@ object Translator {
           // all examples in the batch.
           val expected = label.view.merge[SequenceLength.type]
           val actual = projOutput.view.merge[SequenceLength.type]
-          val loss = CrossEntropy(actual, expected, ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
+          val loss = CrossEntropy(actual, expected.to(DType.int64), ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
 
           println(s"Batch ${count} of ${batches.size}:  loss is ${loss.to(Device.CPU).value}")
           //println("  backward.")

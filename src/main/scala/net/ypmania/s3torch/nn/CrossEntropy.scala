@@ -12,9 +12,9 @@ object CrossEntropy {
   /** Cross entropy where the targets are indexes, and which reduces the loss to a single scalar value.
     * Pytorch only supports Int64 as the target tensor. */
   def apply[
-    SI <: Tuple, ST <: Tuple, D <: Device, T <: DType
+    SI <: Tuple, ST <: Tuple, D <: Device, TI <: DType, TT <: DType.Int64
   ] (
-    input: Tensor[SI, T, D], target: Tensor[ST, DType.Int64, D],
+    input: Tensor[SI, TI, D], target: Tensor[ST, TT, D],
     ignoreIndex: Option[Long] = None, reduction: Reduction = Reduction.Mean, labelSmoothing: Double = 0
   ) (using
     ValidShape[SI, ST]
