@@ -363,6 +363,16 @@ class TensorSpec extends UnitSpec {
         assert(r.size == Seq(3L))
         assert(r.value.toSeq == Seq(1, 2, 3))
       }
+
+      it("can flatten a matrix") {
+        val t = Tensor((
+          ((1.0, 2.0, 3.0)),
+          ((4.0, 5.0, 6.0))
+        ))
+        val tType: Tensor[(Static[2L], Static[3L]), Float64, CPU.type] = t
+        val r = t.flatten
+        val rType: Tensor[Tuple1[ProductDim[Static[2L], Static[3L]]], Float64, CPU.type] = r
+      }
     }
 
     describe("mean") {

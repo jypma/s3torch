@@ -3,6 +3,7 @@ package net.ypmania.s3torch.optim
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Tensor
 import org.bytedeco.pytorch
+import scala.util.Using
 
 class Adam(native: pytorch.Adam) {
   /** Perform a single optimization step. */
@@ -12,6 +13,21 @@ class Adam(native: pytorch.Adam) {
     * @param setToNone Instead of setting to zero, set the grads to None.
     */
   def zeroGrad(setToNone: Boolean = false): Unit = native.zero_grad(setToNone)
+
+  def load(filename: String): this.type = {
+    Using(new pytorch.InputArchive) { archive =>
+      archive.load_from(filename)
+      native.load(archive)
+    }
+    this
+  }
+
+  def save(filename: String): Unit = {
+    Using(new pytorch.OutputArchive) { archive =>
+      native.save(archive)
+      archive.save_to(filename)
+    }
+  }
 }
 
 object Adam {

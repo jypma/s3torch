@@ -77,7 +77,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
       false
   }
 
-  def flatten: Shaped[Flatten.All[S]] = new Tensor(native.flatten())
+  def flatten(using f:Flatten[S]): Shaped[Tuple1[f.Out]] = new Tensor(native.flatten())
 
   def floor: This = new Tensor(native.floor())
 
@@ -132,8 +132,18 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     def run[Idx <: Int](idx: Idx) = new Tensor(native.softmax(idx))
   }
 
-  def to[D1 <: Device](device: D1): Tensor[S, T, D1] = new Tensor(native.to(device.native, dtype.native))
+  def summary: String = {
+    val values = flatten.to(Device.CPU, DType.float32).value
+    val lim = 10
+    if (values.size > lim) {
+      values.take(10).map(_.toString).mkString("(", ",", ", ...)")
+    } else {
+      values.mkString("(", ",", ")")
+    }
+  }
 
+  def to[D1 <: Device, T1 <: DType](device: D1, dtype: T1): Tensor[S, T1, D1] = new Tensor(native.to(device.native, dtype.native))
+  def to[D1 <: Device](device: D1): Tensor[S, T, D1] = new Tensor(native.to(device.native, dtype.native))
   def to[T1 <: DType](dtype: T1): Tensor[S, T1, D] = new Tensor(native.to(dtype.native))
 
   def tril(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.tril(diagonal))

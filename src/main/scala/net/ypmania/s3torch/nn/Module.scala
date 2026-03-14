@@ -161,6 +161,8 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
       })
     }
   }
+
+  def summary: String = namedParameters.toSeq.sortBy(_._1).take(10).map { (n, v) => s"${n} = ${v.summary}"}.mkString("\n")
 }
 
 object AbstractModule {
