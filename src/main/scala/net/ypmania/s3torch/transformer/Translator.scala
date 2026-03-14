@@ -18,6 +18,7 @@ import scala.io.Source
 import net.ypmania.s3torch.nn.CrossEntropy
 
 import net.ypmania.s3torch.Default.cuda
+import java.io.File
 
 case object Src extends IntTokenType
 case object Dst extends IntTokenType
@@ -63,16 +64,26 @@ class Translator[
 }
 
 object Translator {
+  // OK: 128 / 512 / 1024 / 8 / 6 / 16 (17ms per batch)
+  org.bytedeco.pytorch.global.torch.manual_seed(42)
+
   case object SequenceLength extends Dim.Static[128L]
   case object DModel extends Dim.Static[512L]
   case object DFF extends Dim.Static[1024L]
   case object NHeads extends Dim.Static[8L]
   val layers = 6
+  val batchSize = 16
+  val endEpoch = 20
 
   @main def run(): Unit = {
-    val en_nl = translations("en", "nl")
+    val srcLang = "en"
+    val dstLang = "nl"
+    val baseFile = s"model_${srcLang}_${dstLang}_s${SequenceLength.size}_m${DModel.size}_d${DFF.size}_h${NHeads.size}"
+    def modelFile(epoch: Int) = s"${baseFile}_e${epoch}.pt"
+    def optFile(epoch: Int) = s"${baseFile}_e${epoch}_optimizer.pt"
+
+    val en_nl = translations(srcLang, dstLang)
     // TODO save and auto-load tokenizers
-    // TODO investigate tokenizer lack of performance
     val translator = new Translator(SequenceLength,
       WordTokenizer.train[Src.T](en_nl.map(_._1)),
       WordTokenizer.train[Dst.T](en_nl.map(_._2))
@@ -82,18 +93,32 @@ object Translator {
     case object SrcVocabSize extends Dim.Dynamic(translator.src.max.toInt)
     case object DstVocabSize extends Dim.Dynamic(translator.dst.max.toInt)
     val model = Transformer(SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength, DModel, DFF, NHeads, layers)
-    val optimizer = Adam(model.parameters, learningRate = 1e-4, eps = 1e-9)
+    val optimizer = Adam(model.parameters, learningRate = 1e-5, eps = 1e-9)
 
-    val trainingData = allExamples.take((allExamples.size * 0.9).toInt)
-    // TODO save after each epoch, resume
-    for (epoch <- 0.until(20)) {
+    val startEpoch = 0.to(endEpoch).reverse.find(e => new File(modelFile(e)).exists()).map(e => e + 1).getOrElse(0)
+    if (startEpoch > 0) {
+      val lastEpoch = startEpoch - 1
+      //val f = modelFile(lastEpoch)
+      println(s"Loading epoch ${startEpoch}")
+      println("  before load:" + model.summary)
+      //val start = System.nanoTime()
+      model.load(modelFile(lastEpoch))
+      //val end = System.nanoTime()
+      //println(s" took ${(end - start)/1000000}ms")
+      println("  after load:" + model.summary)
+      optimizer.load(optFile(lastEpoch))
+    }
+    val trainingData = allExamples.take((allExamples.size * 0.05).toInt)
+    for (epoch <- startEpoch.until(endEpoch)) {
       println(s"Epoch ${epoch}")
+      println(model.summary)
       model.train(true)
 
       var count = 0
-      val batches = trainingData.grouped(16).toSeq.map(g => Batcher(BatchSize(_), g))
+      val batches = trainingData.grouped(batchSize).toSeq.map(g => Batcher(BatchSize(_), g))
       for (batch <- batches) {
         scoped {
+          val start = System.nanoTime()
           count += 1
           val encoderInput = batch(_.encoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.encode
           val decoderInput = batch(_.decoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.decode
@@ -110,11 +135,8 @@ object Translator {
             r
           }.to(DType.float32)  // TODO investigate Bool for mask type
 
-          //println("  encoding.")
           val encoderOutput = scoped { model.encode(encoderInput, encoderMask) }
-          //println("  decoding.")
           val decoderOutput = scoped { model.decode(encoderOutput, encoderMask, decoderMask)(decoderInput) }
-          //println("  outputting.")
           val projOutput = scoped { model.project(decoderOutput) }
 
           // Let's merge the SequenceLength dimension into BatchSize, so we can do a cross entropy loss of
@@ -123,13 +145,15 @@ object Translator {
           val actual = projOutput.view.merge[SequenceLength.type]
           val loss = CrossEntropy(actual, expected.to(DType.int64), ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
 
-          println(s"Batch ${count} of ${batches.size}:  loss is ${loss.to(Device.CPU).value}")
-          //println("  backward.")
+          val end = System.nanoTime()
+          println(s"Batch ${count} of ${batches.size}:  loss is ${loss.to(Device.CPU).value}, took ${(end - start)/1000000}ms")
           loss.backward()
           optimizer.step()
           optimizer.zeroGrad()
         }
       }
+      model.save(modelFile(epoch))
+      optimizer.save(optFile(epoch))
     }
   }
 

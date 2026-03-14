@@ -258,7 +258,7 @@ object Transformer {
     /** Number of encoder and decoder layers (N), default to 6 */
     coderLayers: Int,
     dropoutProb: Double = 0.1
-  )(using Default[T], Default[D], DModel |/ NHeads, RandomSource) = {
+  )(using rnd:RandomSource, dType:Default[T], device:Default[D])(using DModel |/ NHeads) = {
     val t = new Transformer[D, NHeads, DModel, DFF, T](dModel, dFF, nHeads)
     val srcEmbed = new t.InputEmbeddings(srcVocabSize)
     val tgtEmbed = new t.InputEmbeddings(tgtVocabSize)

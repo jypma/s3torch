@@ -2,9 +2,11 @@ package net.ypmania.s3torch.transformer
 
 import net.ypmania.s3torch.UnitSpec
 import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.Dim.Static
 import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Dim.DivisibleBy
+import net.ypmania.s3torch.RandomSource
 
 class TransformerSpec extends UnitSpec {
   case object DModel extends Dim.Static[4L]
