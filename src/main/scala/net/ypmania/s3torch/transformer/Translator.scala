@@ -19,6 +19,7 @@ import net.ypmania.s3torch.nn.CrossEntropy
 
 import net.ypmania.s3torch.Default.cuda
 import java.io.File
+import net.ypmania.s3torch.Default
 
 case object Src extends IntTokenType
 case object Dst extends IntTokenType
@@ -93,25 +94,20 @@ object Translator {
     case object SrcVocabSize extends Dim.Dynamic(translator.src.max.toInt)
     case object DstVocabSize extends Dim.Dynamic(translator.dst.max.toInt)
     val model = Transformer(SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength, DModel, DFF, NHeads, layers)
-    val optimizer = Adam(model.parameters, learningRate = 1e-5, eps = 1e-9)
+    val optimizer = Adam(model.parameters, learningRate = 1e-6, eps = 1e-9)
 
     val startEpoch = 0.to(endEpoch).reverse.find(e => new File(modelFile(e)).exists()).map(e => e + 1).getOrElse(0)
     if (startEpoch > 0) {
       val lastEpoch = startEpoch - 1
-      //val f = modelFile(lastEpoch)
       println(s"Loading epoch ${startEpoch}")
-      println("  before load:" + model.summary)
-      //val start = System.nanoTime()
       model.load(modelFile(lastEpoch))
-      //val end = System.nanoTime()
-      //println(s" took ${(end - start)/1000000}ms")
-      println("  after load:" + model.summary)
       optimizer.load(optFile(lastEpoch))
     }
-    val trainingData = allExamples.take((allExamples.size * 0.05).toInt)
     for (epoch <- startEpoch.until(endEpoch)) {
+      val indexes = Tensor.randperm(Dim(allExamples.size))(using Default.int32, Default.cpu).value.toSeq
+      val trainingData = indexes.take((indexes.size * 0.9).toInt).map(idx => allExamples(idx))
       println(s"Epoch ${epoch}")
-      println(model.summary)
+      //println(model.summary)
       model.train(true)
 
       var count = 0
@@ -147,6 +143,9 @@ object Translator {
 
           val end = System.nanoTime()
           println(s"Batch ${count} of ${batches.size}:  loss is ${loss.to(Device.CPU).value}, took ${(end - start)/1000000}ms")
+          if (loss.isNan.sumAll.to(Device.CPU).value) {
+            throw new RuntimeException("Loss became NaN")
+          }
           loss.backward()
           optimizer.step()
           optimizer.zeroGrad()

@@ -132,6 +132,10 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     def run[Idx <: Int](idx: Idx) = new Tensor(native.softmax(idx))
   }
 
+  def sumAll: Shaped[Scalar] = new Tensor(native.sum())
+  def sumBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): Shaped[op.Out] =
+    new Tensor(native.sum(Array(op.index), op.keep, new ScalarTypeOptional))
+
   def summary: String = {
     val values = flatten.to(Device.CPU, DType.float32).value
     val lim = 10
@@ -255,6 +259,8 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   def /[V](value: V)(using op: TensOp[V]): op.Out = op(this, value, _.div(_), _.div(_))
   def /=[V](value: V)(using op: ApplOp[V]): Unit = op(this, value, _.div_(_), _.div_(_))
 
+  def isNan: Tensor[S, DType.Bool, D] = new Tensor(native.isnan())
+
   private[Tensor] def unsafeWithShape[S1 <: Tuple]: Shaped[S1] = this.asInstanceOf
 }
 
@@ -282,9 +288,13 @@ object Tensor {
 
   // TODO consider a FunctionApply abstraction, to clean up duplication here
   def cos[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.cos)
+  def cosh[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.cosh)
   def exp[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.exp)
   def relu[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.relu)
   def sin[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.sin)
+  def sinh[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.sinh)
+  def tan[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.tan)
+  def tanh[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.tanh)
 
   def full[T <: DType, D <: Device, V](value: V)(using dtype: Default[T], device: Default[D], toScalar: ToScalar[V]) =
     new ZerosApply(dtype.value, device.value, torch.full(_, toScalar(value), _))
@@ -294,6 +304,8 @@ object Tensor {
     rnd(new ZerosApply(dtype.value, device.value, torch.torch_rand(_, _)))
   def zeros[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
     new ZerosApply(dtype.value, device.value, torch.torch_zeros(_, _))
+  def randperm[T <: DType, D <: Device, N <: Dim](dim: N)(using dtype: Default[T], device: Default[D]): Tensor[Tuple1[N], T, D] =
+    new Tensor(torch.torch_randperm(dim.size, Torch.tensorOptions(dtype.value, device.value)))
 
   /** Concatenates a sequence of tensors along a new dimension. */
   def stack[B <: Dim] = new StackApply[B]

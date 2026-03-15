@@ -654,6 +654,25 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("sum") {
+      val t = Tensor((
+        ((1.0, 2.0, 3.0)),
+        ((4.0, 5.0, 6.0))
+      ))
+
+      it("can sum all dimensions of a matrix") {
+        val s = t.sumAll.value
+        assert(s === 21.0)
+      }
+
+      it("can sum across a single dimension") {
+        val s = t.sumBy(Select.Idx(0))
+        val sType: Tensor[Static[3L] *: EmptyTuple.type, Float64, CPU.type] = s
+        assert(s.size == Seq(3L))
+        assert(s.value.toSeq === Seq(5.0, 7.0, 9.0))
+      }
+    }
+
     describe("to") {
       it("can copy a tensor to the GPU and back") {
         val c = Tensor((1, 2, 3))

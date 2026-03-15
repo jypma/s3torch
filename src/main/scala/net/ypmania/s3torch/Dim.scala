@@ -12,6 +12,8 @@ trait DimLowPriorityGivens {
   }
 }
 object Dim extends DimLowPriorityGivens {
+  def apply(size: Long): Dynamic = new Dynamic(size)
+
   /** A dimension known at compile time */
   abstract class Static[S <: Long](using ValueOf[S]) extends Dim {
     type Size = S
