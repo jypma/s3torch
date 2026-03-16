@@ -13,6 +13,7 @@ import internal._
 import Shape.Scalar
 import DType._
 import Device.CPU
+import scala.util.Using
 
 /**
   * A tensor is a multidimensional structure of values, wrapping pytorch's tensor. A tensor has the following properties, all of
@@ -313,6 +314,11 @@ object Tensor {
     def apply[S <: Tuple, T <: DType, D <: Device](tensors: Iterable[Tensor[S, T, D]]): Tensor[B *: S, T, D] = {
       new Tensor(torch.stack(new pytorch.TensorVector(tensors.map(_.native).toArray*)))
     }
+  }
+
+  /** Runs the given block with gradients disabled. All computations will be performed as if having set requiresGrad == false, even if true was passed. */
+  def noGrad[T](block: =>T): T = {
+    Using.resource(new pytorch.NoGradGuard)(_ => block)
   }
 
   // ---- Methods on Tensor that require floats
