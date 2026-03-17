@@ -4,15 +4,23 @@ import org.bytedeco.pytorch
 
 trait Index[D <: Dim, T] {
   def toNative(t: T): pytorch.TensorIndex
+  type Apply <: Tuple
 }
 
 trait IndexPrio0 {
   given [D <: Dim]: Index[D, Int] with {
     def toNative(i: Int) = new pytorch.TensorIndex(i)
+    type Apply = EmptyTuple
   }
 }
 
 object Index extends IndexPrio0 {
+  case object All
+  given [D <: Dim]: Index[D, All.type] with {
+    def toNative(a: All.type) = new pytorch.TensorIndex(new pytorch.Slice(new pytorch.SymIntOptional, new pytorch.SymIntOptional, new pytorch.SymIntOptional))
+    type Apply = Tuple1[D]
+  }
+
   case class Slice(from: Option[Int], to: Option[Int], step: Option[Int])
   object Slice:
     private def extract(index: Option[Int] | Int) = index match
@@ -25,19 +33,23 @@ object Index extends IndexPrio0 {
     ): Slice = Slice(extract(start), extract(end), extract(step))
 
   given [D <: Dim]: Index[D, Slice] with {
-    def toSymInt(maybeInt: Option[Int]) = maybeInt.map(l => pytorch.SymIntOptional(pytorch.SymInt(l))).orNull
     def toNative(s: Slice) = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(s.from), toSymInt(s.to), toSymInt(s.step)))
+    type Apply = Tuple1[Dim]
   }
 
   // Allow a tuple with the actual dimension type, instead of just the value
   given [D <: Dim, T](using i:Index[D, T]): Index[D, (D, T)] with {
     def toNative(t: (D, T)) = i.toNative(t._2)
+    type Apply = i.Apply
   }
+
+  private def toSymInt(maybeInt: Option[Int]) = maybeInt.map(l => pytorch.SymIntOptional(pytorch.SymInt(l))).orNull
 }
 
 trait Indices[S <: Shape, T] {
   def indexes(t: T): Seq[pytorch.TensorIndex]
   def toNative(t: T): pytorch.TensorIndexArrayRef = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(indexes(t)*))
+  type Apply = Indices.Apply[S, T]
 }
 
 object Indices {
@@ -52,5 +64,12 @@ object Indices {
 
   given [D <: Dim, I, DTail <: Tuple, ITail <: Tuple](using i: Index[D, I], tail: Indices[DTail, ITail]): Indices[D *: DTail, I *: ITail] with {
     def indexes(idx: I *: ITail) = i.toNative(idx.head) +: tail.indexes(idx.tail)
+  }
+
+  type Apply[S <: Tuple, I] = (S, I) match {
+    case (EmptyTuple, EmptyTuple) => EmptyTuple
+    case (dim *: sTail, Index.All.type *: iTail) => dim *: Apply[sTail, iTail]
+    case (dim *: sTail, Index.Slice *: iTail) => Dim *: Apply[sTail, iTail]
+    case (dim *: sTail, Int *: iTail) =>  Apply[sTail, iTail]
   }
 }

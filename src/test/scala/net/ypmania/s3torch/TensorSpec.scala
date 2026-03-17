@@ -302,6 +302,48 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("apply") {
+      val v = Tensor((1, 2, 3))
+      val m = Tensor((
+        ((1, 2, 3)),
+        ((0, 2, 0))
+      ))
+
+      it("can select one element from a vector") {
+        val r = v(0)
+        val rType: Tensor[EmptyTuple, Int32, CPU.type] = r
+        assert(r.size == Seq())
+        assert(r.value == 1)
+      }
+
+      it("can select the whole vector") {
+        val r = v(Index.All)
+        val rType: Tensor[Static[3L] *: EmptyTuple, Int32, CPU.type] = r
+        assert(r.size == Seq(3L))
+      }
+
+      it("can select one element from a matrix") {
+        val r = m(0, 1)
+        val rType: Tensor[EmptyTuple, Int32, CPU.type] = r
+        assert(r.size == Seq())
+        assert(r.value == 2)
+      }
+
+      it("can select one column from a matrix") {
+        val r = m(0, Index.All)
+        val rType: Tensor[Tuple1[Static[3L]], Int32, CPU.type] = r
+        assert(r.size == Seq(3L))
+        assert(r.value === Seq(1, 2, 3))
+      }
+
+      it("can select one row from a matrix") {
+        val r = m(Index.All, 0)
+        val rType: Tensor[Tuple1[Static[2L]], Int32, CPU.type] = r
+        assert(r.size == Seq(2L))
+        assert(r.value === Seq(1, 0))
+      }
+    }
+
     describe("equal") {
       it("are two tensors with same type and contents") {
         val a = Tensor((1, 2, 3))
