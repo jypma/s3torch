@@ -189,10 +189,6 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Returns a view of this Tensor with 5 dimensions, or None if the tensor has a different number of dimensions. */
   def untyped5D: Option[Shaped[(Dim, Dim, Dim, Dim, Dim)]] = Option.when(size.length == 5)(new Tensor(native))
 
-  def update[I,V](indices: I, value: V)(using idx: Indices[S,I], updateSource: UpdateSource[V, D]): Unit = {
-    updateSource(native, idx.toNative(indices), value)
-  }
-
   /** Inserts a dimension of One after D */
   val unsqueezeAfter = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = Shape.InsertAfter[S, Dim.One, Idx]
@@ -235,7 +231,10 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     }
   }
 
-  def value(using toScala: ToScala[S, T])(using D =:= CPU.type) = toScala(native)
+  def value(using toScala: ToScala[S, T])(using D =:= CPU.type): toScala.OutputType = toScala(native)
+  def value_=[V](v: V)(using updateSource: UpdateSource[V, D]): Unit = {
+    updateSource(native, Tensor.tensorIndexArray(), v)
+  }
 
   /** Applies [f] to [this] and the [opt] (if defined), or just returns [this] (if empty) */
   def when[A](opt: Option[A])(f: (This, A) => This): This = opt.map(a => f(this, a)).getOrElse(this)
@@ -338,37 +337,48 @@ object Tensor {
 
   // ---- Methods on Tensor with 1 dimension ---
   extension[T <: DType, D <: Device, D1 <: Dim](t: Tensor[Tuple1[D1], T, D]) {
-    def apply[I1](v1: I1)(using i1: Index[D1, I1]): t.Shaped[i1.Apply] = {
-      new Tensor(t.native.index(new pytorch.TensorIndexVector(i1.toNative(v1))))
+    def apply[I1 <: Index](v1: I1)(using i1: Index.Valid[D1, I1]): t.Shaped[i1.Apply] = {
+      new Tensor(t.native.index(new pytorch.TensorIndexVector(v1.toNative)))
+    }
+
+    def update[I1 <: Index, V](i: I1, value: V)(using Index.Valid[D1, I1])(using updateSource: UpdateSource[V, D]): Unit = {
+      updateSource(t.native, tensorIndexArray(i), value)
     }
   }
 
   // ---- Methods on Tensor with 2 dimensions ---
   extension[T <: DType, D <: Device, D1 <: Dim, D2 <: Dim](t: Tensor[(D1, D2), T, D]) {
-    def apply[I1, I2](v1: I1, v2: I2)(using i1: Index[D1, I1], i2: Index[D2, I2]): t.Shaped[i1.Apply ++ i2.Apply] = {
-      new Tensor(t.native.index(new pytorch.TensorIndexVector(i1.toNative(v1), i2.toNative(v2))))
+    def apply[I1 <: Index, I2 <: Index](v1: I1, v2: I2)(
+      using i1: Index.Valid[D1, I1], i2: Index.Valid[D2, I2]
+    ): t.Shaped[i1.Apply ++ i2.Apply] = {
+      new Tensor(t.native.index(new pytorch.TensorIndexVector(v1.toNative, v2.toNative)))
+    }
+
+    def update[I1 <: Index, I2 <: Index, V](i: (I1, I2), value: V)(
+      using Index.Valid[D1, I1], Index.Valid[D2, I2]
+    )(
+      using updateSource: UpdateSource[V, D]
+    ): Unit = {
+      updateSource(t.native, tensorIndexArray(i._1, i._2), value)
     }
   }
 
   // ---- Methods on Tensor with 3 dimensions ---
   extension[T <: DType, D <: Device, D1 <: Dim, D2 <: Dim, D3 <: Dim](t: Tensor[(D1, D2, D3), T, D]) {
-    def apply[I1, I2, I3](v1: I1, v2: I2, v3: I3)(using i1: Index[D1, I1], i2: Index[D2, I2], i3: Index[D3, I3]): t.Shaped[i1.Apply ++ i2.Apply ++ i3.Apply] = {
-      new Tensor(t.native.index(new pytorch.TensorIndexVector(i1.toNative(v1), i2.toNative(v2), i3.toNative(v3))))
+    def apply[I1 <: Index, I2 <: Index, I3 <: Index](v1: I1, v2: I2, v3: I3)(
+      using i1: Index.Valid[D1, I1], i2: Index.Valid[D2, I2], i3: Index.Valid[D2, I3]
+    ): t.Shaped[i1.Apply ++ i2.Apply ++ i3.Apply] = {
+      new Tensor(t.native.index(new pytorch.TensorIndexVector(v1.toNative, v2.toNative, v3.toNative)))
+    }
+
+    def update[I1 <: Index, I2 <: Index, I3 <: Index, V](i: (I1, I2, I3), value: V)(
+      using Index.Valid[D1, I1], Index.Valid[D2, I2], Index.Valid[D3, I3]
+    )(
+      using updateSource: UpdateSource[V, D]
+    ): Unit = {
+      updateSource(t.native, tensorIndexArray(i._1, i._2, i._3), value)
     }
   }
 
-  // ---- Methods on Tensor with 4 dimensions ---
-  extension[T <: DType, D <: Device, D1 <: Dim, D2 <: Dim, D3 <: Dim, D4 <: Dim](t: Tensor[(D1, D2, D3, D4), T, D]) {
-    def apply[I1, I2, I3, I4](v1: I1, v2: I2, v3: I3, v4: I4)(using i1: Index[D1, I1], i2: Index[D2, I2], i3: Index[D3, I3], i4: Index[D4, I4]): t.Shaped[i1.Apply ++ i2.Apply ++ i3.Apply ++ i4.Apply] = {
-      new Tensor(t.native.index(new pytorch.TensorIndexVector(i1.toNative(v1), i2.toNative(v2), i3.toNative(v3), i4.toNative(v4))))
-    }
-  }
-
-  // ---- Methods on Tensor with 5 dimensions ---
-  extension[T <: DType, D <: Device, D1 <: Dim, D2 <: Dim, D3 <: Dim, D4 <: Dim, D5 <: Dim](t: Tensor[(D1, D2, D3, D4, D5), T, D]) {
-    def apply[I1, I2, I3, I4, I5](v1: I1, v2: I2, v3: I3, v4: I4, v5: I5)(using i1: Index[D1, I1], i2: Index[D2, I2], i3: Index[D3, I3], i4: Index[D4, I4], i5: Index[D5, I5]): t.Shaped[i1.Apply ++ i2.Apply ++ i3.Apply ++ i4.Apply ++ i5.Apply] = {
-      new Tensor(t.native.index(new pytorch.TensorIndexVector(i1.toNative(v1), i2.toNative(v2), i3.toNative(v3), i4.toNative(v4), i5.toNative(v5))))
-    }
-  }
-
+  private[Tensor] def tensorIndexArray(i: Index*) = pytorch.TensorIndexArrayRef (new pytorch.TensorIndexVector(i.map(_.toNative)*))
 }

@@ -1,27 +1,63 @@
 package net.ypmania.s3torch
 
 import org.bytedeco.pytorch
+import scala.annotation.implicitNotFound
+import scala.compiletime.ops.int.ToLong
+import scala.compiletime.ops.int.+
+import scala.compiletime.ops.long.<
+import scala.util.NotGiven
 
-trait Index[D <: Dim, T] {
-  def toNative(t: T): pytorch.TensorIndex
-  type Apply <: Tuple
+/** A way to specify an index, or range of indexes, into a given dimension. */
+trait Index {
+  def toNative: pytorch.TensorIndex
 }
 
 trait IndexPrio0 {
-  given [D <: Dim]: Index[D, Int] with {
-    def toNative(i: Int) = new pytorch.TensorIndex(i)
+  given fromIntDynamic: Conversion[Int, Index.At] with {
+    def apply(i: Int) = Index.At(i)
+  }
+  given validAnyDim[D <: Dim, I <: Int & Singleton](using NotGiven[Index.Invalid[D, Index.Idx[I]]]): Index.Valid[D, Index.Idx[I]] with {
     type Apply = EmptyTuple
   }
 }
 
 object Index extends IndexPrio0 {
-  case object All
-  given [D <: Dim]: Index[D, All.type] with {
-    def toNative(a: All.type) = new pytorch.TensorIndex(new pytorch.Slice(new pytorch.SymIntOptional, new pytorch.SymIntOptional, new pytorch.SymIntOptional))
+  @implicitNotFound("Index is not valid for this tensor. Perhaps it is out of bounds?")
+  trait Valid[D <: Dim, I <: Index] {
+    type Apply <: Tuple
+  }
+
+  trait Invalid[D <: Dim, I <: Index]
+  given invalidStaticDim[L <: Long, D <: Dim.Static[L], I <: Int & Singleton](using ToLong[I] < L =:= false): Invalid[D, Idx[I]] with {}
+
+  /** A statically known index into a dimension */
+  case class Idx[I <: Int & Singleton](value: I) extends Index {
+    def toNative = new pytorch.TensorIndex(value)
+  }
+  given fromIntStatic[I <: Int & Singleton](using ValueOf[I], ValueOf[I + 0]): Conversion[I, Idx[I]] with {
+    def apply(i: I) = Idx(i)
+  }
+
+  /** An index only known at runtime, which is not bounds-checked. */
+  case class At(value: Int) extends Index {
+    def toNative = new pytorch.TensorIndex(value)
+  }
+  given [D <: Dim]: Valid[D, At] with {
+    type Apply = EmptyTuple
+  }
+
+  /** Selects the full dimension */
+  case object All extends Index {
+    def toNative = new pytorch.TensorIndex(new pytorch.Slice(new pytorch.SymIntOptional, new pytorch.SymIntOptional, new pytorch.SymIntOptional))
+  }
+  given [D <: Dim]: Valid[D, All.type] with {
     type Apply = Tuple1[D]
   }
 
-  case class Slice(from: Option[Int], to: Option[Int], step: Option[Int])
+  /** Selects a subset of a dimension. */
+  case class Slice(from: Option[Int], to: Option[Int], step: Option[Int]) extends Index {
+    def toNative = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(from), toSymInt(to), toSymInt(step)))
+  }
   object Slice:
     private def extract(index: Option[Int] | Int) = index match
       case i: Option[Int] => i
@@ -32,44 +68,18 @@ object Index extends IndexPrio0 {
         step: Option[Int] | Int = None
     ): Slice = Slice(extract(start), extract(end), extract(step))
 
-  given [D <: Dim]: Index[D, Slice] with {
-    def toNative(s: Slice) = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(s.from), toSymInt(s.to), toSymInt(s.step)))
+  given [D <: Dim]: Valid[D, Slice] with {
     type Apply = Tuple1[Dim]
   }
 
   // Allow a tuple with the actual dimension type, instead of just the value
-  given [D <: Dim, T](using i:Index[D, T]): Index[D, (D, T)] with {
-    def toNative(t: (D, T)) = i.toNative(t._2)
-    type Apply = i.Apply
+  given fromTuple[D <: Dim, T <: Index]: Conversion[(D, T), T] with {
+    def apply(t: (D, T)) = t._2
+  }
+  // Can't use singleton ints inside tuples, so we can't bounds check here.
+  given fromTupleInt[D <: Dim]: Conversion[(D, Int), At] with {
+    def apply(t: (D, Int)) = At(t._2)
   }
 
   private def toSymInt(maybeInt: Option[Int]) = maybeInt.map(l => pytorch.SymIntOptional(pytorch.SymInt(l))).orNull
-}
-
-trait Indices[S <: Shape, T] {
-  def indexes(t: T): Seq[pytorch.TensorIndex]
-  def toNative(t: T): pytorch.TensorIndexArrayRef = pytorch.TensorIndexArrayRef(new pytorch.TensorIndexVector(indexes(t)*))
-  type Apply = Indices.Apply[S, T]
-}
-
-object Indices {
-  /* Allow a single Dim without tuple syntax */
-  given [D <: Dim, T](using i1: Index[D, T]): Indices[Tuple1[D], T] with {
-    def indexes(t: T) = Seq(i1.toNative(t))
-  }
-
-  given Indices[EmptyTuple, EmptyTuple] with {
-    def indexes(t: EmptyTuple)= Seq.empty
-  }
-
-  given [D <: Dim, I, DTail <: Tuple, ITail <: Tuple](using i: Index[D, I], tail: Indices[DTail, ITail]): Indices[D *: DTail, I *: ITail] with {
-    def indexes(idx: I *: ITail) = i.toNative(idx.head) +: tail.indexes(idx.tail)
-  }
-
-  type Apply[S <: Tuple, I] = (S, I) match {
-    case (EmptyTuple, EmptyTuple) => EmptyTuple
-    case (dim *: sTail, Index.All.type *: iTail) => dim *: Apply[sTail, iTail]
-    case (dim *: sTail, Index.Slice *: iTail) => Dim *: Apply[sTail, iTail]
-    case (dim *: sTail, Int *: iTail) =>  Apply[sTail, iTail]
-  }
 }

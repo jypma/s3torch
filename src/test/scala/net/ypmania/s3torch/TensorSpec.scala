@@ -2,6 +2,7 @@ package net.ypmania.s3torch
 
 import Device.CUDA
 import Index.Slice
+import Index.given
 import Dim.Static
 import Dim.Dynamic
 import scala.reflect.ClassTag
@@ -309,8 +310,24 @@ class TensorSpec extends UnitSpec {
         ((0, 2, 0))
       ))
 
-      it("can select one element from a vector") {
+      it("can select one element from a static vector statically") {
+        // v(3) will nicely give a compile error here.
         val r = v(0)
+        assert(r.size == Seq())
+        assert(r.value == 1)
+      }
+
+      it("can select one element from a static vector dynamically") {
+        val index = 1 - 1
+        val r = v(index)
+        val rType: Tensor[EmptyTuple, Int32, CPU.type] = r
+        assert(r.size == Seq())
+        assert(r.value == 1)
+      }
+
+      it("can select one element from a dynamically-sized vector") {
+        val dv = Tensor(Seq(1,2,3,4,5))
+        val r = dv(0)
         val rType: Tensor[EmptyTuple, Int32, CPU.type] = r
         assert(r.size == Seq())
         assert(r.value == 1)
@@ -789,7 +806,7 @@ class TensorSpec extends UnitSpec {
 
       it("can set a scalar") {
         val a = Tensor(1.0)
-        a(EmptyTuple) = 4
+        a.value = 4
         assert(a.value == 4)
       }
 
