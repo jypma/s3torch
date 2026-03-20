@@ -128,10 +128,20 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Casts the shape of this tensor into compatable shape [O] (which must be a Tuple of Dim's, or a single Dim) */
   def shaped[O](using ev:CanShaped[S, O]): Shaped[ev.Out] = new Tensor(native)
 
+  /** Returns the sizes of all dimensions of the shape of this tensor. */
   def size: Seq[Long] = {
     // Don't use unsafeWrapArray, since the returned array might be freed after returning.
     native.sizes.vec.get.toVector
   }
+
+  /** Returns the size of one dimension selected by D. */
+  def sizeOf = new DimOperator.Of1[S, T] {
+    type Out[Idx <: Int] = Long
+    def run[Idx <: Int](idx: Idx) = size(idx)
+  }
+
+  /** Returns the size of one dimension typed D, using [dim] to create the instance of D holding the result. */
+  def sizeOf[D <: Dim, Idx <: Int](dim: Long => D)(using sel: Shape.SelectIdx[S,D]): D = dim(size(sel.idx))
 
   val softmax = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = S

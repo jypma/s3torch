@@ -3,8 +3,9 @@ package net.ypmania.s3torch
 import scala.compiletime.ops.long._
 import scala.compiletime.ops.int.ToLong
 
-trait Dim {
+trait Dim extends Ordered[Dim] {
   def size: Long
+  override def compare(that: Dim) = java.lang.Long.compare(this.size, that.size)
 }
 trait DimLowPriorityGivens {
   given fromLongDynamic[L <: Long]: Conversion[L, Dim.Dynamic] with {

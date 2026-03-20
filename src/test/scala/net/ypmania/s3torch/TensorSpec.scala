@@ -703,6 +703,23 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("sizeOf") {
+      class DimA(size: Long) extends Dim.Dynamic(size)
+      class DimB(size: Long) extends Dim.Dynamic(size)
+      val t = Tensor.zeros(DimA(2), DimB(3))
+
+      it("can return the size of a selected dimension") {
+        assert(t.sizeOf[DimA] == 2L)
+        assert(t.sizeOf[DimB] == 3L)
+      }
+
+      it("can reify a dimension") {
+        val size = t.sizeOf(DimA(_))
+        val sizeT: DimA = size
+        assert(size.size == 2)
+      }
+    }
+
     describe("std") {
       it("can calculate standard deviation") {
         var t = Tensor((1.0, 2.0, 3.0))
