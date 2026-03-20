@@ -3,14 +3,17 @@ package net.ypmania.s3torch.internal
 import net.ypmania.s3torch.Dim._
 import net.ypmania.s3torch._
 
-import scala.compiletime.ops.int.-
+/** Calculates the result of "unsplitting", or multiplying, the given two dimensions */
+trait Unsplit[D1, D2] {
+  type Out <: Dim
+}
 
-type Unsplit[S <: Shape, Idx <: Int] <: Shape = (S, Idx) match {
-  case (EmptyTuple, 0) => EmptyTuple
-  case (next *: DividedDim[originalDim, divisor] *: tail, 1) =>
-    next match {
-      case divisor => originalDim *: tail
-    }
-  case (a *: b *: tail, 1) => (a * b) *: tail
-  case (head *: tail, idx) => head *: Unsplit[tail, idx - 1]
+trait UnsplitLowPrio {
+  /** Low priority given that returns the product of the two dimensions */
+  inline given prod[A <: Dim, B <: Dim]: Unsplit[A, B] with { type Out = (A * B) }
+}
+
+object Unsplit extends UnsplitLowPrio {
+  /** High priority given that matches a previously split dimension, undoing the split. */
+  inline given divided[Divisor <: Dim, Original <: Dim]: Unsplit[Divisor, DividedDim[Original, Divisor]] with { type Out = Original }
 }

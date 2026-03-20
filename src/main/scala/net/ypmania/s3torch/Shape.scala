@@ -52,6 +52,17 @@ object Shape {
       I ++ Tuple.Drop[S, Idx + 1]
     ]
   }
+
+  /** Replaces the dimension at [Idx] and [Idx - 1] with all dimensions in tuple [I] */
+  type Replace2WithTuple[S <: Shape, I <: Tuple, Idx <: Int] <: Shape = Idx match {
+    case -1 => S
+    case _ => Tuple.Concat[
+      Tuple.Take[S, Idx - 1],
+      I ++ Tuple.Drop[S, Idx + 1]
+    ]
+  }
+
+  /** The index of the last dimension in the shape */
   type LastIdx[S <: Shape] = Tuple.Size[S] - 1
 
   /** Swaps two dimensions  */

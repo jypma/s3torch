@@ -8,6 +8,7 @@ import org.bytedeco.pytorch.ScalarTypeOptional
 import org.bytedeco.pytorch.global.torch
 
 import scala.compiletime.ops.int.>=
+import scala.compiletime.ops.int.-
 
 import internal._
 import Shape.Scalar
@@ -218,17 +219,21 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
       }
     }
 
+    // "merge" can't be a DimOperator, since we simultaneously need to find the index, and verify which Unsplit type to apply.
+    private type Merge[I <: Int] = Unsplit[Elem[S, I - 1], Elem[S, I]]
+    private type Merged[I <: Int, D <: Dim] = Shape.Replace2WithTuple[S, Tuple1[D], I]
     /** Merges the selected dimension with the one before it, by
       * multiplying the dimensions. If these have been previously split using
       * split(), this operation performs the reverse. */
-    val merge = new DimOperator.Of1Tensor[S, T, D] {
-      type Out[Idx <: Int] = Unsplit[S, Idx]
-      def run[Idx <: Int](idx: Idx) = {
-        val (before, after) = size.splitAt(idx - 1)
-        val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
-        new Tensor(native.view(sizes.toArray*))
-      }
+    def merge[D](using sel: Shape.SelectIdx[S, D], ev: Merge[sel.Idx]): Shaped[Merged[sel.Idx, ev.Out]] = {
+      val (before, after) = size.splitAt(sel.idx - 1)
+      val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
+      new Tensor(native.view(sizes.toArray*))
     }
+    /** Merges the selected dimension with the one before it, by
+      * multiplying the dimensions. If these have been previously split using
+      * split(), this operation performs the reverse. */
+    def merge[D](d: D)(using sel: Shape.SelectIdx[S, D], ev: Merge[sel.Idx]): Shaped[Merged[sel.Idx, ev.Out]] = merge[D]
   }
 
   def value(using toScala: ToScala[S, T])(using D =:= CPU.type): toScala.OutputType = toScala(native)
