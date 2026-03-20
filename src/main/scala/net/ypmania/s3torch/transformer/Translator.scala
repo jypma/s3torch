@@ -66,7 +66,7 @@ class Translator[
     }
   }
 
-  def train(batchSize: Int, trainingData: Iterable[Example]): Unit = {
+  def train(batchSize: Int, trainingData: Iterable[Example])(step: => Unit): Unit = {
     model.train(true)
 
     var count = 0
@@ -76,8 +76,8 @@ class Translator[
       scoped {
         val start = System.nanoTime()
         count += 1
-        val encoderInput = batch(_.encoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.encode
-        val decoderInput = batch(_.decoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.decode
+        val encoderInput = batch(_.encoderInput)
+        val decoderInput = batch(_.decoderInput)
         val label = batch(_.label)
         val encoderMask = batch { x =>
           // We need to add SeqLen and NHeads to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
@@ -98,7 +98,6 @@ class Translator[
         // Let's merge the SequenceLength dimension into BatchSize, so we can do a cross entropy loss of
         // all examples in the batch.
         val expected = label.view.merge[SequenceLength]
-        /*
         val actual = projOutput.view.merge[SequenceLength]
         val loss = CrossEntropy(actual, expected.to(DType.int64), ignoreIndex = Some(src.pad.toInt), labelSmoothing = 0.1)
 
@@ -107,10 +106,26 @@ class Translator[
         if (loss.isNan.sumAll.to(Device.CPU).value) {
           throw new RuntimeException("Loss became NaN")
         }
-         loss.backward()
-         */
-        //optimizer.step()
-        //optimizer.zeroGrad()
+        loss.backward()
+        step
+      }
+    }
+  }
+
+  def validate(examples: Seq[Example]): Unit = {
+    model.train(false)
+    Tensor.noGrad {
+      for (x <- examples) {
+        val encoderInput = x.encoderInput
+          .unsqueezeBefore(First) // add BatchSize of 1
+        val encoderMask = x.encoderMask
+          .unsqueezeBefore(First).unsqueezeBefore(First).unsqueezeBefore(First) // add NHeads, SeqLen, BatchSize
+          .to(DType.float32) // TODO investigate Bool for mask type
+
+        // Note: start of greedy_decode
+        val source = encoderInput
+        val sourceMask = encoderMask
+        val encoderOutput = model.encode(source, sourceMask)
       }
     }
   }
@@ -133,7 +148,6 @@ object Translator {
   val endEpoch = 20
 
   @main def run(): Unit = {
-    /*
     val srcLang = "en"
     val dstLang = "nl"
     val baseFile = s"model_${srcLang}_${dstLang}_s${SequenceLength.size}_m${DModel.size}_d${DFF.size}_h${NHeads.size}"
@@ -142,91 +156,31 @@ object Translator {
 
     val en_nl = translations(srcLang, dstLang)
     // TODO save and auto-load tokenizers
-    val translator = new Translator(SequenceLength,
+    val translator = new Translator(SequenceLength, DModel, DFF, NHeads,
       WordTokenizer.train[Src.T](en_nl.map(_._1)),
       WordTokenizer.train[Dst.T](en_nl.map(_._2))
     )
     val allExamples = en_nl.flatMap(translator.Example(_, _))
-    case class BatchSize(size: Long) extends Dim
-    case object SrcVocabSize extends Dim.Dynamic(translator.src.max.toInt)
-    case object DstVocabSize extends Dim.Dynamic(translator.dst.max.toInt)
-    val model = Transformer(SrcVocabSize, DstVocabSize, SequenceLength, SequenceLength, DModel, DFF, NHeads, layers)
-    val optimizer = Adam(model.parameters, learningRate = 1e-6, eps = 1e-9)
-
-    def validate(examples: Seq[translator.Example]): Unit = {
-      model.train(false)
-      Tensor.noGrad {
-        for (x <- examples) {
-          val encoderInput = x.encoderInput.to(DType.int32)  // TODO type safety on the DType in Transformer.encode
-            .unsqueezeBefore(First) // add BatchSize of 1
-          val encoderMark = x.encoderMask
-            .unsqueezeBefore(First).unsqueezeBefore(First).unsqueezeBefore(First) // add NHeads, SeqLen, BatchSize
-
-          // Note: start of greedy_decode
-
-        }
-      }
-    }
+    val optimizer = Adam(translator.model.parameters, learningRate = 1e-6, eps = 1e-9)
 
     val startEpoch = 0.to(endEpoch).reverse.find(e => new File(modelFile(e)).exists()).map(e => e + 1).getOrElse(0)
     if (startEpoch > 0) {
       val lastEpoch = startEpoch - 1
       println(s"Loading epoch ${startEpoch}")
-      model.load(modelFile(lastEpoch))
+      translator.model.load(modelFile(lastEpoch))
       optimizer.load(optFile(lastEpoch))
     }
     for (epoch <- startEpoch.until(endEpoch)) {
       val indexes = Tensor.randperm(Dim(allExamples.size))(using Default.int32, Default.cpu).value.toSeq
       val trainingData = indexes.take((indexes.size * 0.9).toInt).map(idx => allExamples(idx))
       println(s"Epoch ${epoch}")
-      //println(model.summary)
-      model.train(true)
-
-      var count = 0
-      val batches = trainingData.grouped(batchSize).toSeq.map(g => Batcher(BatchSize(_), g))
-      for (batch <- batches) {a
-        scoped {
-          val start = System.nanoTime()
-          count += 1
-          val encoderInput = batch(_.encoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.encode
-          val decoderInput = batch(_.decoderInput).to(DType.int32) // TODO type safety on the DType in Transformer.decode
-          val label = batch(_.label)
-          val encoderMask = batch { x =>
-            // We need to add SeqLen and NHeads to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
-            val r = x.encoderMask.unsqueezeBefore(First).unsqueezeBefore(First)
-            // Somehow, doesn't compile when inlined.
-            r
-          }.to(DType.float32) // TODO investigate Bool for mask type
-          val decoderMask = batch { x =>
-            // We need to add NHeads to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
-            val r = x.decoderMask.unsqueezeBefore(First)
-            r
-          }.to(DType.float32)  // TODO investigate Bool for mask type
-
-          val encoderOutput = scoped { model.encode(encoderInput, encoderMask) }
-          val decoderOutput = scoped { model.decode(encoderOutput, encoderMask, decoderMask)(decoderInput) }
-          val projOutput = scoped { model.project(decoderOutput) }
-
-          // Let's merge the SequenceLength dimension into BatchSize, so we can do a cross entropy loss of
-          // all examples in the batch.
-          val expected = label.view.merge[SequenceLength.type]
-          val actual = projOutput.view.merge[SequenceLength.type]
-          val loss = CrossEntropy(actual, expected.to(DType.int64), ignoreIndex = Some(translator.src.pad.toInt), labelSmoothing = 0.1)
-
-          val end = System.nanoTime()
-          println(s"Batch ${count} of ${batches.size}:  loss is ${loss.to(Device.CPU).value}, took ${(end - start)/1000000}ms")
-          if (loss.isNan.sumAll.to(Device.CPU).value) {
-            throw new RuntimeException("Loss became NaN")
-          }
-          loss.backward()
-          optimizer.step()
-          optimizer.zeroGrad()
-        }
+      translator.train(batchSize, trainingData) {
+        optimizer.step()
+        optimizer.zeroGrad()
       }
-      model.save(modelFile(epoch))
+      translator.model.save(modelFile(epoch))
       optimizer.save(optFile(epoch))
-     }
-     */
+    }
   }
 
   @nowarn // https://github.com/json4s/json4s/issues/982
