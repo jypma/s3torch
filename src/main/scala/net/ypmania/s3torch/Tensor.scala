@@ -125,6 +125,9 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     Option.when(dim.size - size.last >= 0)(padTo(dim)(value, mode))
   }
 
+  /** Casts the shape of this tensor into compatable shape [O] (which must be a Tuple of Dim's, or a single Dim) */
+  def shaped[O](using ev:CanShaped[S, O]): Shaped[ev.Out] = new Tensor(native)
+
   def size: Seq[Long] = {
     // Don't use unsafeWrapArray, since the returned array might be freed after returning.
     native.sizes.vec.get.toVector
@@ -302,16 +305,19 @@ object Tensor {
   def tan[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.tan)
   def tanh[S <: Tuple, T <: DType, D <: Device](t: Tensor[S, T, D]): Tensor[S, T, D] = new Tensor(t.native.tanh)
 
+  /** Returns a tensor filled with uninitialized data. */
+  def empty[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
+    new ZerosApply(dtype.value, device.value, torch.torch_empty(_, _, new pytorch.MemoryFormatOptional))
   def full[T <: DType, D <: Device, V](value: V)(using dtype: Default[T], device: Default[D], toScalar: ToScalar[V]) =
     new ZerosApply(dtype.value, device.value, torch.full(_, toScalar(value), _))
   def ones[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
     new ZerosApply(dtype.value, device.value, torch.torch_ones(_, _))
   def rand[T <: DType, D <: Device](using dtype: Default[T], device: Default[D], rnd:RandomSource) =
     rnd(new ZerosApply(dtype.value, device.value, torch.torch_rand(_, _)))
-  def zeros[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
-    new ZerosApply(dtype.value, device.value, torch.torch_zeros(_, _))
   def randperm[T <: DType, D <: Device, N <: Dim](dim: N)(using dtype: Default[T], device: Default[D]): Tensor[Tuple1[N], T, D] =
     new Tensor(torch.torch_randperm(dim.size, Torch.tensorOptions(dtype.value, device.value)))
+  def zeros[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
+    new ZerosApply(dtype.value, device.value, torch.torch_zeros(_, _))
 
   /** Concatenates a sequence of tensors along a new dimension. */
   def stack[B <: Dim] = new StackApply[B]

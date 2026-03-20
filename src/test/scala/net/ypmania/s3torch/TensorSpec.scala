@@ -797,6 +797,19 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("shaped") {
+      class MyDim(size: Long) extends Dim.Dynamic(size)
+      it("can put a dimension on a vector without using a tuple") {
+        val t = Tensor((1, 2, 3)).shaped[MyDim]
+        val tType = t
+      }
+
+      it("can put dimensions on a 3d tensor") {
+        val t = Tensor(Tuple1(Tuple1(Tuple1(42)))).shaped[(MyDim, MyDim, MyDim)]
+        val tType: Tensor[(MyDim, MyDim, MyDim), Int32, CPU.type] = t
+      }
+    }
+
     describe("update") {
       it("can set a single value in a vector") {
         val a = Tensor((1, 2, 3))

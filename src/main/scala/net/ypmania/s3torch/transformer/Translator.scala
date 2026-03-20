@@ -125,6 +125,15 @@ class Translator[
         val source = encoderInput
         val sourceMask = encoderMask
         val encoderOutput = model.encode(source, sourceMask)
+        class InputSequenceLength(size: Long) extends Dim.Dynamic(size)
+        var decoderInput = Dst.toTensor(dst.pad :: Nil).shaped[InputSequenceLength].unsqueezeBefore(First) // Add BatchSize
+        // TODO Add Tensor.apply[Dim.Dynamic](Seq), just to tag the type
+        // TODO Add Tensor.size(Dim) to get a single size of a dimension of the Tensor
+        // TODO Add Tensor.size(Long => Dim) to get a single size of a dimension of the Tensor as an actual instance of Dim
+        // TODO Add < and <= to Dim
+        while (decoderInput.size(1) <= sequenceLength.size) {
+
+        }
       }
     }
   }
