@@ -84,12 +84,12 @@ class Translator[
           val r = x.encoderMask.unsqueezeBefore(First).unsqueezeBefore(First)
           // Somehow, doesn't compile when inlined.
           r
-        }.to(DType.float32) // TODO investigate Bool for mask type
+        }
         val decoderMask = batch { x =>
           // We need to add NHeads to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
           val r = x.decoderMask.unsqueezeBefore(First)
           r
-        }.to(DType.float32)  // TODO investigate Bool for mask type
+        }
 
         val encoderOutput = scoped { model.encode(encoderInput, encoderMask) }
         val decoderOutput = scoped { model.decode(encoderOutput, encoderMask, decoderMask)(decoderInput) }
@@ -120,7 +120,6 @@ class Translator[
           .unsqueezeBefore(First) // add BatchSize of 1
         val encoderMask = x.encoderMask
           .unsqueezeBefore(First).unsqueezeBefore(First).unsqueezeBefore(First) // add NHeads, SeqLen, BatchSize
-          .to(DType.float32) // TODO investigate Bool for mask type
 
         // Note: start of greedy_decode
         val source = encoderInput

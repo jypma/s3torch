@@ -2,6 +2,7 @@ package net.ypmania.s3torch
 
 import net.ypmania.s3torch.DType.Float32
 import net.ypmania.s3torch.DType.Int32
+import net.ypmania.s3torch.DType.Bool
 
 case class Default[+T](value: T) {
 
@@ -10,6 +11,7 @@ case class Default[+T](value: T) {
 trait DefaultInactiveGivens {
   given cuda: Default[Device.CUDA.type] = Default(Device.CUDA)
   given int32: Default[Int32] = Default(DType.int32)
+  given bool: Default[Bool] = Default(DType.bool)
 }
 
 object Default extends DefaultInactiveGivens {

@@ -29,6 +29,7 @@ class Transformer[
   (using Default[T], Default[D], DModel |/ NHeads, RandomSource) {
 
   type Tn[S <: Shape] = Tensor[S, T, D]
+  type MaskTn[M <: Shape] = Tensor[M, Bool, D]
   type Batch[B <: Dim, SeqLen <: Dim] = Tn[(B, SeqLen, DModel)]
 
   class InputEmbeddings[VocabSize <: Dim](vocabSize: VocabSize) extends Module {
@@ -93,17 +94,17 @@ class Transformer[
     }
 
     def apply[B <: Dim](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen]): Batch[B, QSeqLen] =
-      apply(query, key, value, None.asInstanceOf[Option[Tn[(QSeqLen, KVSeqLen)]]])
+      apply(query, key, value, None.asInstanceOf[Option[MaskTn[(QSeqLen, KVSeqLen)]]])
 
-    // TODO Just make the mask a tensor of Bool instead?
-    def apply[B <: Dim, M <: Shape](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen], mask: Option[Tn[M]])
+    /** @param mask If given, should be true for values we want to give attention to, and false for values to ignore. */
+    def apply[B <: Dim, M <: Shape](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen], mask: Option[MaskTn[M]])
       (using Broadcastable[AttentionScores[B, QSeqLen, KVSeqLen], M]): Batch[B, QSeqLen] = {
       val q = query ~> queryWeights.apply ~> splitHeads
       val k = key ~> keyWeights.apply ~> splitHeads
       val v = value ~> valueWeights.apply ~> splitHeads
 
       val attentionScores = (q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.size))
-        .when(mask.map(_ #== 0))(_.maskedFilled(_, 1e-9))
+        .when(mask.map(_ #== false))(_.maskedFilled(_, 1e-9))
         .softmax(Last)
         ~> dropout.apply
 
@@ -131,7 +132,7 @@ class Transformer[
     addModule("feedForward", feedForward)
     val residual = addModules("residual", Seq.fill(2)(new ResidualConnection(dropoutProb)))
 
-    def apply[B <: Dim, M <: Shape](mask: Tn[M])(in: Batch[B, SeqLen])(using Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]): Batch[B, SeqLen] = {
+    def apply[B <: Dim, M <: Shape](mask: MaskTn[M])(in: Batch[B, SeqLen])(using Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]): Batch[B, SeqLen] = {
       in
         ~> residual(0)(x => attention(x, x, x, Some(mask)))
         ~> residual(1)(feedForward.apply)
@@ -142,7 +143,7 @@ class Transformer[
     addModules("blocks", blocks)
     val norm = addModule("norm", new LayerNormalization)
 
-    def apply[B <: Dim, M <: Shape](mask: Tn[M])(in: Batch[B, SeqLen])(using Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]): Batch[B, SeqLen] = {
+    def apply[B <: Dim, M <: Shape](mask: MaskTn[M])(in: Batch[B, SeqLen])(using Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]): Batch[B, SeqLen] = {
       blocks.foldLeft(in)(_ ~> _(mask)) ~> norm.apply
     }
   }
@@ -159,7 +160,7 @@ class Transformer[
     val residual = addModules("residual", Seq.fill(3)(new ResidualConnection(dropoutProb)))
 
     def apply[B <: Dim, EncoderMask <: Shape, DecoderMask <: Shape] (
-      encoderOutput: Batch[B, SrcSeqLen], encoderMask: Tn[EncoderMask], decoderMask: Tn[DecoderMask])(in: Batch[B, TgtSeqLen]
+      encoderOutput: Batch[B, SrcSeqLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtSeqLen]
     )(using
       Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DecoderMask],
       Broadcastable[AttentionScores[B, TgtSeqLen, SrcSeqLen], EncoderMask]
@@ -176,7 +177,7 @@ class Transformer[
     val norm = addModule("norm", new LayerNormalization)
 
     def apply[B <: Dim, EncoderMask <: Shape, DecoderMask <: Shape](
-      encoderOutput: Batch[B, SrcSeqLen], encoderMask: Tn[EncoderMask], decoderMask: Tn[DecoderMask])(in: Batch[B, TgtSeqLen]
+      encoderOutput: Batch[B, SrcSeqLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtSeqLen]
     )(using
       Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DecoderMask],
       Broadcastable[AttentionScores[B, TgtSeqLen, SrcSeqLen], EncoderMask]
@@ -217,12 +218,14 @@ class Transformer[
 
     parameters.flatMap(_.untyped2D).foreach(init.xavier_uniform)
 
-    def encode[B <: Dim, M <: Shape, T <: Int32](src: Tensor[(B, SrcSeqLen), T, D], srcMask: Tn[M])(using Broadcastable[AttentionScores[B, SrcSeqLen, SrcSeqLen], M]): Batch[B, SrcSeqLen] = {
+    def encode[B <: Dim, M <: Shape, T <: Int32](src: Tensor[(B, SrcSeqLen), T, D], srcMask: MaskTn[M])(
+      using Broadcastable[AttentionScores[B, SrcSeqLen, SrcSeqLen], M]
+    ): Batch[B, SrcSeqLen] = {
       src ~> sourceEmb.apply ~> sourcePos.apply ~> encoder(srcMask)
     }
 
     def decode[B <: Dim, EM <: Shape, DM <: Shape, T <: Int32]
-      (encoderOutput: Batch[B, SrcSeqLen], encoderMask: Tn[EM], decoderMask: Tn[DM])(tgt: Tensor[(B, TgtSeqLen), T, D])
+      (encoderOutput: Batch[B, SrcSeqLen], encoderMask: MaskTn[EM], decoderMask: MaskTn[DM])(tgt: Tensor[(B, TgtSeqLen), T, D])
       (using Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DM], Broadcastable[AttentionScores[B, TgtSeqLen, SrcSeqLen], EM])
         : Batch[B, TgtSeqLen] = {
       tgt ~> targetEmb.apply ~> targetPos.apply ~> decoder(encoderOutput, encoderMask, decoderMask)

@@ -111,7 +111,7 @@ class TransformerSpec extends UnitSpec {
       val in = Tensor.zeros(BatchSize, QSeqLen, DModel)
       in((0, 1, 0)) = 1.0
 
-      val mask0 = Tensor.zeros(QSeqLen, QSeqLen)
+      val mask0 = Tensor.zeros(using Default.bool)(QSeqLen, QSeqLen)
       val res0 = enc(mask0)(in)
       assert(res0.value === Seq(
         Seq(
@@ -121,7 +121,7 @@ class TransformerSpec extends UnitSpec {
         )
       ))
 
-      val mask1 = Tensor.ones(QSeqLen, QSeqLen)
+      val mask1 = Tensor.ones(using Default.bool)(QSeqLen, QSeqLen)
       val res1 = enc(mask1)(in)
       assert(res1.value === Seq(
         Seq(
