@@ -56,10 +56,14 @@ object Index extends IndexPrio0 {
 
   /** Selects elements up to the size of [D] (which must be smaller than or equal than the current dimension in the shape) */
   // TODO consider introducing the type D1 |<= D2 to prove that D1 is smaller than or equal to D2
-  case class Take[D <: Dim](dim: D) extends Index {
-    def toNative = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(None), toSymInt(Some(dim.size.toInt)), toSymInt(None)))
+  case class Take[D](size: Int) extends Index {
+    def toNative = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(None), toSymInt(Some(size)), toSymInt(None)))
   }
-  given [D <: Dim, O <: Dim]: Valid[D, Take[O]] with {
+  case object Take {
+    def apply[D <: Dim](dim: Dim.Ref[D]): Take[D] = Take(dim.size.toInt)
+    def apply[D <: Dim](dim: D): Take[D] = Take(dim.size.toInt)
+  }
+  given givtake[D <: Dim, O]: Valid[D, Take[O]] with {
     type Apply = Tuple1[O]
   }
 

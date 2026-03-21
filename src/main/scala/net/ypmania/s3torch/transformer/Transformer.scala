@@ -1,7 +1,6 @@
 package net.ypmania.s3torch.transformer
 
 import net.ypmania.s3torch.DType._
-import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Dim._
 import net.ypmania.s3torch.Shape.Select.Last
 import net.ypmania.s3torch._
@@ -47,8 +46,9 @@ class Transformer[
     val div_term = exp(indices * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 
-    def apply[B <: Dim](in: Batch[B, SeqLen]): Batch[B, SeqLen] = {
-      dropout(in + positionalEncodingDeltas)
+    def apply[B <: Dim, L <: Dim](in: Batch[B, L]): Batch[B, L] = {
+      val deltas = positionalEncodingDeltas(Index.Take(in.sizeOf[L]), Index.All)
+      dropout(in + deltas)
     }
   }
 

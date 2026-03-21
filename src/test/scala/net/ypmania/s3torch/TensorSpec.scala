@@ -367,6 +367,15 @@ class TensorSpec extends UnitSpec {
         assert(r.size == Seq(2L))
         assert(r.value === Seq(1, 2))
       }
+
+      it("can reduce a dimension to the Dim of another tensor") {
+        case object D2 extends Dim.Static[2L]
+        val t2 = Tensor.zeros(D2)
+        val r = v(Index.Take(t2.sizeOf[D2.type]))
+        val rType: Tensor[Tuple1[D2.type], Int32, CPU.type] = r
+        assert(r.size == Seq(2L))
+        assert(r.value === Seq(1, 2))
+      }
     }
 
     describe("equal") {
@@ -717,8 +726,8 @@ class TensorSpec extends UnitSpec {
       val t = Tensor.zeros(DimA(2), DimB(3))
 
       it("can return the size of a selected dimension") {
-        assert(t.sizeOf[DimA] == 2L)
-        assert(t.sizeOf[DimB] == 3L)
+        assert(t.sizeOf[DimA].size == 2L)
+        assert(t.sizeOf[DimB].size == 3L)
       }
 
       it("can reify a dimension") {

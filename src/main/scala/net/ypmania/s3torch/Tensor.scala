@@ -134,10 +134,10 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     native.sizes.vec.get.toVector
   }
 
-  /** Returns the size of one dimension selected by D. */
+  /** Returns the size of one dimension selected by D, as a Dim.Ref (since we can't create an actual instance of a Dim). */
   def sizeOf = new DimOperator.Of1[S, T] {
-    type Out[Idx <: Int] = Long
-    def run[Idx <: Int](idx: Idx) = size(idx)
+    type Out[Idx <: Int] = Dim.Ref[Elem[S, Idx]]
+    def run[Idx <: Int](idx: Idx) = Dim.Ref(size(idx))
   }
 
   /** Returns the size of one dimension typed D, using [dim] to create the instance of D holding the result. */

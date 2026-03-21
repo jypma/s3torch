@@ -1,5 +1,5 @@
 fork := true
-scalaVersion := "3.8.1"
+scalaVersion := "3.8.2"
 organization := "ypmania.net"
 version := "0.0.1-SNAPSHOT"
 

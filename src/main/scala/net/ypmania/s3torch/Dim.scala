@@ -60,4 +60,8 @@ object Dim extends DimLowPriorityGivens {
   /** A Dim that is the result of dividing two other Dims */
   trait DividedDim[D <: Dim, L <: Dim] extends Dim {}
   infix type /[D <: Dim, L <: Dim] = DividedDim[D, L]
+
+  /** A Dim that references the type of another Dim, of which the value is known, but no instance to
+    * the actual Dim subclass is available. */
+  case class Ref[D](size: Long) extends Dim
 }
