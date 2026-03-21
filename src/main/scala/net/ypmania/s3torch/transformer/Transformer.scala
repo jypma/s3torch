@@ -169,12 +169,12 @@ class Transformer[
     addModule("feedForward", feedForward)
     val residual = addModules("residual", Seq.fill(3)(new ResidualConnection(dropoutProb)))
 
-    def apply[B <: Dim, SrcSeqLen <: Dim, TgtSeqLen <: Dim, EncoderMask <: Shape, DecoderMask <: Shape] (
-      encoderOutput: Batch[B, SrcSeqLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtSeqLen]
+    def apply[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EncoderMask <: Shape, DecoderMask <: Shape] (
+      encoderOutput: Batch[B, SrcLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtLen]
     )(using
-      Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DecoderMask],
-      Broadcastable[AttentionScores[B, TgtSeqLen, SrcSeqLen], EncoderMask]
-    ): Batch[B, TgtSeqLen] = {
+      Broadcastable[AttentionScores[B, TgtLen, TgtLen], DecoderMask],
+      Broadcastable[AttentionScores[B, TgtLen, SrcLen], EncoderMask]
+    ): Batch[B, TgtLen] = {
       in
         ~> residual(0)(x => selfAttention(x, x, x, Some(decoderMask)))
         ~> residual(1)(x => crossAttention(x, encoderOutput, encoderOutput, Some(encoderMask)))
@@ -186,12 +186,12 @@ class Transformer[
     addModules("blocks", blocks)
     val norm = addModule("norm", new LayerNormalization)
 
-    def apply[B <: Dim, SrcSeqLen <: Dim, TgtSeqLen <: Dim, EncoderMask <: Shape, DecoderMask <: Shape](
-      encoderOutput: Batch[B, SrcSeqLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtSeqLen]
+    def apply[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EncoderMask <: Shape, DecoderMask <: Shape](
+      encoderOutput: Batch[B, SrcLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtLen]
     )(using
-      Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DecoderMask],
-      Broadcastable[AttentionScores[B, TgtSeqLen, SrcSeqLen], EncoderMask]
-    ): Batch[B, TgtSeqLen] = {
+      Broadcastable[AttentionScores[B, TgtLen, TgtLen], DecoderMask],
+      Broadcastable[AttentionScores[B, TgtLen, SrcLen], EncoderMask]
+    ): Batch[B, TgtLen] = {
       blocks.foldLeft(in)(_ ~> _(encoderOutput, encoderMask, decoderMask)) ~> norm.apply
     }
   }
@@ -205,7 +205,7 @@ class Transformer[
   }
 
   class Main[
-    SrcSeqLen <: Dim,
+    SrcSeqLen <: Dim, // TODO consider renaming to MaxSrcLen
     TgtSeqLen <: Dim,
     SrcVocabSize <: Dim,
     TgtVocabSize <: Dim
@@ -228,16 +228,16 @@ class Transformer[
 
     parameters.flatMap(_.untyped2D).foreach(init.xavier_uniform)
 
-    def encode[B <: Dim, M <: Shape, T <: Int32](src: Tensor[(B, SrcSeqLen), T, D], srcMask: MaskTn[M])(
-      using Broadcastable[AttentionScores[B, SrcSeqLen, SrcSeqLen], M]
-    ): Batch[B, SrcSeqLen] = {
+    def encode[B <: Dim, M <: Shape, T <: Int32, SrcLen <: Dim](src: Tensor[(B, SrcLen), T, D], srcMask: MaskTn[M])(
+      using Broadcastable[AttentionScores[B, SrcLen, SrcLen], M]
+    ): Batch[B, SrcLen] = {
       src ~> sourceEmb.apply ~> sourcePos.apply ~> encoder(srcMask)
     }
 
-    def decode[B <: Dim, EM <: Shape, DM <: Shape, T <: Int32]
-      (encoderOutput: Batch[B, SrcSeqLen], encoderMask: MaskTn[EM], decoderMask: MaskTn[DM])(tgt: Tensor[(B, TgtSeqLen), T, D])
-      (using Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DM], Broadcastable[AttentionScores[B, TgtSeqLen, SrcSeqLen], EM])
-        : Batch[B, TgtSeqLen] = {
+    def decode[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EM <: Shape, DM <: Shape, T <: Int32]
+      (encoderOutput: Batch[B, SrcLen], encoderMask: MaskTn[EM], decoderMask: MaskTn[DM])(tgt: Tensor[(B, TgtLen), T, D])
+      (using Broadcastable[AttentionScores[B, TgtLen, TgtLen], DM], Broadcastable[AttentionScores[B, TgtLen, SrcLen], EM])
+        : Batch[B, TgtLen] = {
       tgt ~> targetEmb.apply ~> targetPos.apply ~> decoder(encoderOutput, encoderMask, decoderMask)
     }
 

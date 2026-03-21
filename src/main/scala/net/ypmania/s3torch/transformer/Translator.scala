@@ -3,7 +3,6 @@ package net.ypmania.s3torch.transformer
 import net.ypmania.s3torch.Batcher
 import net.ypmania.s3torch.DType
 import net.ypmania.s3torch.DType.Bool
-import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Dim.|/
@@ -130,7 +129,7 @@ class Translator[
         def inputLength = decoderInput.sizeOf(InputSequenceLength(_))
         while (inputLength <= sequenceLength) {
           val decoderMask = causalMask(inputLength)
-          //val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput)
+          val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput)
         }
       }
     }
