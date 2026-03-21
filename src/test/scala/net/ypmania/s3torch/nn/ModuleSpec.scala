@@ -1,17 +1,9 @@
 package net.ypmania.s3torch.nn
 
-import org.scalatest.Assertions._
-
 import net.ypmania.s3torch.*
 
-import Dim.Static
-import Dim.Dynamic
-import scala.reflect.ClassTag
-import net.ypmania.s3torch.internal.Torch
 import java.nio.file.Files
 import java.nio.file.Path
-import scala.util.Using
-import java.io.FileOutputStream
 
 class ModuleSpec extends UnitSpec {
   case object ExampleDim extends Dim.Static[3L]

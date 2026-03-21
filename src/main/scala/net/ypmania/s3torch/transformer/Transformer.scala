@@ -76,7 +76,7 @@ class Transformer[
 
   type AttentionScores[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim] = (B, NHeads, QSeqLen, KVSeqLen)
 
-  class MultiHeadAttention[QSeqLen <: Dim, KVSeqLen <: Dim](dropoutProb: Double) extends Module {
+  class MultiHeadAttention(dropoutProb: Double) extends Module {
     val queryWeights = addModule("queryWeights", Linear(dModel, dModel)) // FIXME Maybe there should be no bias here if it's just a mul.
     val keyWeights = addModule("keyWeights", Linear(dModel, dModel))
     val valueWeights = addModule("valueWeights", Linear(dModel, dModel))
@@ -89,16 +89,22 @@ class Transformer[
     private def splitHeads[B <: Dim, SeqLen <: Dim](b: Batch[B, SeqLen]): Tn[(B, NHeads, SeqLen, DModel / NHeads)] =
       b.view.split[DModel].into(nHeads).transpose[SeqLen, NHeads]
 
-    private def joinHeads[B <: Dim](h: Tn[(B, NHeads, QSeqLen, DModel / NHeads)]) = {
-      h.transpose[NHeads, QSeqLen].contiguous.view.merge[DModel / NHeads]
+    private def joinHeads[B <: Dim, SeqLen <: Dim](h: Tn[(B, NHeads, SeqLen, DModel / NHeads)]) = {
+      h.transpose[NHeads, SeqLen].contiguous.view.merge[DModel / NHeads]
     }
 
-    def apply[B <: Dim](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen]): Batch[B, QSeqLen] =
+    /** Applies the MultiHeadAttention without a mask (attenting to all input values) */
+    def apply[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim](
+      query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen]
+    ): Batch[B, QSeqLen] =
       apply(query, key, value, None.asInstanceOf[Option[MaskTn[(QSeqLen, KVSeqLen)]]])
 
     /** @param mask If given, should be true for values we want to give attention to, and false for values to ignore. */
-    def apply[B <: Dim, M <: Shape](query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen], mask: Option[MaskTn[M]])
-      (using Broadcastable[AttentionScores[B, QSeqLen, KVSeqLen], M]): Batch[B, QSeqLen] = {
+    def apply[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim, M <: Shape](
+      query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen], mask: Option[MaskTn[M]]
+    ) (using
+      Broadcastable[AttentionScores[B, QSeqLen, KVSeqLen], M]
+    ): Batch[B, QSeqLen] = {
       val q = query ~> queryWeights.apply ~> splitHeads
       val k = key ~> keyWeights.apply ~> splitHeads
       val v = value ~> valueWeights.apply ~> splitHeads
@@ -111,7 +117,7 @@ class Transformer[
       // TODO save the attention scores somehow, they're apparently needed for visualization later.
       attentionScores
         `@` v
-        ~> joinHeads[B].apply
+        ~> joinHeads[B, QSeqLen].apply
         ~> outputWeights.apply
     }
   }
@@ -127,30 +133,34 @@ class Transformer[
       in => (in ~> norm.apply ~> sublayer ~> dropout.apply) + in
   }
 
-  class EncoderBlock[SeqLen <: Dim](attention: MultiHeadAttention[SeqLen, SeqLen], feedForward: FeedForward, dropoutProb: Double) extends Module {
+  class EncoderBlock(attention: MultiHeadAttention, feedForward: FeedForward, dropoutProb: Double) extends Module {
     addModule("attention", attention)
     addModule("feedForward", feedForward)
     val residual = addModules("residual", Seq.fill(2)(new ResidualConnection(dropoutProb)))
 
-    def apply[B <: Dim, M <: Shape](mask: MaskTn[M])(in: Batch[B, SeqLen])(using Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]): Batch[B, SeqLen] = {
+    def apply[B <: Dim, SeqLen <: Dim, M <: Shape](mask: MaskTn[M])(in: Batch[B, SeqLen])(using
+      Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]
+    ): Batch[B, SeqLen] = {
       in
         ~> residual(0)(x => attention(x, x, x, Some(mask)))
         ~> residual(1)(feedForward.apply)
     }
   }
 
-  class Encoder[SeqLen <: Dim](blocks: Seq[EncoderBlock[SeqLen]]) extends Module {
+  class Encoder(blocks: Seq[EncoderBlock]) extends Module {
     addModules("blocks", blocks)
     val norm = addModule("norm", new LayerNormalization)
 
-    def apply[B <: Dim, M <: Shape](mask: MaskTn[M])(in: Batch[B, SeqLen])(using Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]): Batch[B, SeqLen] = {
+    def apply[B <: Dim, SeqLen <: Dim, M <: Shape](mask: MaskTn[M])(in: Batch[B, SeqLen])(using
+      Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]
+    ): Batch[B, SeqLen] = {
       blocks.foldLeft(in)(_ ~> _(mask)) ~> norm.apply
     }
   }
 
-  class DecoderBlock[SrcSeqLen <: Dim, TgtSeqLen <: Dim](
-    selfAttention: MultiHeadAttention[TgtSeqLen, TgtSeqLen],
-    crossAttention: MultiHeadAttention[TgtSeqLen, SrcSeqLen],
+  class DecoderBlock(
+    selfAttention: MultiHeadAttention,
+    crossAttention: MultiHeadAttention,
     feedForward: FeedForward,
     dropoutProb: Double) extends Module
   {
@@ -159,7 +169,7 @@ class Transformer[
     addModule("feedForward", feedForward)
     val residual = addModules("residual", Seq.fill(3)(new ResidualConnection(dropoutProb)))
 
-    def apply[B <: Dim, EncoderMask <: Shape, DecoderMask <: Shape] (
+    def apply[B <: Dim, SrcSeqLen <: Dim, TgtSeqLen <: Dim, EncoderMask <: Shape, DecoderMask <: Shape] (
       encoderOutput: Batch[B, SrcSeqLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtSeqLen]
     )(using
       Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DecoderMask],
@@ -172,11 +182,11 @@ class Transformer[
     }
   }
 
-  class Decoder[SrcSeqLen <: Dim, TgtSeqLen <: Dim](blocks: Seq[DecoderBlock[SrcSeqLen, TgtSeqLen]]) extends Module {
+  class Decoder(blocks: Seq[DecoderBlock]) extends Module {
     addModules("blocks", blocks)
     val norm = addModule("norm", new LayerNormalization)
 
-    def apply[B <: Dim, EncoderMask <: Shape, DecoderMask <: Shape](
+    def apply[B <: Dim, SrcSeqLen <: Dim, TgtSeqLen <: Dim, EncoderMask <: Shape, DecoderMask <: Shape](
       encoderOutput: Batch[B, SrcSeqLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtSeqLen]
     )(using
       Broadcastable[AttentionScores[B, TgtSeqLen, TgtSeqLen], DecoderMask],
@@ -200,8 +210,8 @@ class Transformer[
     SrcVocabSize <: Dim,
     TgtVocabSize <: Dim
   ](
-    encoder: Encoder[SrcSeqLen],
-    decoder: Decoder[SrcSeqLen, TgtSeqLen],
+    encoder: Encoder,
+    decoder: Decoder,
     sourceEmb: InputEmbeddings[SrcVocabSize],
     targetEmb: InputEmbeddings[TgtVocabSize],
     sourcePos: PositionalEncoding[SrcSeqLen],
@@ -271,7 +281,7 @@ object Transformer {
     val encoder = new t.Encoder(
       0.until(coderLayers).map { i =>
         new t.EncoderBlock(
-          new t.MultiHeadAttention[SrcSeqLen, SrcSeqLen](dropoutProb),
+          new t.MultiHeadAttention(dropoutProb),
           new t.FeedForward(dropoutProb),
           dropoutProb
         )
@@ -281,8 +291,8 @@ object Transformer {
     val decoder = new t.Decoder(
       0.until(coderLayers).map { i =>
         new t.DecoderBlock(
-          new t.MultiHeadAttention[TgtSeqLen, TgtSeqLen](dropoutProb),
-          new t.MultiHeadAttention[TgtSeqLen, SrcSeqLen](dropoutProb),
+          new t.MultiHeadAttention(dropoutProb),
+          new t.MultiHeadAttention(dropoutProb),
           new t.FeedForward(dropoutProb),
           dropoutProb
         )

@@ -82,7 +82,7 @@ class TransformerSpec extends UnitSpec {
   }
 
   describe("MultiHeadAttention") {
-    val mh = new transformer.MultiHeadAttention[QSeqLen.type, KVSeqLen.type](0.5)
+    val mh = new transformer.MultiHeadAttention(0.5)
 
     it("should apply key and value to the batch") {
       val in = Tensor.zeros(BatchSize, QSeqLen, DModel)
@@ -102,7 +102,7 @@ class TransformerSpec extends UnitSpec {
 
   describe("EncoderBlock") {
     val enc = new transformer.EncoderBlock(
-      new transformer.MultiHeadAttention[QSeqLen.type, QSeqLen.type](0.5),
+      new transformer.MultiHeadAttention(0.5),
       new transformer.FeedForward(0.0),
       0.5
     )

@@ -359,6 +359,14 @@ class TensorSpec extends UnitSpec {
         assert(r.size == Seq(2L))
         assert(r.value === Seq(1, 0))
       }
+
+      it("can reduce a dimension using Take") {
+        case object D2 extends Dim.Static[2L]
+        val r = v(Index.Take(D2))
+        val rType: Tensor[Tuple1[D2.type], Int32, CPU.type] = r
+        assert(r.size == Seq(2L))
+        assert(r.value === Seq(1, 2))
+      }
     }
 
     describe("equal") {

@@ -127,8 +127,10 @@ class Translator[
         val encoderOutput = model.encode(source, sourceMask)
         class InputSequenceLength(size: Long) extends Dim.Dynamic(size)
         var decoderInput = Dst.toTensor(dst.pad :: Nil).shaped[InputSequenceLength].unsqueezeBefore(First) // Add BatchSize
-        while (decoderInput.sizeOf(InputSequenceLength(_)) <= sequenceLength) {
-
+        def inputLength = decoderInput.sizeOf(InputSequenceLength(_))
+        while (inputLength <= sequenceLength) {
+          val decoderMask = causalMask(inputLength)
+          //val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput)
         }
       }
     }
