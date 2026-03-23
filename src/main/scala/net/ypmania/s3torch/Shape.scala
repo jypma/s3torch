@@ -129,17 +129,26 @@ object Shape {
       def apply[D <: Dim](d: D): At[D] = new At {}
     }
     given atDim[S <: Shape, D <: Dim, Idx <: Int](using Select[S, D, Idx]): Select[S, At[D], Idx] with {}
+
+    //given append[S <: Shape, Next <: Dim, D](using Select[Tuple1[Next], D, 0]): Select[S :* Next, D, Size[S]] with {}
+
+    // given concat[B <: Shape, N <: Shape, D, Idx <: Int](using Select[N, D, Idx]): Select[B ++ N, D, Size[B] + Idx] with {}
   }
 
 
   trait SelectIdx[S <: Shape, D] {
     type Idx <: Int
-    def idx: Idx
+    def idx: Int
   }
   object SelectIdx {
-    given [S <: Shape, D, I <: Int](using s:Select[S, D, I], i:ValueOf[I]): SelectIdx[S, D] with {
+    given g[S <: Shape, D, I <: Int](using s:Select[S, D, I], i:ValueOf[I]): SelectIdx[S, D] with {
       type Idx = I
       def idx = i.value
+    }
+
+    given concat[B <: Shape, N <: Shape, D, I <: Int](using n:Select[N, D, I], i:ValueOf[I], b: ValueOf[Size[B]]): SelectIdx[B ++ N, D] with {
+      type Idx = Size[B] + I
+      def idx = summon[ValueOf[Size[B]]].value + summon[ValueOf[I]].value
     }
   }
 }

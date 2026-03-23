@@ -5,6 +5,7 @@ import net.ypmania.s3torch.DType
 import net.ypmania.s3torch.DType.Bool
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.Index
 import net.ypmania.s3torch.Dim.|/
 import net.ypmania.s3torch.Shape.Select.First
 import net.ypmania.s3torch.Tensor
@@ -130,6 +131,8 @@ class Translator[
         while (inputLength <= sequenceLength) {
           val decoderMask = causalMask(inputLength)
           val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput)
+          val in = out(Index.All, Index.Last, Index.All).unsqueezeBefore[DModel] // re-introduce sequence length of 1
+          val prob = model.project(in)
         }
       }
     }

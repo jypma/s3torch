@@ -1,20 +1,20 @@
 package net.ypmania.s3torch.nn
 
+import net.ypmania.s3torch.Batched1
 import net.ypmania.s3torch.DType
 import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.RandomSource
-import net.ypmania.s3torch.Shape
 import net.ypmania.s3torch.Tensor
 import org.bytedeco.pytorch
 
-import Shape._
+import Tuple._
 
 class Linear[In <: Dim, Out <: Dim, D <: Device, T <: DType] private (native: pytorch.LinearImpl) extends AbstractModule[D, T](native) {
   type This[D <: Device, T <: DType] = Linear[In, Out, D, T]
 
-  def apply[S <: Shape, T <: DType, D <: Device, Idx <: Int](in: Tensor[S, T, D])(using Tuple.Last[S] =:= In): in.Shaped[Replace[S, Out, LastIdx[S]]] =
+  def apply[S <: Tuple, B <: Tuple, T <: DType, Idx <: Int](in: Tensor[S, T, D])(using Batched1[B, In, S]): in.Shaped[B ++ Tuple1[Out]] =
     new Tensor(native.forward(in.native))
 }
 

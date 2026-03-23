@@ -38,11 +38,28 @@ object Index extends IndexPrio0 {
     def apply(i: I) = Idx(i)
   }
 
+  // TODO consider introducing the type value (Int & Singleton) |<= D2
   /** An index only known at runtime, which is not bounds-checked. */
   case class At(value: Int) extends Index {
     def toNative = new pytorch.TensorIndex(value)
   }
   given [D <: Dim]: Valid[D, At] with {
+    type Apply = EmptyTuple
+  }
+
+  /** Selects the first element in that dimension */
+  case object First extends Index {
+    def toNative = new pytorch.TensorIndex(0)
+  }
+  given [D <: Dim]: Valid[D, First.type] with {
+    type Apply = EmptyTuple
+  }
+
+  /** Selects the last element in that dimension */
+  case object Last extends Index {
+    def toNative = new pytorch.TensorIndex(-1)
+  }
+  given [D <: Dim]: Valid[D, Last.type] with {
     type Apply = EmptyTuple
   }
 

@@ -86,7 +86,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   val log_softmax = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = S
-    def run[Idx <: Int](idx: Idx) = new Tensor(native.log_softmax(idx))
+    def run[Idx <: Int](idx: Int) = new Tensor(native.log_softmax(idx))
   }
 
   /** Fills elements of self tensor with value where mask is true. */
@@ -137,7 +137,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Returns the size of one dimension selected by D, as a Dim.Ref (since we can't create an actual instance of a Dim). */
   def sizeOf = new DimOperator.Of1[S, T] {
     type Out[Idx <: Int] = Dim.Ref[Elem[S, Idx]]
-    def run[Idx <: Int](idx: Idx) = Dim.Ref(size(idx))
+    def run[Idx <: Int](idx: Int) = Dim.Ref(size(idx))
   }
 
   /** Returns the size of one dimension typed D, using [dim] to create the instance of D holding the result. */
@@ -145,7 +145,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   val softmax = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = S
-    def run[Idx <: Int](idx: Idx) = new Tensor(native.softmax(idx))
+    def run[Idx <: Int](idx: Int) = new Tensor(native.softmax(idx))
   }
 
   def sumAll: Shaped[Scalar] = new Tensor(native.sum())
@@ -172,7 +172,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Swaps the given two dimensions. */
   val transpose = new DimOperator.Of2Tensor[S, T, D] {
     type Out[I1 <: Int, I2 <: Int] = Shape.Swap[S, I1, I2]
-    def run[I1 <: Int, I2 <: Int](i1: I1, i2: I2) = new Tensor(native.transpose(i1, i2))
+    def run[I1 <: Int, I2 <: Int](i1: Int, i2: Int) = new Tensor(native.transpose(i1, i2))
   }
 
   /** Swaps the last two dimensions. Tensor must have >= 2 dimensions. */
@@ -206,13 +206,13 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Inserts a dimension of One after D */
   val unsqueezeAfter = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = Shape.InsertAfter[S, Dim.One, Idx]
-    def run[Idx <: Int](idx: Idx) = new Tensor(native.unsqueeze(idx + 1))
+    def run[Idx <: Int](idx: Int) = new Tensor(native.unsqueeze(idx + 1))
   }
 
   /** Inserts a dimension of One before D */
   val unsqueezeBefore = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = Shape.InsertBefore[S, Dim.One, Idx]
-    def run[Idx <: Int](idx: Idx) = new Tensor(native.unsqueeze(idx))
+    def run[Idx <: Int](idx: Int) = new Tensor(native.unsqueeze(idx))
   }
 
   /** Provides alternative views to this Tensor, without changing the underlying storage. */
@@ -220,9 +220,9 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     /** Transforms a split version of this tensor, split across dimension D in N parts. */
     val split = new DimOperator.Of1[S, T] {
       type Out[Idx <: Int] = SplitApply[Idx, Elem[S, Idx]]
-      def run[Idx <: Int](idx: Idx) = new SplitApply(idx)
+      def run[Idx <: Int](idx: Int) = new SplitApply(idx)
     }
-    class SplitApply[Idx <: Int, D](private[s3torch] val idx: Idx) {
+    class SplitApply[Idx <: Int, D](private[s3torch] val idx: Int) {
       /** Splits the selected dimension into N parts, i.e. the dimension D gets split into two dimensions (N, D / N) */
       def into[N <: Dim](n: N)(using ev:Split[D, N]): Shaped[Shape.ReplaceWithTuple[S, ev.Out, Idx]] = {
         val (before, after) = size.splitAt(idx)
@@ -387,7 +387,7 @@ object Tensor {
   // ---- Methods on Tensor with 3 dimensions ---
   extension[T <: DType, D <: Device, D1 <: Dim, D2 <: Dim, D3 <: Dim](t: Tensor[(D1, D2, D3), T, D]) {
     def apply[I1 <: Index, I2 <: Index, I3 <: Index](v1: I1, v2: I2, v3: I3)(
-      using i1: Index.Valid[D1, I1], i2: Index.Valid[D2, I2], i3: Index.Valid[D2, I3]
+      using i1: Index.Valid[D1, I1], i2: Index.Valid[D2, I2], i3: Index.Valid[D3, I3]
     ): t.Shaped[i1.Apply ++ i2.Apply ++ i3.Apply] = {
       new Tensor(t.native.index(new pytorch.TensorIndexVector(v1.toNative, v2.toNative, v3.toNative)))
     }
