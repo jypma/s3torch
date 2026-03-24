@@ -71,7 +71,7 @@ class Transformer[
     val dropout = addModule("dropout", Dropout(dropoutProb))
     val l2 = addModule("l2", Linear(dff, dModel))
 
-    def apply[B <: Shape, SeqLen <: Dim, S <: Shape](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B ++ Tuple1[DModel]] = {
+    def apply[B <: Shape, SeqLen <: Dim, S <: Shape](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* DModel] = {
       import b.given
       in ~> l1.apply ~> relu ~> dropout.apply ~> l2.apply
     }
@@ -202,7 +202,7 @@ class Transformer[
   class Projection[VocabSize <: Dim](vocabSize: VocabSize) extends Module {
     val proj = addModule("proj", Linear(dModel, vocabSize))
 
-    def apply[B <: Shape, S <: Shape](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B ++ Tuple1[VocabSize]] = {
+    def apply[B <: Shape, S <: Shape](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* VocabSize] = {
       import b.given
       proj(in).log_softmax[VocabSize]
     }
@@ -245,7 +245,7 @@ class Transformer[
       tgt ~> targetEmb.apply ~> targetPos.apply ~> decoder(encoderOutput, encoderMask, decoderMask)
     }
 
-    def project[B <: Shape, S <: Shape](x: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B ++ Tuple1[TgtVocabSize]] = projection(x)
+    def project[B <: Shape, S <: Shape](x: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* TgtVocabSize] = projection(x)
   }
 }
 

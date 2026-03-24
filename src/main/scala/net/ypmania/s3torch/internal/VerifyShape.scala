@@ -12,7 +12,6 @@ trait VerifyShape[S <: Shape]
 
 trait VerifyShapePrio0 {
   given knownStatic[S <: Shape](using Size[S] >= 0 =:= true): VerifyShape[S] with {}
-  //given append[S <: Shape, D](using VerifyShape[S]): VerifyShape[S :* D] with {}
 }
 
 trait VerifyShapePrio1 extends VerifyShapePrio0 {
@@ -21,4 +20,5 @@ trait VerifyShapePrio1 extends VerifyShapePrio0 {
 
 object VerifyShape extends VerifyShapePrio1  {
   given concatGiven[S <: Shape, N <: Shape](using ValueOf[Size[S]], ValueOf[Size[N]]): VerifyShape[S ++ N] with {}
+  given appendGiven[S <: Shape, N <: Dim](using ValueOf[Size[S]]): VerifyShape[S :* N] with {}
 }

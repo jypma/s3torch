@@ -14,7 +14,7 @@ import Tuple._
 class Linear[In <: Dim, Out <: Dim, D <: Device, T <: DType] private (native: pytorch.LinearImpl) extends AbstractModule[D, T](native) {
   type This[D <: Device, T <: DType] = Linear[In, Out, D, T]
 
-  def apply[S <: Tuple, B <: Tuple, T <: DType, Idx <: Int](in: Tensor[S, T, D])(using Batched1[B, In, S]): in.Shaped[B ++ Tuple1[Out]] =
+  def apply[S <: Tuple, B <: Tuple, T <: DType, Idx <: Int](in: Tensor[S, T, D])(using Batched1[B, In, S]): in.Shaped[B :* Out] =
     new Tensor(native.forward(in.native))
 }
 

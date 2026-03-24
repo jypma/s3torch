@@ -10,6 +10,7 @@ type Batched1[B <: Tuple, D <: Dim, S <: Tuple] = Batched[B, Tuple1[D], S]
 
 object Batched {
   given concat[B <: Tuple, T <: Tuple](using ValueOf[Size[B]], ValueOf[Size[T]]): Batched[B, T, B ++ T] with {}
+  given append[B <: Tuple, D](using ValueOf[Size[B]]): Batched[B, Tuple1[D], B :* D] with {}
 
   given d1[D <: Dim]: Batched[EmptyTuple, Tuple1[D], Tuple1[D]] with {}
 
