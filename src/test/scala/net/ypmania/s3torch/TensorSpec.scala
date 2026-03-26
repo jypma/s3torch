@@ -7,7 +7,6 @@ import Dim.Static
 import Dim.Dynamic
 import scala.reflect.ClassTag
 import DType.*
-import Tensor.KeepDim
 import net.ypmania.s3torch.Dim.*
 import net.ypmania.s3torch.Shape.Select
 import net.ypmania.s3torch.Shape.Scalar
@@ -378,6 +377,25 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("cat") {
+      val m = Tensor((
+        ((1, 2, 3)),
+        ((0, 2, 0))
+      ))
+      val m1 = Tensor((
+        ((1, 2, 3)),
+        ((0, 2, 0))
+      ))
+      it("can concatenate two equal matrices along the first dimension") {
+        //class OutDim(size: Long) extends Dim.Dynamic(size)
+        //val r = m.cat(m1)(42)
+        //assert(r.size == Seq(4L, 3L))
+
+        //val m2 = new Tn[(Dim.Static[2L], Dim.Static[3L]), Int64, CPU.type]
+        //m2.cat(m2)(Shape.Select.Idx(0))
+      }
+    }
+
     describe("equal") {
       it("are two tensors with same type and contents") {
         val a = Tensor((1, 2, 3))
@@ -447,42 +465,7 @@ class TensorSpec extends UnitSpec {
         ))
         val tType: Tensor[(Static[2L], Static[3L]), Float64, CPU.type] = t
         val r = t.flatten
-        val rType: Tensor[Tuple1[ProductDim[Static[2L], Static[3L]]], Float64, CPU.type] = r
-      }
-    }
-
-    describe("mean") {
-      case object DimA extends Dim.Static[2L]
-      case object DimB extends Dim.Static[3L]
-
-      it("can calculate mean of first dim") {
-        var t = Tensor.zeros(DimA, DimB)
-        t((0,0)) = 3.0
-        t((1,0)) = 2.0
-        val res = t.meanBy(DimA)
-        val resType: Tensor[DimB.type *: EmptyTuple, Float32, CPU.type] = res
-        assert(res.size == Seq(3L))
-        assert(res.value.toSeq == Seq(2.5, 0, 0))
-      }
-
-      it("can calculate mean of second dim") {
-        var t = Tensor.zeros(DimA, DimB)
-        t((0,0)) = 3.0
-        t((1,0)) = 2.0
-        val res = t.meanBy(DimB)
-        val resType: Tensor[DimA.type *: EmptyTuple, Float32, CPU.type] = res
-        assert(res.size == Seq(2L))
-        assert(res.value.toSeq === Seq(1.0, 0.6666))
-      }
-
-      it("can calculate mean of selected dim and keep it") {
-        var t = Tensor.zeros(DimA, DimB)
-        t((0,0)) = 3.0
-        t((1,0)) = 2.0
-        val res = t.meanBy(DimA)(using KeepDim)
-        val resType: Tensor[(Dim.One, DimB.type), Float32, CPU.type] = res
-        assert(res.size == Seq(1L, 3L))
-        assert(res.value.toSeq == Seq(Seq(2.5, 0, 0)))
+        val rType: Tensor[Tuple1[Static[2L] * Static[3L]], Float64, CPU.type] = r
       }
     }
 
@@ -645,6 +628,81 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("max") {
+      it("can find the maximum of a tensor") {
+        val r = Tensor((1, 2, 3)).max
+        val rType: Tensor[Scalar, Int32, CPU.type] = r
+        assert(r.size == Seq.empty)
+        assert(r.value == 3)
+      }
+    }
+
+    describe("maxBy") {
+      class Row(size: Long) extends Dim.Dynamic(size)
+      class Column(size: Long) extends Dim.Dynamic(size)
+      val t = Tensor((
+        ((1.0, 5.0, 3.0)),
+        ((4.0, 2.0, 6.0))
+      )).shaped[(Row, Column)]
+
+      it("can find the maximum for each row in a matrix") {
+        val r = t.maxBy[Row]
+        val v = r.result
+        val vType: Tensor[Column *: EmptyTuple.type, Float64, CPU.type] = v
+        assert(v.size == Seq(3L))
+        assert(v.value === Seq(4.0, 5.0, 6.0))
+
+        val i = r.indices
+        val iType: Tensor[Column *: EmptyTuple.type, Int64, CPU.type] = i
+        assert(i.size == Seq(3L))
+        assert(i.dtype == int64)
+        assert(i.value === Seq(1, 0, 1))
+      }
+
+      it("can find the maximum for each column in a matrix") {
+        val r = t.maxBy[Column]
+        val v = r.result
+        val vType: Tensor[Row *: EmptyTuple.type, Float64, CPU.type] = v
+        assert(v.size == Seq(2L))
+        assert(v.value === Seq(5.0, 6.0))
+      }
+    }
+
+    describe("mean") {
+      case object DimA extends Dim.Static[2L]
+      case object DimB extends Dim.Static[3L]
+
+      it("can calculate mean of first dim") {
+        var t = Tensor.zeros(DimA, DimB)
+        t((0,0)) = 3.0
+        t((1,0)) = 2.0
+        val res = t.meanBy(DimA)
+        val resType: Tensor[DimB.type *: EmptyTuple, Float32, CPU.type] = res
+        assert(res.size == Seq(3L))
+        assert(res.value.toSeq == Seq(2.5, 0, 0))
+      }
+
+      it("can calculate mean of second dim") {
+        var t = Tensor.zeros(DimA, DimB)
+        t((0,0)) = 3.0
+        t((1,0)) = 2.0
+        val res = t.meanBy(DimB)
+        val resType: Tensor[DimA.type *: EmptyTuple, Float32, CPU.type] = res
+        assert(res.size == Seq(2L))
+        assert(res.value.toSeq === Seq(1.0, 0.6666))
+      }
+
+      it("can calculate mean of selected dim and keep it") {
+        var t = Tensor.zeros(DimA, DimB)
+        t((0,0)) = 3.0
+        t((1,0)) = 2.0
+        val res = t.meanBy.keepDim(DimA)
+        val resType: Tensor[(Dim.One, DimB.type), Float32, CPU.type] = res
+        assert(res.size == Seq(1L, 3L))
+        assert(res.value.toSeq == Seq(Seq(2.5, 0, 0)))
+      }
+    }
+
     describe("padTo") {
       it("can pad a vector to a higher length") {
         case object DimA extends Dim.Static[4L]
@@ -754,7 +812,7 @@ class TensorSpec extends UnitSpec {
       ))
 
       it("can sum all dimensions of a matrix") {
-        val s = t.sumAll.value
+        val s = t.sum.value
         assert(s === 21.0)
       }
 

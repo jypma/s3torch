@@ -6,7 +6,6 @@ import net.ypmania.s3torch.Shape.Select.Last
 import net.ypmania.s3torch._
 import net.ypmania.s3torch.internal.Broadcast
 import net.ypmania.s3torch.internal.Broadcastable
-import net.ypmania.s3torch.internal.ReduceOperand
 import net.ypmania.s3torch.nn.Dropout
 import net.ypmania.s3torch.nn.Embedding
 import net.ypmania.s3torch.nn.Linear
@@ -59,8 +58,8 @@ class Transformer[
     val bias = addParameter("bias", Tensor.zeros(1L))
 
     def apply[B <: Dim, SeqLen <: Dim](in: Batch[B, SeqLen]): Batch[B, SeqLen] = {
-      val mean = in.meanBy(Last)(using KeepDim) // FIXME verify this, video says "everything after batch" but picks last.
-      val std = in.stdBy(Last)(using KeepDim)
+      val mean = in.meanBy.keepDim(Last) // FIXME verify this, video says "everything after batch" but picks last.
+      val std = in.stdBy.keepDim(Last)
 
       alpha * (in - mean) / (std + eps) + bias
     }

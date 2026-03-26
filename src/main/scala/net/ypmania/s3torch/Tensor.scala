@@ -38,6 +38,18 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   type ShapedT[S1 <: Tuple, T1 <: DType] = Tensor[S1, T1, D]
   type This = Tensor[S, T, D]
 
+  /** An operation that reduces the tensor across a given dimension. */
+  class ReduceOp(op: ((Long, Boolean) => pytorch.Tensor)) extends DimOperator.Of1Tensor[S, T, D] {
+    type Out[Idx <: Int] = Shape.Remove[S, Idx]
+    protected def run[Idx <: Int](idx: Int) = new Tensor(op(idx, false))
+
+    /** Variant of this operation that keeps the targeted dimension (reduced to one), rather than removing it. */
+    case object keepDim extends DimOperator.Of1Tensor[S, T, D] {
+      type Out[Idx <: Int] = Shape.Replace[S, Dim.One, Idx]
+      protected def run[Idx <: Int](idx: Int) = new Tensor(op(idx, true))
+    }
+  }
+
   /** Experimental syntax: returns the result of applying the given function to this tensor. This allows us
     * to write nested function applications as arrows instead. This is particularly expressive when
     * writing several layers of neural network transformations calling into each other. */
@@ -106,6 +118,32 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Matrix multiplication, alias for .matmul */
   def `@`[S2 <: Tuple, T2 <: DType, R <: Tuple](b: ShapedT[S2, T2])(using MatMul[S, S2, R]): ShapedT[R, Promoted[T, T2]] = matmul(b)
 
+  /** Returns the maximum value of all elements. */
+  def max: Shaped[Scalar] = new Tensor(native.max)
+
+  case class MaxResult[S <: Tuple](result: Shaped[S], indices: Tensor[S, Int64, D])
+
+  // Special variant of ReduceOp that returns a Tuple (MaxResult), rather than a single tensor.
+  class MaxReduceOp extends DimOperator.Of1[S, T] {
+    type Out[Idx <: Int] = MaxResult[Shape.Remove[S, Idx]]
+    protected def run[Idx <: Int](idx: Int) = {
+      val res = torch.max(native, idx, false)
+      MaxResult(new Tensor(res.get0()), new Tensor(res.get1()))
+    }
+
+    /** Variant of this operation that keeps the targeted dimension (reduced to one), rather than removing it. */
+    case object keepDim extends DimOperator.Of1[S, T] {
+      type Out[Idx <: Int] = MaxResult[Shape.Replace[S, Dim.One, Idx]]
+      protected def run[Idx <: Int](idx: Int) = {
+        val res = torch.max(native, idx, true)
+        MaxResult(new Tensor(res.get0()), new Tensor(res.get1()))
+      }
+    }
+  }
+
+  /** Returns the maximum across a given dimension, along with the indexes where that maximum was found. */
+  val maxBy = new MaxReduceOp
+
   /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
   def padTo[D <: Dim](dim: D)(value: Double, mode: PaddingMode): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
     val n = dim.size - size.last
@@ -125,7 +163,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     Option.when(dim.size - size.last >= 0)(padTo(dim)(value, mode))
   }
 
-  /** Casts the shape of this tensor into compatable shape [O] (which must be a Tuple of Dim's, or a single Dim) */
+  /** Casts the shape of this tensor into compatible shape [O] (which must be a Tuple of Dim's, or a single Dim) */
   def shaped[O](using ev:CanShaped[S, O]): Shaped[ev.Out] = new Tensor(native)
 
   /** Returns the sizes of all dimensions of the shape of this tensor. */
@@ -148,9 +186,8 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     def run[Idx <: Int](idx: Int) = new Tensor(native.softmax(idx))
   }
 
-  def sumAll: Shaped[Scalar] = new Tensor(native.sum())
-  def sumBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): Shaped[op.Out] =
-    new Tensor(native.sum(Array(op.index), op.keep, new ScalarTypeOptional))
+  def sum: Shaped[Scalar] = new Tensor(native.sum())
+  val sumBy = new ReduceOp((idx, keep) => native.sum(Array(idx), keep, new ScalarTypeOptional))
 
   def summary: String = {
     val values = flatten.to(Device.CPU, DType.float32).value
@@ -287,8 +324,6 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   * approximated mathemetical notation better than "x.sin", even
   * though the latter would be more idiomatic Scala. */
 object Tensor {
-  val KeepDim = ReduceOperand.KeepDim
-
   // TODO Revisit this, just always make the DType from a Default given.
   def apply[V, D <: Device](value: V)(using fromScala: FromScala[V], device: Default[D]): Tensor[fromScala.OutputShape, fromScala.DefaultDType, D] =
     fromScala(value, device.value)
@@ -344,11 +379,10 @@ object Tensor {
 
   // ---- Methods on Tensor that require floats
   extension[S <: Shape, T <: DType.Floaty, Dv <: Device](t: Tensor[S, T, Dv]) {
-    // TODO consider a  ReduceOperandApply abstraction, in 0 and 1 arity, to clean up duplication here
-    def stdBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D, correction: Double = 1.0)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): t.Shaped[op.Out] =
-      new Tensor(t.native.std(Array(op.index), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), op.keep))
-    def meanBy[D, Idx <: Int, K <: ReduceOperand.Variant](dim: D)(using keep: K)(using op: ReduceOperand[S,D,Idx,K]): t.Shaped[op.Out] =
-      new Tensor(t.native.mean(Array(op.index), op.keep, new ScalarTypeOptional))
+    def stdBy = new t.ReduceOp((idx, keep) => t.native.std(Array(idx), new pytorch.ScalarOptional, keep))
+    def stdBy(correction: Double) = new t.ReduceOp((idx, keep) => t.native.std(Array(idx), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), keep))
+    def meanBy = new t.ReduceOp((idx, keep) => t.native.mean(Array(idx), keep, new ScalarTypeOptional))
+
   }
 
   // ---- Methods on Tensor that only exist on scalars

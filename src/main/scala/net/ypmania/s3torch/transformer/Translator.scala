@@ -103,7 +103,7 @@ class Translator[
 
         val end = System.nanoTime()
         println(s"Batch ${count} of ${batches.size}:  loss is ${loss.to(Device.CPU).value}, took ${(end - start)/1000000}ms")
-        if (loss.isNan.sumAll.to(Device.CPU).value) {
+        if (loss.isNan.sum.to(Device.CPU).value) {
           throw new RuntimeException("Loss became NaN")
         }
         loss.backward()
@@ -116,6 +116,7 @@ class Translator[
     model.train(false)
     Tensor.noGrad {
       for (x <- examples) {
+        // TODO refactor encode and decode to use Batched, so we can remove the batch dimension here entirely.
         val encoderInput = x.encoderInput
           .unsqueezeBefore(First) // add BatchSize of 1
         val encoderMask = x.encoderMask
@@ -131,8 +132,10 @@ class Translator[
         while (inputLength <= sequenceLength) {
           val decoderMask = causalMask(inputLength)
           val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput)
-          val in = out(Index.All, Index.Last, Index.All).unsqueezeBefore[DModel] // re-introduce sequence length of 1
+          // TODO investigate Dim -> Index tuple syntax here, so we can remove the comment
+          val in = out(Index.First, Index.Last, Index.All) // Grab the First (only) batch, and only the  Last token in that batch
           val prob = model.project(in)
+          val nextToken = prob.maxBy(DstVocabSize).indices
         }
       }
     }
