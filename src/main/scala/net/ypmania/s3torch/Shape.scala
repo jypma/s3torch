@@ -36,7 +36,7 @@ object Shape {
   }
 
   /** Replaces the dimension at [Idx] with the dimension [I] */
-  type Replace[S <: Shape, I <: Dim, Idx <: Int] <: Shape = Idx match {
+  type Replace[S <: Shape, I, Idx <: Int] <: Shape = Idx match {
     case -1 => S
     case _ => Tuple.Concat[
       Tuple.Take[S, Idx],

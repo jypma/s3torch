@@ -409,11 +409,12 @@ class TensorSpec extends UnitSpec {
         assert(r.size == Seq(2L, 4L))
       }
 
-      it("can concatenate into a given output dimension") {
-        val m = Tensor.zeros(2L, 3L)
-        class OutDim(size:Long) extends Dim.Dynamic(size)
-        val r = m.cat(m).into[OutDim]((Shape.Select.Idx(1)))
-        val rType: Tensor[(Static[2L], OutDim), Float32, CPU.type] = r
+      it("can concatenate into an existing dynamic output dimension") {
+        class Row(size:Long) extends Dim.Dynamic(size)
+        class Column(size:Long) extends Dim.Dynamic(size)
+        val m = Tensor.zeros(2L, 3L).shaped[(Row, Column)]
+        val r = m.cat(m)((Shape.Select.Idx(1)))
+        val rType: Tensor[(Row, Column), Float32, CPU.type] = r
       }
     }
 

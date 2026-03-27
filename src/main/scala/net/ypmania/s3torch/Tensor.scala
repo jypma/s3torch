@@ -55,22 +55,19 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     * writing several layers of neural network transformations calling into each other. */
   def ~>[U](f: This => U) = f(this)
 
-  class CatOps[U <: Tuple, OutDim <: Dim.Dynamic](that: Shaped[U]) extends DimOperator.Of1TensorEv[S, T, D, [I <: Int] =>> Cat[S, U, I]] {
-    type Out[Idx <: Int] = Shape.Replace[S, OutDim, Idx]
-    def run[Idx <: Int](idx: Int)(using ev:Cat[S, U, Idx]) = new Tensor(torch.cat(new pytorch.TensorVector(native, that.native), idx))
+  class CatApply[U <: Tuple](that: Shaped[U]) {
+    type Out[Idx <: Int, O] = Shape.Replace[S, O, Idx]
+    type Pick[Idx <: Int] = Cat.PickDynamic[Tuple.Elem[S, Idx], Tuple.Elem[U, Idx]]
+
+    protected def cat(a: pytorch.Tensor, b: pytorch.Tensor, idx: Int) = torch.cat(new pytorch.TensorVector(native, that.native), idx)
+
+    def apply[Dm](d: Dm)(using sel: Shape.SelectIdx[S,Dm], pick: Pick[sel.Idx])(using VerifyShape[Out[sel.Idx, pick.Out]], Cat[S, U, sel.Idx]): Shaped[Out[sel.Idx, pick.Out]] = new Tensor(cat(native, that.native, sel.idx))
+
+    def apply[Dm](using sel: Shape.SelectIdx[S,Dm], pick: Pick[sel.Idx])(using VerifyShape[Out[sel.Idx, pick.Out]], Cat[S, U, sel.Idx]): Shaped[Out[sel.Idx, pick.Out]]  = new Tensor(cat(native, that.native, sel.idx))
   }
 
-  class CatApply[U <: Tuple](that: Shaped[U]) extends CatOps[U, Dim.Dynamic](that) {
-    /** Makes the resulting dimension [OutDim] explicitly, instead of a flat [Dim.Dynamic]. */
-    def into[OutDim <: Dim.Dynamic] = new CatOps[U, OutDim](that)
-    /** Makes the resulting dimension [OutDim] explicitly, instead of a flat [Dim.Dynamic]. */
-    def into[OutDim <: Dim.Dynamic](outDim: OutDim) = new CatOps[U, OutDim](that)
-  }
-
-  /** Concatenates two tensors along a given dimension. Several syntax variants exist:
+  /** Concatenates two tensors along a given dimension:
     * val result = t1.cat(t2)(alongDim)
-    * val result = t1.cat(t2).into[OutputDimType](alongDim)
-    * val result = t1.cat(t2).into(outputDimValue)(alongDim) // not guaranteed to have the same size as outputDimValue
     */
   def cat[U <: Tuple](that: Shaped[U]) = new CatApply[U](that)
 
