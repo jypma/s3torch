@@ -407,11 +407,14 @@ object Tensor {
   // ---- Methods on Tensor that only exist on scalars
   extension[T <: DType, D <: Device](t: Tensor[Scalar, T, D]) {
     def backward(): Unit = t.native.backward()
+
+    /** Adds a single dimension to this scalar, turning it into a vector of size one. */
+    def unsqueeze: t.Shaped[Tuple1[Dim.One]] = new Tensor(t.native.unsqueeze(0))
   }
 
   // ---- Methods on Tensor with at least 1 dimension
   extension[T <: DType, D <: Device, D1 <: Dim, DT <: Tuple](t: Tensor[D1 *: DT, T, D]) {
-    def ++[U <: Tuple](that: t.Shaped[U])(using Cat[D1 *: DT, U, 0]): t.Shaped[Dim.Dynamic *: DT] =
+    def ++[U <: Tuple](that: t.Shaped[U])(using Cat[D1 *: DT, U, 0])(using pick:Cat.PickDynamic[D1, Tuple.Head[U]]): t.Shaped[pick.Out *: DT] =
       new Tensor(torch.cat(new pytorch.TensorVector(t.native, that.native), 0))
   }
 

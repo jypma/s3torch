@@ -1049,6 +1049,14 @@ class TensorSpec extends UnitSpec {
           ),
         ))
       }
+
+      it("can unsqueeze a scalar into a vector") {
+        val t = Tensor(1.0)
+        val r = t.unsqueeze
+        val rType: Tensor[Tuple1[One], Float64, CPU.type] = r
+        assert(r.size == Seq(1L))
+        assert(r.value.toSeq === Seq(1.0))
+      }
     }
 
     describe("split and unsplit") {

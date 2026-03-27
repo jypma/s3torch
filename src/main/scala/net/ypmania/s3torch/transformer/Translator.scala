@@ -127,15 +127,16 @@ class Translator[
         val sourceMask = encoderMask
         val encoderOutput = model.encode(source, sourceMask)
         class InputSequenceLength(size: Long) extends Dim.Dynamic(size)
-        var decoderInput = Dst.toTensor(dst.pad :: Nil).shaped[InputSequenceLength].unsqueezeBefore(First) // Add BatchSize
+        var decoderInput = Dst.toTensor(dst.pad :: Nil).shaped[InputSequenceLength]
         def inputLength = decoderInput.sizeOf(InputSequenceLength(_))
         while (inputLength <= sequenceLength) {
           val decoderMask = causalMask(inputLength)
-          val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput)
+          val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(First)) // Add BatchSize
           // TODO investigate Dim -> Index tuple syntax here, so we can remove the comment
           val in = out(Index.First, Index.Last, Index.All) // Grab the First (only) batch, and only the  Last token in that batch
           val prob = model.project(in)
-          val nextToken = prob.maxBy(DstVocabSize).indices
+          val nextToken = prob.maxBy(DstVocabSize).indices.to(Dst.dType).unsqueeze
+          decoderInput += nextToken
         }
       }
     }

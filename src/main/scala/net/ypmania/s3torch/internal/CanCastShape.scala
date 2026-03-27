@@ -8,9 +8,12 @@ trait CanCastShape[I <: Shape, O]
 
 object CanCastShape {
   trait CanCastDim[I, O]
-  object CanCastDim {
-    given same[T <: Dim]: CanCastDim[T, T] with {}
+
+  trait CanCastDimPrio0 {
     given toDyn[I <: Dim, O <: Dim.Dynamic]: CanCastDim[I, O] with {}
+  }
+  object CanCastDim extends CanCastDimPrio0 {
+    given same[T <: Dim]: CanCastDim[T, T] with {}
   }
 
   given CanCastShape[EmptyTuple, EmptyTuple] with {}
