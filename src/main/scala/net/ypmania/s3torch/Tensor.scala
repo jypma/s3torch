@@ -77,7 +77,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   def deviceType: DeviceType = DeviceType.of(native.device().`type`())
 
-  def device: Device = new Device(deviceType, native.device().index()) {}
+  def device: Device = Device.of(native.device())
 
   private type BoolOp[V] = TensorOperandBool[S, T, D, V]
   /** Computes element-wise equality. We don't define pytorch's "eq" or "==", since those have a different meaning in Scala. */
@@ -97,12 +97,13 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Computes element-wise logical OR, interpreting both sides as a boolean. */
   def ||[V](value: V)(using op:BoolOp[V]): op.Out = op(this, value, _.__or__(_), _.__or__(_))
 
-  /** True if `other` has the same size and elements as this tensor, false otherwise. */
+  /** True if `other` has the same size and elements as this tensor, false otherwise, and fails to compile if
+    * the tensors are known to have a different size, or a different device. */
   def equal[S2 <: Tuple](that: Shaped[S2])(using SameSize[S, S2]): Boolean = native.equal(that.native)
 
   override def equals(that: Any): Boolean = that match {
-    // TODO investigate if this should just be .equal
-    case other: Tensor[?, ?, ?] if dtype == other.dtype =>
+    // Check dtype and device, since pytorch will just crash if they don't match.
+    case other: Tensor[?, ?, ?] if dtype == other.dtype && device == other.device =>
       native.equal(other.native)
     case _ =>
       false

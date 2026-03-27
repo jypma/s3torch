@@ -20,12 +20,16 @@ trait ToScala[-S <: Tuple, +T <: DType] {
   def apply(native: pytorch.Tensor): OutputType
 }
 
-object ToScala {
+trait ToScalaPrio0 {
   abstract class ItemTo[V](get: pytorch.Tensor => V) {
     type OutputType = V
     def apply(native: pytorch.Tensor) = get(native)
   }
 
+  given [T <: Int32]: ItemTo[Int](_.item_int) with ToScala[Scalar, T] with {}
+}
+
+object ToScala extends ToScalaPrio0 {
   given ItemTo[Boolean](_.item_bool) with ToScala[Scalar, Bool] with {}
   given ItemTo[Byte](_.item_byte) with ToScala[Scalar, Int8] with {}
   given ItemTo[Short](_.item_short) with ToScala[Scalar, Int16] with {}

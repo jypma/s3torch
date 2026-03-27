@@ -1,5 +1,6 @@
 package net.ypmania.s3torch.transformer
 
+import org.bytedeco.pytorch
 import net.ypmania.s3torch
 import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Device
@@ -46,6 +47,12 @@ trait IntTokenType {
 
   abstract class DType extends s3torch.DType.Int32
   val dType = new DType {}
+
+  /** Turns the given token into a scalar tensor */
+  def toTensor[Dv <: Device](token: T)(using Default[Dv]): Tensor[EmptyTuple, DType, Dv] = {
+    val int = token.asInstanceOf[Int] // Safe, because of opaque type
+    Tensor(int, dType)
+  }
 
   /** Turns the given tokens into a tensor */
   def toTensor[Dv <: Device](tokens: Seq[T])(using Default[Dv]): Tensor[Dim.Dynamic *: EmptyTuple, DType, Dv] = {

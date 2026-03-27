@@ -5,6 +5,10 @@ import org.bytedeco.pytorch.global.torch
 
 sealed abstract class DeviceType(val native: torch.DeviceType) {
   DeviceType.fromNative = DeviceType.fromNative + (native.value -> this)
+
+  override def equals(that: Any) = that match {
+    case dev:DeviceType => native.value == dev.native.value
+  }
 }
 
 object DeviceType {
@@ -18,11 +22,17 @@ object DeviceType {
   case object CUDA extends DeviceType(torch.DeviceType.CUDA)
 }
 
-abstract class Device(val deviceType: DeviceType, val index: Byte = -1) {
+sealed abstract class Device(val deviceType: DeviceType, val index: Byte = -1) {
   def native: pytorch.Device = pytorch.Device(deviceType.native.value, index)
 }
 
 object Device {
+  def of(native: pytorch.Device) = new Device(DeviceType.of(native.`type`), native.index) {
+    override def equals(that: Any) = that match {
+      case dev:Device => deviceType == dev.deviceType && index == dev.index
+    }
+  }
+
   /** The CPU device */
   case object CPU extends Device(DeviceType.CPU)
   /** The first CUDA device found */

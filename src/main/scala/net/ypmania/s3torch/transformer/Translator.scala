@@ -129,7 +129,8 @@ class Translator[
         class InputSequenceLength(size: Long) extends Dim.Dynamic(size)
         var decoderInput = Dst.toTensor(dst.pad :: Nil).shaped[InputSequenceLength]
         def inputLength = decoderInput.sizeOf(InputSequenceLength(_))
-        while (inputLength <= sequenceLength) {
+
+        while (inputLength <= sequenceLength && !decoderInput(Index.Last).equal(Dst.toTensor(dst.eos))) {
           val decoderMask = causalMask(inputLength)
           val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(First)) // Add BatchSize
           // TODO investigate Dim -> Index tuple syntax here, so we can remove the comment

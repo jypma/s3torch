@@ -445,6 +445,26 @@ class TensorSpec extends UnitSpec {
     }
 
     describe("equals") {
+      it("should equal tensors") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1, 2, 3))
+        assert(a.equals(b))
+      }
+
+      it("should not equal tensors on different devices") {
+        val a = Tensor((1, 2, 3)).to(Device.CUDA)
+        val b = Tensor((1, 2, 3))
+        assert(!a.equals(b))
+      }
+
+      it("should not equal tensors on different dtypes") {
+        val a = Tensor((1, 2, 3)).to(float32)
+        val b = Tensor((1, 2, 3)).to(int32)
+        assert(!a.equals(b))
+      }
+    }
+
+    describe("equals") {
       it("are two tensors with same type and contents") {
         val a = Tensor((1, 2, 3))
         val b = Tensor((1, 2, 3))
