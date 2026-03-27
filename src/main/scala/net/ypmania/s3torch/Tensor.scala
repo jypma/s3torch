@@ -55,6 +55,25 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     * writing several layers of neural network transformations calling into each other. */
   def ~>[U](f: This => U) = f(this)
 
+  class CatOps[U <: Tuple, OutDim <: Dim.Dynamic](that: Shaped[U]) extends DimOperator.Of1TensorEv[S, T, D, [I <: Int] =>> Cat[S, U, I]] {
+    type Out[Idx <: Int] = Shape.Replace[S, OutDim, Idx]
+    def run[Idx <: Int](idx: Int)(using ev:Cat[S, U, Idx]) = new Tensor(torch.cat(new pytorch.TensorVector(native, that.native), idx))
+  }
+
+  class CatApply[U <: Tuple](that: Shaped[U]) extends CatOps[U, Dim.Dynamic](that) {
+    /** Makes the resulting dimension [OutDim] explicitly, instead of a flat [Dim.Dynamic]. */
+    def into[OutDim <: Dim.Dynamic] = new CatOps[U, OutDim](that)
+    /** Makes the resulting dimension [OutDim] explicitly, instead of a flat [Dim.Dynamic]. */
+    def into[OutDim <: Dim.Dynamic](outDim: OutDim) = new CatOps[U, OutDim](that)
+  }
+
+  /** Concatenates two tensors along a given dimension. Several syntax variants exist:
+    * val result = t1.cat(t2)(alongDim)
+    * val result = t1.cat(t2).into[OutputDimType](alongDim)
+    * val result = t1.cat(t2).into(outputDimValue)(alongDim) // not guaranteed to have the same size as outputDimValue
+    */
+  def cat[U <: Tuple](that: Shaped[U]) = new CatApply[U](that)
+
   def contiguous: This = new Tensor(native.contiguous())
 
   def dtype: DType = DType.of(native.dtype().toScalarType())
@@ -388,6 +407,12 @@ object Tensor {
   // ---- Methods on Tensor that only exist on scalars
   extension[T <: DType, D <: Device](t: Tensor[Scalar, T, D]) {
     def backward(): Unit = t.native.backward()
+  }
+
+  // ---- Methods on Tensor with at least 1 dimension
+  extension[T <: DType, D <: Device, D1 <: Dim, DT <: Tuple](t: Tensor[D1 *: DT, T, D]) {
+    def ++[U <: Tuple](that: t.Shaped[U])(using Cat[D1 *: DT, U, 0]): t.Shaped[Dim.Dynamic *: DT] =
+      new Tensor(torch.cat(new pytorch.TensorVector(t.native, that.native), 0))
   }
 
   // ---- Methods on Tensor with 1 dimension ---

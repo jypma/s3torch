@@ -47,4 +47,9 @@ There are many ways in which having dimensions available helps development of co
 - You can refer to dimensions by a logical name (type), instead of just index, e.g. when calculating [`meanBy`](src/test/scala/net/ypmania/s3torch/TensorSpec.scala#L362).
 - Transposing dimensions is visible [in the return type](src/test/scala/net/ypmania/s3torch/TensorSpec.scala#L649)
 
+# Compiler bugs
 
+```
+java.lang.AssertionError: assertion failed: no owner from  <none>/ <none> 
+```
+The above assertion can happen if a `Tensor` with an inferred type is used in a subsequent calculation. Try to insert an explicit type for the tensor variable, or for any intermediate results. This has been hard to create minimal reproducer for, as it only occurs on a long chain of inferred/derived types, involving `given`.

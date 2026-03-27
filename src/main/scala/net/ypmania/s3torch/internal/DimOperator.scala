@@ -28,6 +28,15 @@ object DimOperator {
     def apply[D](using sel: Shape.SelectIdx[S,D], v: VerifyShape[Out[sel.Idx]]): Tensor[Out[sel.Idx], T, Dv] = run(sel.idx)
   }
 
+  /** Variant of OfTensor that additionally requires a given of type E, depending on the selected dimension. */
+  abstract class Of1TensorEv[S <: Shape, T <: DType, Dv <: Device, E[_ <: Int]] {
+    type Out[Idx <: Int] <: Shape
+    protected def run[Idx <: Int](idx: Int)(using ev: E[Idx]): Tensor[Out[Idx], T, Dv]
+
+    def apply[D](d: D)(using sel: Shape.SelectIdx[S,D], v: VerifyShape[Out[sel.Idx]], ev: E[sel.Idx]): Tensor[Out[sel.Idx], T, Dv] = run(sel.idx)
+    def apply[D](using sel: Shape.SelectIdx[S,D], v: VerifyShape[Out[sel.Idx]], ev: E[sel.Idx]): Tensor[Out[sel.Idx], T, Dv] = run(sel.idx)
+  }
+
   /** A method that operates on two dimensions, which can be
     * selected using one of the Shape.Select traits, either as a type
     * or as a value. It returns a Tensor. */

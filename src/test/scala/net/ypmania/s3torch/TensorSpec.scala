@@ -378,21 +378,42 @@ class TensorSpec extends UnitSpec {
     }
 
     describe("cat") {
-      val m = Tensor((
-        ((1, 2, 3)),
-        ((0, 2, 0))
-      ))
-      val m1 = Tensor((
-        ((1, 2, 3)),
-        ((0, 2, 0))
-      ))
-      it("can concatenate two equal matrices along the first dimension") {
-        //class OutDim(size: Long) extends Dim.Dynamic(size)
-        //val r = m.cat(m1)(42)
-        //assert(r.size == Seq(4L, 3L))
+      it("can concatenate two equal matrices along the second dimension") {
+        val m = Tensor.zeros(2L, 3L)
+        val r = m.cat(m)((Shape.Select.Idx(1)))
+        val rType: Tensor[(Static[2L], Dim.Dynamic), Float32, CPU.type] = r
+        assert(r.size == Seq(2L, 6L))
+      }
 
-        //val m2 = new Tn[(Dim.Static[2L], Dim.Static[3L]), Int64, CPU.type]
-        //m2.cat(m2)(Shape.Select.Idx(0))
+      it("can concatenate two unequal matrices along the first dimension") {
+        val m1 = Tensor.zeros(1L, 3L)
+        val m2 = Tensor.zeros(2L, 3L)
+        val r = m1.cat(m2)((Shape.Select.Idx(0)))
+        val rType: Tensor[(Dim.Dynamic, Static[3L]), Float32, CPU.type] = r
+        assert(r.size == Seq(3L, 3L))
+      }
+
+      it("can concatenate two unequal matrices along the first dimension using ++") {
+        val m1 = Tensor.zeros(1L, 3L)
+        val m2 = Tensor.zeros(2L, 3L)
+        val r = m1 ++ m2
+        val rType: Tensor[(Dim.Dynamic, Static[3L]), Float32, CPU.type] = r
+        assert(r.size == Seq(3L, 3L))
+      }
+
+      it("can concatenate two unequal matrices along the second dimension") {
+        val m1 = Tensor.zeros(2L, 3L)
+        val m2 = Tensor.zeros(2L, 1L)
+        val r = m1.cat(m2)((Shape.Select.Idx(1)))
+        val rType: Tensor[(Static[2L], Dim.Dynamic), Float32, CPU.type] = r
+        assert(r.size == Seq(2L, 4L))
+      }
+
+      it("can concatenate into a given output dimension") {
+        val m = Tensor.zeros(2L, 3L)
+        class OutDim(size:Long) extends Dim.Dynamic(size)
+        val r = m.cat(m).into[OutDim]((Shape.Select.Idx(1)))
+        val rType: Tensor[(Static[2L], OutDim), Float32, CPU.type] = r
       }
     }
 
@@ -655,8 +676,8 @@ class TensorSpec extends UnitSpec {
         val i = r.indices
         val iType: Tensor[Column *: EmptyTuple.type, Int64, CPU.type] = i
         assert(i.size == Seq(3L))
-        assert(i.dtype == int64)
         assert(i.value === Seq(1, 0, 1))
+        assert(i.dtype == int64)
       }
 
       it("can find the maximum for each column in a matrix") {
