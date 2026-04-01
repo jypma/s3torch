@@ -6,6 +6,7 @@ import scala.compiletime.ops.int.ToLong
 trait Dim extends Ordered[Dim] {
   def size: Long
   override def compare(that: Dim) = java.lang.Long.compare(this.size, that.size)
+  override def toString = s"${getClass.getSimpleName().dropRight(1)}(${size})"
 }
 trait DimLowPriorityGivens {
   given fromLongDynamic[L <: Long]: Conversion[L, Dim.Dynamic] with {

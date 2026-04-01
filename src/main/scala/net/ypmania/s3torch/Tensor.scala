@@ -162,7 +162,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   val maxBy = new MaxReduceOp
 
   /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
-  def padTo[D <: Dim](dim: D)(value: Double, mode: PaddingMode): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
+  def padTo[D <: Dim](dim: D)(value: Double, mode: PaddingMode = PaddingMode.Append): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
     val n = dim.size - size.last
     if (n == 0) new Tensor(native) else {
       assert(n > 0, s"Can't pad dimension of size ${size.last} to lower size ${dim.size}")
@@ -207,12 +207,28 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   val sumBy = new ReduceOp((idx, keep) => native.sum(Array(idx), keep, new ScalarTypeOptional))
 
   def summary: String = {
+    val res = new StringBuilder()
     val values = flatten.to(Device.CPU, DType.float32).value
-    val lim = 10
-    if (values.size > lim) {
-      values.take(10).map(_.toString).mkString("(", ",", ", ...)")
+
+    val s = size
+    if (s.isEmpty) {
+      values.toString
     } else {
-      values.mkString("(", ",", ")")
+      def indent(i: String, s: String) = s.split("\n").map(l => i + l).mkString("\n")
+
+      def sum[T](sizes: Seq[Long], values: Seq[T]): String = {
+        if (sizes.size == 1) {
+          // FIXME check DType here
+          values.map(o => f"${o.asInstanceOf[Float]}%.4f")mkString("(", ", ", ")")
+        } else {
+          values
+            .grouped(sizes.drop(1).foldLeft(1L)(_ * _).toInt)
+            .map(s => indent("  ", sum(sizes.drop(1), s)))
+            .mkString("(\n", ",\n", ")")
+        }
+      }
+
+      sum(size, values.toSeq)
     }
   }
 
@@ -341,6 +357,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   * approximated mathemetical notation better than "x.sin", even
   * though the latter would be more idiomatic Scala. */
 object Tensor {
+  // TODO nicer .apply with a known-static dimension and a known-sized tuple
   // TODO Revisit this, just always make the DType from a Default given.
   def apply[V, D <: Device](value: V)(using fromScala: FromScala[V], device: Default[D]): Tensor[fromScala.OutputShape, fromScala.DefaultDType, D] =
     fromScala(value, device.value)

@@ -62,7 +62,6 @@ There are many ways in which having dimensions available helps development of co
         val b = Tensor.zeros(DimB)
         val r = a `@` b
         val rType: Tensor[Tuple1[DimA.type], Float32, CPU.type] = r
-        assert(r.size == Seq(DimA.size))
       }
 
       it("can multiply batch with matrix") {
@@ -70,7 +69,6 @@ There are many ways in which having dimensions available helps development of co
         val b = Tensor.zeros(DimB, DimC)
         val r = a `@` b
         val rType: Tensor[(Static[2L], DimA.type, DimC.type), Float32, CPU.type] = r
-        assert(r.size == Seq(2L, DimA.size, DimC.size))
       }
 ```
 
