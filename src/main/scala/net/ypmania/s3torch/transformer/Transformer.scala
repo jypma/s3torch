@@ -111,10 +111,21 @@ class Transformer[
       val k = key ~> keyWeights.apply ~> splitHeads
       val v = value ~> valueWeights.apply ~> splitHeads
 
-      val attentionScores = (q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.size))
-        .when(mask.map(_ #== false))(_.maskedFilled(_, 1e-9))
+      val limit = 1000
+      //println(s"q=${q.summary(limit)}")
+      //println(s"k=${k.summary(limit)}")
+      //println(s"v=${v.summary(limit)}")
+      //println(s"m=${mask.map(_.summary(limit))}")
+
+      val a1 = (q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.size))
+      val a2 = a1.when(mask.map(_ #== false))(_.maskedFilled(_, 1e-20))
+      //println(s"a2=${a2.summary(limit)}")
+
+      val attentionScores = a2
         .softmax(Last)
         ~> dropout.apply
+
+      //println(s"s=${attentionScores.summary(limit)}")
 
       // TODO save the attention scores somehow, they're apparently needed for visualization later.
       attentionScores
@@ -231,6 +242,7 @@ class Transformer[
 
     parameters.flatMap(_.untyped2D).foreach(init.xavier_uniform)
 
+    // TODO Why only int32, not also int64 or other ints?
     def encode[B <: Dim, M <: Shape, T <: Int32, SrcLen <: Dim](src: Tensor[(B, SrcLen), T, D], srcMask: MaskTn[M])(
       using Broadcastable[AttentionScores[B, SrcLen, SrcLen], M]
     ): Batch[B, SrcLen] = {

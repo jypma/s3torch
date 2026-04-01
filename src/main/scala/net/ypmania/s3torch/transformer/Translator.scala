@@ -42,15 +42,18 @@ class Translator[
     val eos = reservedToken
     val pad = reservedToken
   }
+  println(s"dst: ${dst.sos} ${dst.eos} ${dst.pad}")
   case object SrcVocabSize extends Dim.Dynamic(src.max.toInt)
   case object DstVocabSize extends Dim.Dynamic(dst.max.toInt)
   val model = Transformer(SrcVocabSize, DstVocabSize, sequenceLength, sequenceLength, dModel, dff, nHeads, /*layers*/ 6)
 
   type Tokens[T <: DType] = Tensor[SequenceLength *: EmptyTuple, T, Dv]
 
-  case class Example(encoderInput: Tokens[Src.DType], decoderInput: Tokens[Dst.DType], label: Tokens[Dst.DType]) {
+  case class Example(srcText: String, dstText: String, encoderInput: Tokens[Src.DType], decoderInput: Tokens[Dst.DType], label: Tokens[Dst.DType]) {
     def encoderMask = (encoderInput #!= src.pad)
     def decoderMask = (decoderInput #!= dst.pad) && causalMask(sequenceLength) // TODO investigate need for .unsqueeze(1) to add batchSize
+
+    override def toString = s"${srcText} -> ${dstText}"
   }
 
   object Example {
@@ -62,17 +65,18 @@ class Translator[
         encoderInput <- Src.toTensor(src.sos +: srcTok :+ src.eos, sequenceLength, src.pad)
         decoderInput <- Dst.toTensor(dst.sos +: dstTok, sequenceLength, dst.pad)
         label <- Dst.toTensor(dstTok :+ dst.eos, sequenceLength, dst.pad)
-      } yield new Example(encoderInput, decoderInput, label)
+      } yield new Example(srcText, dstText, encoderInput, decoderInput, label)
     }
   }
 
-  def train(batchSize: Int, trainingData: Iterable[Example])(step: => Unit): Unit = {
-    model.train(true)
-
+  def train(batchSize: Int, trainingData: Iterable[Example], validationData: Iterable[Example])(step: => Unit): Unit = {
+    validate(validationData)
     var count = 0
     case class BatchSize(size: Long) extends Dim
     val batches = trainingData.grouped(batchSize).toSeq.map(g => Batcher(BatchSize(_), g))
+    var finalLoss: Double = 0
     for (batch <- batches) {
+      model.train(true)
       scoped {
         val start = System.nanoTime()
         count += 1
@@ -87,6 +91,7 @@ class Translator[
         }
         val decoderMask = batch { x =>
           // We need to add NHeads to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
+          //println("decoderMask: " + x.decoderMask.to(Device.CPU).value.map(_.mkString(",")).mkString("\n"))
           val r = x.decoderMask.unsqueezeBefore(First)
           r
         }
@@ -98,46 +103,69 @@ class Translator[
         // Let's merge the SequenceLength dimension into BatchSize, so we can do a cross entropy loss of
         // all examples in the batch.
         val expected = label.view.merge[SequenceLength]
+        //println("  expected: " + expected.summary)
         val actual = projOutput.view.merge[SequenceLength]
-        val loss = CrossEntropy(actual, expected.to(DType.int64), ignoreIndex = Some(src.pad.toInt), labelSmoothing = 0.1)
+        //println("  actual (first 10): " + actual(Index.All, Index.Slice(0, 10)).summary)
+        // TODO see if we can make "ignoreIndex" typesafe
+        val loss = CrossEntropy(actual, expected.to(DType.int64), ignoreIndex = Some(dst.pad.toInt), labelSmoothing = 0.1)
 
         val end = System.nanoTime()
-        println(s"Batch ${count} of ${batches.size}:  loss is ${loss.to(Device.CPU).value}, took ${(end - start)/1000000}ms")
+        finalLoss = loss.to(Device.CPU).value
+        //println(s"Batch ${count} of ${batches.size}:  loss is ${loss.to(Device.CPU).value}, took ${(end - start)/1000000}ms")
         if (loss.isNan.sum.to(Device.CPU).value) {
           throw new RuntimeException("Loss became NaN")
         }
         loss.backward()
         step
+        if (count % 500 == 0) {
+          validate(validationData)
+        }
       }
     }
+    println("Loss = " + finalLoss)
   }
 
-  def validate(examples: Seq[Example]): Unit = {
+  def validate(examples: Iterable[Example]): Unit = {
     model.train(false)
     Tensor.noGrad {
       for (x <- examples) {
-        // TODO refactor encode and decode to use Batched, so we can remove the batch dimension here entirely.
-        val encoderInput = x.encoderInput
-          .unsqueezeBefore(First) // add BatchSize of 1
-        val encoderMask = x.encoderMask
-          .unsqueezeBefore(First).unsqueezeBefore(First).unsqueezeBefore(First) // add NHeads, SeqLen, BatchSize
+        scoped {
+          // TODO refactor encode and decode to use Batched, so we can remove the batch dimension here entirely.
+          val encoderInput = x.encoderInput
+            .unsqueezeBefore(First) // add BatchSize of 1
+          val encoderMask = x.encoderMask
+            .unsqueezeBefore(First).unsqueezeBefore(First).unsqueezeBefore(First) // add NHeads, SeqLen, BatchSize
 
-        // Note: start of greedy_decode
-        val source = encoderInput
-        val sourceMask = encoderMask
-        val encoderOutput = model.encode(source, sourceMask)
-        class InputSequenceLength(size: Long) extends Dim.Dynamic(size)
-        var decoderInput = Dst.toTensor(dst.pad :: Nil).shaped[InputSequenceLength]
-        def inputLength = decoderInput.sizeOf(InputSequenceLength(_))
+          // Note: start of greedy_decode
+          val source = encoderInput
+          val sourceMask = encoderMask
+          val encoderOutput = model.encode(source, sourceMask)
+          class InputSequenceLength(size: Long) extends Dim.Dynamic(size)
+          // TODO see if we can get the tokenizing pattern (start and end tokens) extracted to a type class
+          var decoderInput = Dst.toTensor(dst.sos :: Nil).shaped[InputSequenceLength]
+          def inputLength = decoderInput.sizeOf(InputSequenceLength(_))
 
-        while (inputLength <= sequenceLength && !decoderInput(Index.Last).equal(Dst.toTensor(dst.eos))) {
-          val decoderMask = causalMask(inputLength)
-          val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(First)) // Add BatchSize
-          // TODO investigate Dim -> Index tuple syntax here, so we can remove the comment
-          val in = out(Index.First, Index.Last, Index.All) // Grab the First (only) batch, and only the  Last token in that batch
-          val prob = model.project(in)
-          val nextToken = prob.maxBy(DstVocabSize).indices.to(Dst.dType).unsqueeze
-          decoderInput += nextToken
+          while (inputLength <= sequenceLength && !decoderInput(Index.Last).equal(Dst.toTensor(dst.eos))) {
+            val nextToken = scoped {
+              val decoderMask = causalMask(inputLength)
+              val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(First)) // Add BatchSize
+
+              // TODO investigate Dim -> Index tuple syntax here, so we can remove the comment
+              val in = out(Index.First, Index.Last, Index.All) // Grab the First (only) batch, and only the  Last token in that batch
+              val prob = model.project(in)
+              val p = prob.to(Device.CPU).value.toSeq.zipWithIndex.sortBy(_._1).reverse.take(10)
+              val next = prob.maxBy(DstVocabSize).indices.to(Dst.dType).unsqueeze
+              println("  probs: " + p.mkString(",") + " -> " + dst.untokenize(next.to(Device.CPU).value.toSeq))
+              next
+            }
+            // TODO introduce NotGiven[IsIndex[DType]] to disallow += here
+            decoderInput ++= nextToken
+          }
+          // Note: end of greedy_decode
+
+          val value = decoderInput.to(Device.CPU).value.toSeq
+          val modelOut = dst.untokenize(value.drop(1) /* remove start of sentence token */ )
+          println(s"${x}: ${modelOut}")
         }
       }
     }
@@ -158,8 +186,19 @@ object Translator {
   case object NHeads extends Dim.Static[8L]
   val layers = 6
   val batchSize = 16
-  val endEpoch = 20
+  val endEpoch = 1000
+  val learningRate = 1e-6
 
+  /*
+  case object SequenceLength extends Dim.Static[64L]
+  case object DModel extends Dim.Static[32L]
+  case object DFF extends Dim.Static[32L]
+  case object NHeads extends Dim.Static[8L]
+  val layers = 6
+  val batchSize = 48
+  val endEpoch = 2000
+  val learningRate = 1e-4
+   */
   @main def run(): Unit = {
     val srcLang = "en"
     val dstLang = "nl"
@@ -174,7 +213,8 @@ object Translator {
       WordTokenizer.train[Dst.T](en_nl.map(_._2))
     )
     val allExamples = en_nl.flatMap(translator.Example(_, _))
-    val optimizer = Adam(translator.model.parameters, learningRate = 1e-6, eps = 1e-9)
+    // Note: python original using LR of 1e-4, but that's all over the place. Let's use 1e-6 and be patient.
+    val optimizer = Adam(translator.model.parameters, learningRate = learningRate, eps = 1e-9)
 
     val startEpoch = 0.to(endEpoch).reverse.find(e => new File(modelFile(e)).exists()).map(e => e + 1).getOrElse(0)
     if (startEpoch > 0) {
@@ -185,11 +225,14 @@ object Translator {
     }
     for (epoch <- startEpoch.until(endEpoch)) {
       val indexes = Tensor.randperm(Dim(allExamples.size))(using Default.int32, Default.cpu).value.toSeq
-      val trainingData = indexes.take((indexes.size * 0.9).toInt).map(idx => allExamples(idx))
+      val splitIdx = (indexes.size * 0.9).toInt
+      val trainingData = indexes.take(splitIdx).map(allExamples(_))
+      val validationData = indexes.drop(splitIdx).take(1).map(allExamples(_))
       println(s"Epoch ${epoch}")
-      translator.train(batchSize, trainingData) {
+      translator.train(batchSize, trainingData, validationData) {
         optimizer.step()
         optimizer.zeroGrad()
+        //Thread.sleep(1000)
       }
       translator.model.save(modelFile(epoch))
       optimizer.save(optFile(epoch))

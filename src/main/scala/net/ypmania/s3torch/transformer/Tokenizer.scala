@@ -7,6 +7,7 @@ import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.PaddingMode
 import net.ypmania.s3torch.Tensor
+import net.ypmania.s3torch.internal.ToScala
 import net.ypmania.s3torch.internal.FromScala
 import net.ypmania.s3torch.internal.FromScala.ToScalar
 
@@ -44,6 +45,10 @@ trait IntTokenType {
 
   given Token[T] = new IntToken {}
   given ToScalar[T] = summon[ToScalar[Int]]
+  given d1[D1]: ToScala[Tuple1[D1], DType] with {
+    type OutputType = Array[T]
+    def apply(native: pytorch.Tensor) = ToScala.int32d1(native)
+  }
 
   abstract class DType extends s3torch.DType.Int32
   val dType = new DType {}
@@ -101,7 +106,10 @@ abstract class Tokenizer[A: Token] {
 
 }
 
-case class WordData[T](known: Map[String, T])
+case class WordData[T](known: Map[String, T], inverse: Map[T, String])
+object WordData {
+  def apply[T](known: Map[String, T]): WordData[T] = WordData(known, known.map(_.swap))
+}
 
 class WordTokenizer[A: Token](data: WordData[A]) extends Tokenizer[A] {
   private val t = summon[Token[A]]
@@ -117,6 +125,10 @@ class WordTokenizer[A: Token](data: WordData[A]) extends Tokenizer[A] {
   def max = nextReservedToken
 
   def tokenize(in: String) = split(in).map(s => data.known.getOrElse(s, t.unknown))
+
+  def untokenize(seq: Seq[A]): String = {
+    seq.map(t => data.inverse.getOrElse(t, "�")).mkString
+  }
 }
 
 object WordTokenizer {
