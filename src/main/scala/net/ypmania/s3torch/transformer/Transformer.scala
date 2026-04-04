@@ -24,9 +24,10 @@ class Transformer[
   NHeads <: Dim,
   DModel <: Dim,
   Dff <: Dim,
-  T <: DType.Floaty]
+  T <: DType.Floaty,
+  V]
   (dModel: DModel, dff: Dff, nHeads: NHeads)
-  (using Default[T], Default[D], DModel |/ NHeads, RandomSource) {
+  (using Default[T], Default[D], DModel |/ NHeads, RandomSource, DTypeOps.Scalar[T, V]) {
 
   type Tn[S <: Shape] = Tensor[S, T, D]
   type MaskTn[M <: Shape] = Tensor[M, Bool, D]
@@ -41,10 +42,10 @@ class Transformer[
   class PositionalEncoding[SeqLen <: Dim](seqLen: SeqLen, dropoutProb: Double) extends Module {
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
-    val position = Tensor.arangeOf(seqLen).unsqueezeAfter(Last)
-    val indices = Tensor.arangeOf(dModel) /|/ 2
-    val phase_offset = (Tensor.arangeOf(dModel) % 2) * (Math.PI * 0.5)
-    val div_term = exp(indices * (-Math.log(10000.0) / dModel.size))
+    val position = Tensor.arangeOfD(seqLen).unsqueezeAfter(Last)
+    val indices = Tensor.arangeOf(dModel) /|/ 2L
+    val phase_offset = (Tensor.arangeOf(dModel) % 2L).toD * (Math.PI * 0.5)
+    val div_term = exp(indices.toD * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 
     def apply[B <: Dim, L <: Dim](in: Batch[B, L]): Batch[B, L] = {
@@ -264,6 +265,7 @@ object Transformer {
   def apply[
     D <: Device,
     T <: DType.Floaty,
+    V,
     SrcVocabSize <: Dim,
     TgtVocabSize <: Dim,
     SrcSeqLen <: Dim,
@@ -285,8 +287,8 @@ object Transformer {
     /** Number of encoder and decoder layers (N), default to 6 */
     coderLayers: Int,
     dropoutProb: Double = 0.1
-  )(using rnd:RandomSource, dType:Default[T], device:Default[D])(using DModel |/ NHeads) = {
-    val t = new Transformer[D, NHeads, DModel, DFF, T](dModel, dFF, nHeads)
+  )(using rnd:RandomSource, dType:Default[T], device:Default[D])(using DModel |/ NHeads, DTypeOps.Scalar[T, V]) = {
+    val t = new Transformer[D, NHeads, DModel, DFF, T, V](dModel, dFF, nHeads)
     val srcEmbed = new t.InputEmbeddings(srcVocabSize)
     val tgtEmbed = new t.InputEmbeddings(tgtVocabSize)
 

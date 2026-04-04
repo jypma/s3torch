@@ -10,6 +10,7 @@ import org.bytedeco.pytorch.global.torch
 // but can't be confused with a vector of e.g. output tokens.
 /** The data type for a tensor, e.g. 32-bit float or 8-bit integer. */
 abstract class DType(private[s3torch] val native: torch.ScalarType) {
+  // FIXME only do this for builtin DTypes
   DType.fromNative = DType.fromNative + (native.value -> this)
 }
 

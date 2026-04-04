@@ -9,6 +9,7 @@ import net.ypmania.s3torch.Index
 import net.ypmania.s3torch.Dim.|/
 import net.ypmania.s3torch.Shape.Select.First
 import net.ypmania.s3torch.Tensor
+import net.ypmania.s3torch.token.Token32Type
 import net.ypmania.s3torch.HeapExternal.scoped
 import net.ypmania.s3torch.optim.Adam
 import org.json4s._
@@ -22,8 +23,8 @@ import net.ypmania.s3torch.Default.cuda
 import java.io.File
 import net.ypmania.s3torch.Default
 
-case object Src extends IntTokenType
-case object Dst extends IntTokenType
+case object Src extends Token32Type
+case object Dst extends Token32Type
 
 class Translator[
   SequenceLength <: Dim,
@@ -31,20 +32,20 @@ class Translator[
   DFF <: Dim,
   NHeads <: Dim,
   Dv <: Device
-](sequenceLength: SequenceLength, dModel: DModel, dff: DFF, nHeads: NHeads, srcData: WordData[Src.T], dstData: WordData[Dst.T])(using Default[Dv], DModel |/ NHeads) {
-  object src extends WordTokenizer[Src.T](srcData) {
+](sequenceLength: SequenceLength, dModel: DModel, dff: DFF, nHeads: NHeads, srcData: WordData[Src.S], dstData: WordData[Dst.S])(using Default[Dv], DModel |/ NHeads) {
+  object src extends WordTokenizer[Src.S](srcData) {
     val sos = reservedToken
     val eos = reservedToken
     val pad = reservedToken
   }
-  object dst extends WordTokenizer[Dst.T](dstData) {
+  object dst extends WordTokenizer[Dst.S](dstData) {
     val sos = reservedToken
     val eos = reservedToken
     val pad = reservedToken
   }
   println(s"dst: ${dst.sos} ${dst.eos} ${dst.pad}")
-  case object SrcVocabSize extends Dim.Dynamic(src.max.toInt)
-  case object DstVocabSize extends Dim.Dynamic(dst.max.toInt)
+  case object SrcVocabSize extends Dim.Dynamic(src.max.value)
+  case object DstVocabSize extends Dim.Dynamic(dst.max.value)
   val model = Transformer(SrcVocabSize, DstVocabSize, sequenceLength, sequenceLength, dModel, dff, nHeads, /*layers*/ 6)
 
   type Tokens[T <: DType] = Tensor[SequenceLength *: EmptyTuple, T, Dv]
@@ -62,9 +63,9 @@ class Translator[
       val dstTok = dst.tokenize(dstText)
 
       for {
-        encoderInput <- Src.toTensor(src.sos +: srcTok :+ src.eos, sequenceLength, src.pad)
-        decoderInput <- Dst.toTensor(dst.sos +: dstTok, sequenceLength, dst.pad)
-        label <- Dst.toTensor(dstTok :+ dst.eos, sequenceLength, dst.pad)
+        encoderInput <- Tensor(src.sos +: srcTok :+ src.eos).padToOption(sequenceLength, src.pad)
+        decoderInput <- Tensor(dst.sos +: dstTok).padToOption(sequenceLength, dst.pad)
+        label <- Tensor(dstTok :+ dst.eos).padToOption(sequenceLength, dst.pad)
       } yield new Example(srcText, dstText, encoderInput, decoderInput, label)
     }
   }
@@ -74,7 +75,7 @@ class Translator[
     var count = 0
     case class BatchSize(size: Long) extends Dim
     val batches = trainingData.grouped(batchSize).toSeq.map(g => Batcher(BatchSize(_), g))
-    var finalLoss: Double = 0
+    var finalLoss: Float = 0
     for (batch <- batches) {
       model.train(true)
       scoped {
@@ -107,7 +108,7 @@ class Translator[
         val actual = projOutput.view.merge[SequenceLength]
         //println("  actual (first 10): " + actual(Index.All, Index.Slice(0, 10)).summary)
         // TODO see if we can make "ignoreIndex" typesafe
-        val loss = CrossEntropy(actual, expected.to(DType.int64), ignoreIndex = Some(dst.pad.toInt), labelSmoothing = 0.1)
+        val loss = CrossEntropy(actual, expected.to(DType.int64), ignoreIndex = Some(dst.pad.value), labelSmoothing = 0.1)
 
         val end = System.nanoTime()
         finalLoss = loss.to(Device.CPU).value
@@ -142,10 +143,10 @@ class Translator[
           val encoderOutput = model.encode(source, sourceMask)
           class InputSequenceLength(size: Long) extends Dim.Dynamic(size)
           // TODO see if we can get the tokenizing pattern (start and end tokens) extracted to a type class
-          var decoderInput = Dst.toTensor(dst.sos :: Nil).shaped[InputSequenceLength]
+          var decoderInput = Tensor(dst.sos :: Nil).shaped[InputSequenceLength]
           def inputLength = decoderInput.sizeOf(InputSequenceLength(_))
 
-          while (inputLength <= sequenceLength && !decoderInput(Index.Last).equal(Dst.toTensor(dst.eos))) {
+          while (inputLength <= sequenceLength && !decoderInput(Index.Last).equal(Tensor(dst.eos))) {
             val nextToken = scoped {
               val decoderMask = causalMask(inputLength)
               val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(First)) // Add BatchSize
@@ -209,8 +210,8 @@ object Translator {
     val en_nl = translations(srcLang, dstLang)
     // TODO save and auto-load tokenizers
     val translator = new Translator(SequenceLength, DModel, DFF, NHeads,
-      WordTokenizer.train[Src.T](en_nl.map(_._1)),
-      WordTokenizer.train[Dst.T](en_nl.map(_._2))
+      WordTokenizer.train[Src.S](en_nl.map(_._1)),
+      WordTokenizer.train[Dst.S](en_nl.map(_._2))
     )
     val allExamples = en_nl.flatMap(translator.Example(_, _))
     // Note: python original using LR of 1e-4, but that's all over the place. Let's use 1e-6 and be patient.

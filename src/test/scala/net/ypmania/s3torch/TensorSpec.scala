@@ -28,7 +28,7 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can create an Int scalar and change defaults") {
-        val t = Tensor(5, int8)
+        val t = Tensor(5.toByte).to(int8)
         val tType: Tensor[EmptyTuple.type, Int8, CPU.type] = t
         assert(t.size == Seq[Long]())
         assert(t.value.isInstanceOf[Byte])
@@ -50,8 +50,7 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can create a dynamic float vector") {
-        // FIXME investigate what happens if we leave out [Float] here
-        val t = Tensor(Seq[Float](1.0, 2.0, 3.0), float32)
+        val t = Tensor(Seq(1.0, 2.0, 3.0)).to(float32)
         val tType: Tensor[Tuple1[Dynamic], Float32, CPU.type] = t
         assert(t.size == Seq(3L))
         assert(t.value.toSeq == Seq(1.0, 2.0, 3.0))
@@ -131,17 +130,35 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can create various int scalars") {
-        Tensor(5, int8)
-        Tensor(5, uint8)
-        Tensor(5, int16)
-        Tensor(5, int32)
-        Tensor(5, int64)
+        Tensor(5).to(int8)
+        Tensor(5).to(uint8)
+        Tensor(5).to(int16)
+        Tensor(5).to(int32)
+        Tensor(5).to(int64)
       }
 
       it("can create various float scalars") {
-        Tensor(5.0, float16)
-        Tensor(5.0, float32)
-        Tensor(5.0, float64)
+        Tensor(5.0).to(float16)
+        Tensor(5.0).to(float32)
+        Tensor(5.0).to(float64)
+      }
+
+      it("can create, modify and read back a Float16 vector") {
+        val t = Tensor((1.0, 2.0, 3.0)).to(float16)
+        val tType: Tensor[Static[3L] *: EmptyTuple, Float16, CPU.type] = t
+        assert(t(0).value === 1.0)
+        t(0) = 4.0
+        val r = t.value
+        assert(r.toSeq === Seq(4.0, 2.0, 3.0))
+      }
+
+      it("can create, modify and read back a BFloat16 vector") {
+        val t = Tensor((1.0, 2.0, 3.0)).to(bfloat16)
+        val tType: Tensor[Static[3L] *: EmptyTuple, BFloat16, CPU.type] = t
+        assert(t(0).value === 1.0)
+        t(0) = 4.0
+        val r = t.value
+        assert(r.toSeq === Seq(4.0, 2.0, 3.0))
       }
     }
 
@@ -160,9 +177,15 @@ class TensorSpec extends UnitSpec {
         assert(t.value.toSeq == Seq(0, 1, 2))
       }
 
-      it("can create a range from Dim") {
+      it("can create a range from Dim, in natural DType") {
         val t = Tensor.arangeOf(ExampleStatic)
-        // Follows the default DType.
+        val tType: Tensor[Tuple1[ExampleStatic.type], Int64, CPU.type] = t
+        assert(t.size == Seq(10L))
+        assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
+      }
+
+      it("can create a range from Dim, in default DType") {
+        val t = Tensor.arangeOfD(ExampleStatic)
         val tType: Tensor[Tuple1[ExampleStatic.type], Float32, CPU.type] = t
         assert(t.size == Seq(10L))
         assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
@@ -170,27 +193,28 @@ class TensorSpec extends UnitSpec {
 
       it("can create a range from unknown Dim") {
         val dim: Dim = ExampleStatic
-        val t = Tensor.arangeOf(dim)
-        // Follows the default DType.
+        val t = Tensor.arangeOfD(dim)
         val tType: Tensor[Tuple1[Dim], Float32, CPU.type] = t
-        assert(t.size == Seq(10L))
-        assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
-      }
-
-      it("can create a float range from Dim") {
-        val t = Tensor.arangeOf(ExampleStatic, float32)
-        val tType: Tensor[Tuple1[ExampleStatic.type], Float32, CPU.type] = t
         assert(t.size == Seq(10L))
         assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
       }
     }
 
     describe("full") {
-      it("can fill a vector with a value") {
-        val t = Tensor.full(5.0)(ExampleStatic)
+      it("can fill a vector with a value, with natural DType") {
+        val t = Tensor.full(5)(ExampleStatic)
+        val tType: Tensor[Tuple1[ExampleStatic.type], Int32, CPU.type] = t
         assert(t.size == Seq(10L))
         assert(t.value.toSeq == Seq(5, 5, 5, 5, 5, 5, 5, 5, 5, 5))
       }
+
+      it("can fill a vector with a value, with default DType") {
+        val t = Tensor.fullD(5.0)(ExampleStatic)
+        val tType: Tensor[Tuple1[ExampleStatic.type], Float32, CPU.type] = t
+        assert(t.size == Seq(10L))
+        assert(t.value.toSeq == Seq(5, 5, 5, 5, 5, 5, 5, 5, 5, 5))
+      }
+
     }
 
     describe("stack") {
@@ -748,7 +772,7 @@ class TensorSpec extends UnitSpec {
     describe("padTo") {
       it("can pad a vector to a higher length") {
         case object DimA extends Dim.Static[4L]
-        val r = Tensor((1, 2)).padTo(DimA)(9, PaddingMode.Append)
+        val r = Tensor((1, 2)).padTo(DimA, 9)
         val rType: Tensor[DimA.type *: EmptyTuple, Int32, CPU.type] = r
         assert(r.size == Seq(4L))
         assert(r.value.toSeq == Seq(1, 2, 9, 9))
@@ -756,7 +780,7 @@ class TensorSpec extends UnitSpec {
 
       it("can pad a vector to the same length") {
         case object DimA extends Dim.Static[2L]
-        val r = Tensor((1, 2)).padTo(DimA)(9, PaddingMode.Append)
+        val r = Tensor((1, 2)).padTo(DimA, 9)
         val rType: Tensor[DimA.type *: EmptyTuple, Int32, CPU.type] = r
         assert(r.size == Seq(2L))
         assert(r.value.toSeq == Seq(1, 2))

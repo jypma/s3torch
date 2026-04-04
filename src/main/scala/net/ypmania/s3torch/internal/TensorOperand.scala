@@ -5,6 +5,7 @@ import net.ypmania.s3torch.DType.Promoted
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Tensor
 import org.bytedeco.pytorch
+import net.ypmania.s3torch.DTypeOps
 
 /** Type class that exists for V where V can be the operand to an operation on a tensor with either a scalar (resulting in the same shaped tensor), or another tensor (resulting in Broadcast being applied), with the result being the same or promoted DType of the two tensors. */
 trait TensorOperand[S <: Tuple, T <: DType, D <: Device, V] {
@@ -13,9 +14,9 @@ trait TensorOperand[S <: Tuple, T <: DType, D <: Device, V] {
 }
 
 object TensorOperand {
-  given scalar[S <: Tuple, T <: DType, D <: Device, V](using toScalar: FromScala.ToScalar[V]): TensorOperand[S, T, D, V] with {
+  given scalar[S <: Tuple, T <: DType, D <: Device, V](using ops: DTypeOps.Scalar[T, V]): TensorOperand[S, T, D, V] with {
     type Out = Tensor[S, T, D]
-    override def apply(t: Tensor[S, T, D], v: V, withScalar: (pytorch.Tensor, pytorch.Scalar) => pytorch.Tensor, withTensor: (pytorch.Tensor, pytorch.Tensor) => pytorch.Tensor) = new Tensor(withScalar(t.native, toScalar(v)))
+    override def apply(t: Tensor[S, T, D], v: V, withScalar: (pytorch.Tensor, pytorch.Scalar) => pytorch.Tensor, withTensor: (pytorch.Tensor, pytorch.Tensor) => pytorch.Tensor) = new Tensor(withScalar(t.native, ops.fromScalar(v)))
   }
 
   given tensor[S <: Tuple, T <: DType, S2 <: Tuple, T2 <: DType, D <: Device, R <: Tuple](using Broadcast[S, S2, R]): TensorOperand[S, T, D, Tensor[S2, T2, D]] with {

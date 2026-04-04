@@ -2,7 +2,6 @@ package net.ypmania.s3torch
 
 import net.ypmania.s3torch.Shape.Elem
 import net.ypmania.s3torch.Shape.SameSize
-import net.ypmania.s3torch.internal.FromScala.ToScalar
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.ScalarTypeOptional
 import org.bytedeco.pytorch.global.torch
@@ -16,6 +15,7 @@ import DType._
 import Device.CPU
 import scala.util.Using
 import Tuple.++
+import scala.reflect.ClassTag
 
 /**
   * A tensor is a multidimensional structure of values, wrapping pytorch's tensor. A tensor has the following properties, all of
@@ -119,13 +119,13 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   }
 
   /** Fills elements of self tensor with value where mask is true. */
-  def maskedFill[S2 <: Tuple, V](mask: ShapedT[S2, DType.Bool], value: V)(using Broadcast[S, S2, S])(using toScalar:FromScala.ToScalar[V]): Unit = {
+  def maskedFill[S2 <: Tuple, V](mask: ShapedT[S2, DType.Bool], value: V)(using Broadcast[S, S2, S])(using ops: DTypeOps.Scalar[T, V]): Unit = {
     // Any [V] is indeed correct here, pytorch accepts doubles for int vectors.
-    native.masked_fill_(mask.native, toScalar(value))
+    native.masked_fill_(mask.native, ops.fromScalar(value))
   }
   /** Returns copy that fills elements of self tensor with value where mask is true. */
-  def maskedFilled[S2 <: Tuple, V, R <: Tuple](b: ShapedT[S2, DType.Bool], value: V)(using br:Broadcast[S, S2, R], toScalar:FromScala.ToScalar[V]): Shaped[R] = {
-    new Tensor(native.masked_fill(b.native, toScalar(value)))
+  def maskedFilled[S2 <: Tuple, V, R <: Tuple](b: ShapedT[S2, DType.Bool], value: V)(using br:Broadcast[S, S2, R], ops: DTypeOps.Scalar[T, V]): Shaped[R] = {
+    new Tensor(native.masked_fill(b.native, ops.fromScalar(value)))
   }
 
   /** Matrix multiplication */
@@ -162,7 +162,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   val maxBy = new MaxReduceOp
 
   /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
-  def padTo[D <: Dim](dim: D)(value: Double, mode: PaddingMode = PaddingMode.Append): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
+  def padTo[D <: Dim, V](dim: D, value: V, mode: PaddingMode = PaddingMode.Append)(using ops: DTypeOps.Scalar[T, V]): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
     val n = dim.size - size.last
     if (n == 0) new Tensor(native) else {
       assert(n > 0, s"Can't pad dimension of size ${size.last} to lower size ${dim.size}")
@@ -171,13 +171,13 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
         case PaddingMode.Append => Array(0L, n)
         case PaddingMode.Prepend => Array(n, 0L)
       }
-      new Tensor(torch.pad(native, padding, "constant", new pytorch.DoubleOptional(value)))
+      new Tensor(torch.pad(native, padding, "constant", new pytorch.DoubleOptional(ops.toDouble(value))))
     }
   }
 
   /** Returns a new tensor with the last dimension padded to [dim]. If the source is bigger than [dim], returns None. */
-  def padToOption[D <: Dim](dim: D)(value: Double, mode: PaddingMode): Option[Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]]] = {
-    Option.when(dim.size - size.last >= 0)(padTo(dim)(value, mode))
+  def padToOption[D <: Dim, V](dim: D, value: V, mode: PaddingMode = PaddingMode.Append)(using ops:DTypeOps.Scalar[T, V]): Option[Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]]] = {
+    Option.when(dim.size - size.last >= 0)(padTo(dim, value, mode))
   }
 
   /** Casts the shape of this tensor into compatible shape [O] (which must be a Tuple of Dim's, or a single Dim) */
@@ -232,9 +232,14 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     }
   }
 
+  /** Converts the tensor to the given device and dtype */
   def to[D1 <: Device, T1 <: DType](device: D1, dtype: T1): Tensor[S, T1, D1] = new Tensor(native.to(device.native, dtype.native))
+  /** Converts the tensor to the given device */
   def to[D1 <: Device](device: D1): Tensor[S, T, D1] = new Tensor(native.to(device.native, dtype.native))
+  /** Converts the tensor to the given dtype */
   def to[T1 <: DType](dtype: T1): Tensor[S, T1, D] = new Tensor(native.to(dtype.native))
+  /** Converts the Tensor to the Default[DType] and Default[Device] in scope. */
+  def toD[D1 <: Device, T1 <: DType](using t:Default[T1], d:Default[D1]): Tensor[S, T1, D1] = new Tensor(native.to(d.value.native, t.value.native))
 
   def tril(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.tril(diagonal))
   def triu(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.triu(diagonal))
@@ -319,7 +324,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     def merge[D](d: D)(using sel: Shape.SelectIdx[S, D], ev: Merge[sel.Idx]): Shaped[Merged[sel.Idx, ev.Out]] = merge[D]
   }
 
-  def value(using toScala: ToScala[S, T])(using D =:= CPU.type): toScala.OutputType = toScala(native)
+  def value[O](using ev: TensorValue[S, T, O])(using D =:= CPU.type): O = ev(native)
   def value_=[V](v: V)(using updateSource: UpdateSource[V, D]): Unit = {
     updateSource(native, Tensor.tensorIndexArray(), v)
   }
@@ -357,21 +362,34 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   * approximated mathemetical notation better than "x.sin", even
   * though the latter would be more idiomatic Scala. */
 object Tensor {
-  // TODO nicer .apply with a known-static dimension and a known-sized tuple
-  // TODO Revisit this, just always make the DType from a Default given.
-  def apply[V, D <: Device](value: V)(using fromScala: FromScala[V], device: Default[D]): Tensor[fromScala.OutputShape, fromScala.DefaultDType, D] =
-    fromScala(value, device.value)
-  def apply[V, T <: DType, D <: Device](value: V, dtype: T)(using fromScala: FromScala[V], device: Default[D]): Tensor[fromScala.OutputShape, T, D] =
-    fromScala(value, device.value).to(dtype)
+  // TODO nicer .apply:
+  // - Reshaping or creating with known dimension:
+  //   Tensor.shaped(Tuple(AnyDim))((Values))     // return option if too big?
+  //   Tensor.shaped[Tuple(StaticDim)]((Values))  // return option if too big?
+  //   Tensor.shaped[Tuple(StaticDim)]((tuple))   // staticaly checked
+  //   OR just do this in .shaped instance method.
 
-  def arangeOf[D <: Dim, T <: DType, Dv <: Device](dim: D)(using dtype: Default[T], dv: Default[Dv]): Tensor[Tuple1[D], T, Dv] = arange(0L, dim.size, 1L, dtype.value).unsafeWithShape
-  def arangeOf[D <: Dim, T <: DType, Dv <: Device](dim: D, dtype: T)(using Default[Dv]): Tensor[Tuple1[D], T, Dv] = arange(0L, dim.size, 1L, dtype).unsafeWithShape
-
-  def arange[V, Dv <: Device](start: V, end: V, step: V)(using toScalar: ToScalar[V], fromScala: FromScala[V], dv: Default[Dv]): Tensor[Tuple1[Dim.Dynamic], fromScala.DefaultDType, Dv] = {
-    new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(fromScala.defaultDType, dv.value)))
+  /** Creates a Tensor from the given value, which can be a scalar, a
+    * (potentially) nested Seq, or a (potentially nested) tuple,
+    * picking an appropriate shape and DType. */
+  def apply[V, T <: DType, D <: Device](value: V)(using t: DTypeFor[TensorApply.BaseType[V]], device: Default[D], ev:TensorApply[V]): Tensor[ev.OutShape, t.Out, D] = {
+    new Tensor(ev(value, device.value))
   }
-  def arange[V, T <: DType, Dv <: Device](start: V, end: V, step: V, dtype: T)(using toScalar: ToScalar[V], dv:Default[Dv]): Tensor[Tuple1[Dim.Dynamic], T, Dv] = {
-    new Tensor(torch.torch_arange(toScalar(start), toScalar(end), toScalar(step), Torch.tensorOptions(dtype, dv.value)))
+
+  /** Creates a range, returning a DType that follows the Default[DType] */
+  def arangeOfD[D <: Dim, T <: DType, Dv <: Device](dim: D)(using device: Default[Dv], dType: Default[T], ops: DTypeOps.Scalar[T, ?]): Tensor[Tuple1[D], T, Dv] = arangeD(0L, dim.size, 1L)(using ops = DTypeOps.ScalarFromLong(ops)).unsafeWithShape
+
+  /** Creates a range of Int64 DType (since dimensions are Long) */
+  // TODO: For static din, auto-pick Int32, Int16 or Int8 for lower values.
+  def arangeOf[D <: Dim, Dv <: Device](dim: D)(using Default[Dv]): Tensor[Tuple1[D], Int64, Dv] = arange(0L, dim.size, 1L).unsafeWithShape
+
+  /** Creates a range, returning a DType that follows the Default[DType] */
+  def arangeD[V, T <: DType, Dv <: Device](start: V, end: V, step: V)(using dType: Default[T], ops: DTypeOps.Scalar[T, V], dv: Default[Dv]): Tensor[Tuple1[Dim.Dynamic], T, Dv] = {
+    new Tensor(torch.torch_arange(ops.fromScalar(start), ops.fromScalar(end), ops.fromScalar(step), Torch.tensorOptions(dType.value, dv.value)))
+  }
+  /** Creates a range, returning a DType that that is a good match for V */
+  def arange[V, Dv <: Device](start: V, end: V, step: V)(using t: DTypeFor[V], ops: DTypeOps.Scalar[t.Out, V], dv: Default[Dv]): Tensor[Tuple1[Dim.Dynamic], t.Out, Dv] = {
+    new Tensor(torch.torch_arange(ops.fromScalar(start), ops.fromScalar(end), ops.fromScalar(step), Torch.tensorOptions(t.dType, dv.value)))
   }
 
   // TODO consider a FunctionApply abstraction, to clean up duplication here
@@ -387,8 +405,10 @@ object Tensor {
   /** Returns a tensor filled with uninitialized data. */
   def empty[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
     new ZerosApply(dtype.value, device.value, torch.torch_empty(_, _, new pytorch.MemoryFormatOptional))
-  def full[T <: DType, D <: Device, V](value: V)(using dtype: Default[T], device: Default[D], toScalar: ToScalar[V]) =
-    new ZerosApply(dtype.value, device.value, torch.full(_, toScalar(value), _))
+  def full[D <: Device, V](value: V)(using t: DTypeFor[V], device: Default[D], ops: DTypeOps.Scalar[t.Out, V]) =
+    new ZerosApply(t.dType, device.value, torch.full(_, ops.fromScalar(value), _))
+  def fullD[T <: DType, D <: Device, V](value: V)(using dtype: Default[T], device: Default[D], ops: DTypeOps.Scalar[T, V]) =
+    new ZerosApply(dtype.value, device.value, torch.full(_, ops.fromScalar(value), _))
   def ones[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
     new ZerosApply(dtype.value, device.value, torch.torch_ones(_, _))
   def rand[T <: DType, D <: Device](using dtype: Default[T], device: Default[D], rnd:RandomSource) =
