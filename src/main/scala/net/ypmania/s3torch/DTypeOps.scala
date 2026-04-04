@@ -30,14 +30,13 @@ import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 
 // NOT +T, because sub-dtypes will have different ScalaType, typically.
+/** Contains sequence-based operations to convert Scala instances to/from a libtorch DType */
 trait DTypeOps[T <: DType, S] extends DTypeOps.Scalar[T, S]{
   type ScalaType = S
   def dType: T
 
-  //def fromScalar(v: ScalaType): pytorch.Scalar
   def toPointer(v: Seq[ScalaType]): Pointer
 
-  //def toScalar(t: pytorch.Tensor): ScalaType
   def copyToArray(t: pytorch.Tensor, a: Array[ScalaType]): Unit
   def toArray(t: pytorch.Tensor)(using ClassTag[ScalaType]): Array[ScalaType] = {
     // This assumes the tensor is on CPU, and in Strided format. Tensor.scala makes sure of that.
@@ -65,6 +64,7 @@ trait DTypeOps[T <: DType, S] extends DTypeOps.Scalar[T, S]{
 }
 
 object DTypeOps {
+  /** Contains scalar-based operations to convert Scala instances to/from a libtorch DType */
   trait Scalar[T <: DType, S] {
     def fromScalar(v: S): pytorch.Scalar
     def toScalar(t: pytorch.Tensor): S
