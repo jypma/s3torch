@@ -1,8 +1,8 @@
 package net.ypmania.s3torch.internal
 
-import net.ypmania.s3torch.Shape
 import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Dim._
+import net.ypmania.s3torch.Shape
 
 trait Flatten[S <: Shape] {
   type Out <: Dim

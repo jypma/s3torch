@@ -1,11 +1,11 @@
 package net.ypmania.s3torch.internal
 
+import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Shape
 
 import scala.compiletime.ops.int.>=
 
-import Tuple.*
-import net.ypmania.s3torch.Dim
+import Tuple._
 
 /** A trait that can be pulled in as given, to check that any match types defining that shape are fully resolved at declaration time. */
 trait VerifyShape[S <: Shape]

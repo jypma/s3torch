@@ -1,7 +1,7 @@
 package net.ypmania.s3torch.internal
 
 import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.DType.*
+import net.ypmania.s3torch.DType._
 
 /** Given that gives the appropriate default DType for a Scala type (when used with Tensor.apply) */
 trait DTypeFor[V] {

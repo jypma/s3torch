@@ -1,8 +1,8 @@
 package net.ypmania.s3torch
 
+import net.ypmania.s3torch.DType.Bool
 import net.ypmania.s3torch.DType.Float32
 import net.ypmania.s3torch.DType.Int32
-import net.ypmania.s3torch.DType.Bool
 
 case class Default[+T](value: T) {
 

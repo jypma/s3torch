@@ -2,10 +2,10 @@ package net.ypmania.s3torch.internal
 
 import net.ypmania.s3torch.DType
 import net.ypmania.s3torch.DType.Promoted
+import net.ypmania.s3torch.DTypeOps
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Tensor
 import org.bytedeco.pytorch
-import net.ypmania.s3torch.DTypeOps
 
 /** Type class that exists for V where V can be the operand to an operation on a tensor with either a scalar (resulting in the same shaped tensor), or another tensor (resulting in Broadcast being applied), with the result being the same or promoted DType of the two tensors. */
 trait TensorOperand[S <: Tuple, T <: DType, D <: Device, V] {

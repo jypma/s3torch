@@ -1,8 +1,9 @@
 package net.ypmania.s3torch
 
 import org.bytedeco.javacpp.Pointer
-import scala.util.Using
 import org.bytedeco.javacpp.PointerScope
+
+import scala.util.Using
 
 trait HeapExternal[T] {
   def toPointer(t: T): Pointer

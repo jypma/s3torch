@@ -1,7 +1,7 @@
 package net.ypmania.s3torch.internal
 
-import net.ypmania.s3torch.Shape
 import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.Shape
 
 /** Given that is available when shape I can be safely cast to shape O, by them having the same dimensions, and each dimension in O being either Dynamic, or the same as I. */
 trait CanCastShape[I <: Shape, O]

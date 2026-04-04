@@ -1,8 +1,9 @@
 package net.ypmania.s3torch.internal
 
 import net.ypmania.s3torch.DType
-import org.bytedeco.pytorch
 import net.ypmania.s3torch.DTypeOps
+import org.bytedeco.pytorch
+
 import scala.reflect.ClassTag
 
 trait TensorValue[S <: Tuple, T <: DType, O] {

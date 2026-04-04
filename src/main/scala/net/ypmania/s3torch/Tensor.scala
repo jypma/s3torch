@@ -6,16 +6,16 @@ import org.bytedeco.pytorch
 import org.bytedeco.pytorch.ScalarTypeOptional
 import org.bytedeco.pytorch.global.torch
 
-import scala.compiletime.ops.int.>=
 import scala.compiletime.ops.int.-
+import scala.compiletime.ops.int.>=
+import scala.reflect.ClassTag
+import scala.util.Using
 
 import internal._
 import Shape.Scalar
 import DType._
 import Device.CPU
-import scala.util.Using
 import Tuple.++
-import scala.reflect.ClassTag
 
 /**
   * A tensor is a multidimensional structure of values, wrapping pytorch's tensor. A tensor has the following properties, all of

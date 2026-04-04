@@ -1,8 +1,9 @@
 package net.ypmania.s3torch.internal
 
-import net.ypmania.s3torch.Shape
-import scala.compiletime.ops.int.*
 import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.Shape
+
+import scala.compiletime.ops.int._
 
 trait Cat[S <: Shape, U <: Shape, Idx <: Int] {}
 

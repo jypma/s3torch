@@ -3,25 +3,24 @@ package net.ypmania.s3torch.transformer
 import net.ypmania.s3torch.Batcher
 import net.ypmania.s3torch.DType
 import net.ypmania.s3torch.DType.Bool
+import net.ypmania.s3torch.Default
+import net.ypmania.s3torch.Default.cuda
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Dim
-import net.ypmania.s3torch.Index
 import net.ypmania.s3torch.Dim.|/
+import net.ypmania.s3torch.HeapExternal.scoped
+import net.ypmania.s3torch.Index
 import net.ypmania.s3torch.Shape.Select.First
 import net.ypmania.s3torch.Tensor
-import net.ypmania.s3torch.token.Token32Type
-import net.ypmania.s3torch.HeapExternal.scoped
+import net.ypmania.s3torch.nn.CrossEntropy
 import net.ypmania.s3torch.optim.Adam
+import net.ypmania.s3torch.token.Token32Type
 import org.json4s._
 import org.json4s.native.JsonMethods.parse
 
+import java.io.File
 import scala.annotation.nowarn
 import scala.io.Source
-import net.ypmania.s3torch.nn.CrossEntropy
-
-import net.ypmania.s3torch.Default.cuda
-import java.io.File
-import net.ypmania.s3torch.Default
 
 case object Src extends Token32Type
 case object Dst extends Token32Type

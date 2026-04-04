@@ -1,11 +1,11 @@
 package net.ypmania.s3torch.token
 
 import net.ypmania.s3torch
-import net.ypmania.s3torch.internal.DTypeFor
 import net.ypmania.s3torch.DTypeOps
-
-import org.bytedeco.pytorch
+import net.ypmania.s3torch.internal.DTypeFor
 import org.bytedeco.javacpp.IntPointer
+import org.bytedeco.pytorch
+
 import java.nio.IntBuffer
 
 /** A wrapper for tokens that are represented as 32-bit integers */

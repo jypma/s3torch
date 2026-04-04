@@ -1,6 +1,6 @@
 package net.ypmania.s3torch
 
-import Tuple.*
+import Tuple._
 
 abstract class Batched[B <: Tuple, T <: Tuple, S <: Tuple](using ValueOf[Size[B]], ValueOf[Size[T]]) {
   given batchSize:ValueOf[Size[B]] = summon[ValueOf[Size[B]]]

@@ -1,32 +1,33 @@
 package net.ypmania.s3torch
 
-import org.bytedeco.pytorch.global.torch
-import org.bytedeco.pytorch
-import java.nio.FloatBuffer
-import scala.reflect.ClassTag
-import scala.collection.immutable.ArraySeq
-import java.nio.IntBuffer
+import net.ypmania.s3torch.DType.BFloat16
+import net.ypmania.s3torch.DType.Bool
 import net.ypmania.s3torch.DType.Float16
 import net.ypmania.s3torch.DType.Float32
+import net.ypmania.s3torch.DType.Float64
+import net.ypmania.s3torch.DType.Int16
 import net.ypmania.s3torch.DType.Int32
-import net.ypmania.s3torch.DType.Bool
-import java.nio.ByteBuffer
-import org.bytedeco.javacpp.Pointer
+import net.ypmania.s3torch.DType.Int64
+import net.ypmania.s3torch.DType.Int8
 import org.bytedeco.javacpp.BoolPointer
+import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.DoublePointer
 import org.bytedeco.javacpp.FloatPointer
 import org.bytedeco.javacpp.IntPointer
-import net.ypmania.s3torch.DType.Float64
-import org.bytedeco.javacpp.DoublePointer
-import java.nio.DoubleBuffer
-import net.ypmania.s3torch.DType.Int8
-import org.bytedeco.javacpp.BytePointer
-import net.ypmania.s3torch.DType.Int16
-import org.bytedeco.javacpp.ShortPointer
-import java.nio.ShortBuffer
-import net.ypmania.s3torch.DType.Int64
 import org.bytedeco.javacpp.LongPointer
+import org.bytedeco.javacpp.Pointer
+import org.bytedeco.javacpp.ShortPointer
+import org.bytedeco.pytorch
+import org.bytedeco.pytorch.global.torch
+
+import java.nio.ByteBuffer
+import java.nio.DoubleBuffer
+import java.nio.FloatBuffer
+import java.nio.IntBuffer
 import java.nio.LongBuffer
-import net.ypmania.s3torch.DType.BFloat16
+import java.nio.ShortBuffer
+import scala.collection.immutable.ArraySeq
+import scala.reflect.ClassTag
 
 // NOT +T, because sub-dtypes will have different ScalaType, typically.
 trait DTypeOps[T <: DType, S] extends DTypeOps.Scalar[T, S]{

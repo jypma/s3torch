@@ -1,7 +1,7 @@
 package net.ypmania.s3torch
 
-import scala.compiletime.ops.long._
 import scala.compiletime.ops.int.ToLong
+import scala.compiletime.ops.long._
 
 trait Dim extends Ordered[Dim] {
   def size: Long

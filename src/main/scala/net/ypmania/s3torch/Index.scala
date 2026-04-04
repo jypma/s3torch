@@ -1,9 +1,10 @@
 package net.ypmania.s3torch
 
 import org.bytedeco.pytorch
+
 import scala.annotation.implicitNotFound
-import scala.compiletime.ops.int.ToLong
 import scala.compiletime.ops.int.+
+import scala.compiletime.ops.int.ToLong
 import scala.compiletime.ops.long.<
 import scala.util.NotGiven
 

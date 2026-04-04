@@ -1,5 +1,6 @@
 package net.ypmania.s3torch.transformer
 
+import net.ypmania.s3torch.Batched
 import net.ypmania.s3torch.DType._
 import net.ypmania.s3torch.Dim._
 import net.ypmania.s3torch.Shape.Select.Last
@@ -10,7 +11,6 @@ import net.ypmania.s3torch.nn.Dropout
 import net.ypmania.s3torch.nn.Embedding
 import net.ypmania.s3torch.nn.Linear
 import net.ypmania.s3torch.nn.Module
-import net.ypmania.s3torch.Batched
 import net.ypmania.s3torch.nn.init
 
 import scala.Tuple.Append

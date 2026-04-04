@@ -3,6 +3,7 @@ package net.ypmania.s3torch.optim
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Tensor
 import org.bytedeco.pytorch
+
 import scala.util.Using
 
 class Adam(native: pytorch.Adam) {

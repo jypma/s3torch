@@ -1,13 +1,14 @@
 package net.ypmania.s3torch.internal
 
-import compiletime.ops.int.ToLong
+import net.ypmania.s3torch.DType
+import net.ypmania.s3torch.DTypeOps
 import net.ypmania.s3torch.Device
+import net.ypmania.s3torch.DeviceType
+import net.ypmania.s3torch.Dim
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.global.torch
-import net.ypmania.s3torch.DType
-import net.ypmania.s3torch.Dim
-import net.ypmania.s3torch.DeviceType
-import net.ypmania.s3torch.DTypeOps
+
+import compiletime.ops.int.ToLong
 
 trait TensorApply[V] {
   type OutShape <: Tuple
