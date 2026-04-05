@@ -3,3 +3,5 @@
 .metals
 target
 project/project
+/examples/project/metals.sbt
+/examples/project/project/

@@ -14,6 +14,7 @@ import net.ypmania.s3torch.Shape.Select.First
 import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.nn.CrossEntropy
 import net.ypmania.s3torch.optim.Adam
+import net.ypmania.s3torch.tokenizer.*
 import net.ypmania.s3torch.token.Token32Type
 import org.json4s._
 import org.json4s.native.JsonMethods.parse

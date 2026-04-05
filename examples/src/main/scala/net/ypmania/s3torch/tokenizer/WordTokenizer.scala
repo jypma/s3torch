@@ -1,15 +1,7 @@
-package net.ypmania.s3torch.transformer
+package net.ypmania.s3torch.tokenizer
 
 import net.ypmania.s3torch
 import net.ypmania.s3torch.token.Token
-
-abstract class Tokenizer[A: Token] {
-  private val t = summon[Token[A]]
-
-  def max: A
-  def tokenize(in: String): Seq[A]
-
-}
 
 case class WordData[T](known: Map[String, T], inverse: Map[T, String])
 object WordData {
@@ -29,9 +21,9 @@ class WordTokenizer[A: Token](data: WordData[A]) extends Tokenizer[A] {
 
   def max = nextReservedToken
 
-  def tokenize(in: String) = split(in).map(s => data.known.getOrElse(s, t.unknown))
+  override def tokenize(in: String) = split(in).map(s => data.known.getOrElse(s, t.unknown))
 
-  def untokenize(seq: Seq[A]): String = {
+  override def untokenize(seq: Seq[A]): String = {
     seq.map(t => data.inverse.getOrElse(t, "�")).mkString
   }
 }
