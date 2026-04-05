@@ -218,12 +218,25 @@ class TensorSpec extends UnitSpec {
     }
 
     describe("stack") {
-      it("can combine two tensors into a batch") {
+      it("can combine two tensors into a type-only batch") {
         val a = Tensor((1, 2, 3))
         val b = Tensor((4, 5, 6))
         trait Batch extends Dim
         val c = Tensor.stack[Batch](Seq(a, b))
         val cType: Tensor[(Batch, Static[3L]), Int32, CPU.type] = c
+        assert(c.size == Seq(2L, 3L))
+        assert(c.value.toSeq == Seq(
+          Seq(1, 2, 3),
+          Seq(4, 5, 6)
+        ))
+      }
+
+      it("can combine two tensors into a value-based batch") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((4, 5, 6))
+        case object Batch extends Dim.Static[2L]
+        val c = Tensor.stack(Batch)(Seq(a, b))
+        val cType: Tensor[(Batch.type, Static[3L]), Int32, CPU.type] = c
         assert(c.size == Seq(2L, 3L))
         assert(c.value.toSeq == Seq(
           Seq(1, 2, 3),
@@ -915,6 +928,19 @@ class TensorSpec extends UnitSpec {
         val sType: Tensor[Static[3L] *: EmptyTuple.type, Float64, CPU.type] = s
         assert(s.size == Seq(3L))
         assert(s.value.toSeq === Seq(5.0, 7.0, 9.0))
+      }
+    }
+
+    describe("summary") {
+      it("can summarize all types") {
+        assert(Tensor(5).to(int8).summary == "5")
+        assert(Tensor(5, 1).to(uint8).summary == "(5, 1)")
+        assert(Tensor(5, 1).to(int16).summary == "(5, 1)")
+        assert(Tensor(5, 1).to(int32).summary == "(5, 1)")
+        assert(Tensor(5, 1).to(int64).summary == "(5, 1)")
+        assert(Tensor(5.0, 1.0).to(float16).summary == "(5.0000, 1.0000)")
+        assert(Tensor(5.0, 1.0).to(float32).summary == "(5.0000, 1.0000)")
+        assert(Tensor(5.0, 1.0).to(float64).summary == "(5.0000, 1.0000)")
       }
     }
 

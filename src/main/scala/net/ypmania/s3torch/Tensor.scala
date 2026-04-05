@@ -208,18 +208,25 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   def summary: String = {
     val res = new StringBuilder()
-    val values = flatten.to(Device.CPU, DType.float32).value
+    val isFloat = dtype == DType.bfloat16 || dtype == DType.float16 || dtype == DType.float32 || dtype == DType.float64
+    val values = if(isFloat)
+      flatten.to(Device.CPU, DType.float32).value
+    else
+      flatten.to(Device.CPU, DType.int64).value
 
     val s = size
     if (s.isEmpty) {
-      values.toString
+      values.head.toString
     } else {
       def indent(i: String, s: String) = s.split("\n").map(l => i + l).mkString("\n")
 
       def sum[T](sizes: Seq[Long], values: Seq[T]): String = {
         if (sizes.size == 1) {
-          // FIXME check DType here
-          values.map(o => f"${o.asInstanceOf[Float]}%.4f")mkString("(", ", ", ")")
+          if (values.headOption.exists(v => v.isInstanceOf[Float] || v.isInstanceOf[Double])) {
+            values.map(o => f"${o.asInstanceOf[Float]}%.4f")mkString("(", ", ", ")")
+          } else {
+            values.map(o => f"${o.asInstanceOf[Long]}%d")mkString("(", ", ", ")")
+          }
         } else {
           values
             .grouped(sizes.drop(1).foldLeft(1L)(_ * _).toInt)
@@ -429,9 +436,13 @@ object Tensor {
     new ZerosApply(dtype.value, device.value, torch.torch_zeros(_, _))
 
   /** Concatenates a sequence of tensors along a new dimension. */
-  def stack[B <: Dim] = new StackApply[B]
-  class StackApply[B <: Dim] {
+  def stack[B <: Dim] = new StackApply[B](None)
+  def stack[B <: Dim](batchDim: B) = new StackApply[B](Some(batchDim.size.toInt))
+  class StackApply[B <: Dim](expected: Option[Int]) {
     def apply[S <: Tuple, T <: DType, D <: Device](tensors: Iterable[Tensor[S, T, D]]): Tensor[B *: S, T, D] = {
+      if (expected.exists(c => tensors.size != c)) {
+        throw new IllegalArgumentException(s"Expected ${expected.get} tensors, but got ${tensors.size}")
+      }
       new Tensor(torch.stack(new pytorch.TensorVector(tensors.map(_.native).toArray*)))
     }
   }
