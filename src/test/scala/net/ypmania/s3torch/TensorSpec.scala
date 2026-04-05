@@ -241,6 +241,17 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("randint") {
+      it("can generate random numbers using fixed seed") {
+        // Seed provided by given RandomSource in UnitTest.scala
+        val t = Tensor.randint(42)(3L)
+        // Even though they're integers, we default to Default[DType] for now.
+        val tType: Tensor[Tuple1[Static[3L]], Float32, CPU.type] = t
+        assert(t.size == Seq(3L))
+        assert(t.value.toSeq === Seq(32.0, 3.0, 35.0))
+      }
+    }
+
     describe("zeros") {
       it("can create with dimension 1") {
         val of1static = Tensor.zeros(1L)
