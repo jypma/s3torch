@@ -245,8 +245,15 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   def to[D1 <: Device](device: D1): Tensor[S, T, D1] = new Tensor(native.to(device.native, dtype.native))
   /** Converts the tensor to the given dtype */
   def to[T1 <: DType](dtype: T1): Tensor[S, T1, D] = new Tensor(native.to(dtype.native))
+
   /** Converts the Tensor to the Default[DType] and Default[Device] in scope. */
-  def toD[D1 <: Device, T1 <: DType](using t:Default[T1], d:Default[D1]): Tensor[S, T1, D1] = new Tensor(native.to(d.value.native, t.value.native))
+  def toDeviceDType[D1 <: Device, T1 <: DType](using t:Default[T1], d:Default[D1]): Tensor[S, T1, D1] = to(d.value, t.value)
+
+  /** Converts the Tensor to the Default[Device] in scope. */
+  def toDevice[D1 <: Device](using d:Default[D1]): Tensor[S, T, D1] = to(d.value)
+
+  /** Converts the Tensor to the Default[DType] in scope. */
+  def toDType[T1 <: DType](using t:Default[T1]): Tensor[S, T1, D] = to(t.value)
 
   def tril(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.tril(diagonal))
   def triu(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.triu(diagonal))

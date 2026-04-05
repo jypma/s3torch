@@ -44,8 +44,8 @@ class Transformer[
 
     val position = Tensor.arangeOfD(seqLen).unsqueezeAfter(Last)
     val indices = Tensor.arangeOf(dModel) /|/ 2L
-    val phase_offset = (Tensor.arangeOf(dModel) % 2L).toD * (Math.PI * 0.5)
-    val div_term = exp(indices.toD * (-Math.log(10000.0) / dModel.size))
+    val phase_offset = (Tensor.arangeOf(dModel) % 2L).toDType * (Math.PI * 0.5)
+    val div_term = exp(indices.toDType * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 
     def apply[B <: Dim, L <: Dim](in: Batch[B, L]): Batch[B, L] = {
