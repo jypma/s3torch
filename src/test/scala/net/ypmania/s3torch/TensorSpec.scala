@@ -391,6 +391,14 @@ class TensorSpec extends UnitSpec {
         assert(r.value === Seq(1, 2))
       }
 
+      it("can reduce a dimension using Take with drop") {
+        case object D2 extends Dim.Static[2L]
+        val r = v(Index.Take(D2, drop = 1))
+        val rType: Tensor[Tuple1[D2.type], Int32, CPU.type] = r
+        assert(r.size == Seq(2L))
+        assert(r.value === Seq(2, 3))
+      }
+
       it("can reduce a dimension to the Dim of another tensor") {
         case object D2 extends Dim.Static[2L]
         val t2 = Tensor.zeros(D2)

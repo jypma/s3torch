@@ -73,14 +73,20 @@ object Index extends IndexPrio0 {
     type Apply = Tuple1[D]
   }
 
-  /** Selects elements up to the size of [D] (which must be smaller than or equal than the current dimension in the shape) */
+  /** Selects elements exactly sized [D] (D must be smaller than or equal than the current dimension in the shape) */
   // TODO consider introducing the type D1 |<= D2 to prove that D1 is smaller than or equal to D2
-  case class Take[D](size: Int) extends Index {
-    def toNative = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(None), toSymInt(Some(size)), toSymInt(None)))
+  case class Take[D] private (drop: Int, size: Int) extends Index {
+    def toNative = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(Some(drop)), toSymInt(Some(drop + size)), toSymInt(None)))
   }
   case object Take {
-    def apply[D <: Dim](dim: Dim.Ref[D]): Take[D] = Take(dim.size.toInt)
-    def apply[D <: Dim](dim: D): Take[D] = Take(dim.size.toInt)
+    /** Selects [D] elements from the start (D must be smaller than or equal than the current dimension in the shape) */
+    def apply[D <: Dim](dim: Dim.Ref[D]): Take[D] = Take(0, dim.size.toInt)
+    /** Selects [D] elements from the start (D must be smaller than or equal than the current dimension in the shape) */
+    def apply[D <: Dim](dim: D): Take[D] = Take(0, dim.size.toInt)
+    /** Selects [D] elements starting from [drop] (D must be smaller than or equal than the current dimension in the shape) */
+    def apply[D <: Dim](dim: Dim.Ref[D], drop: Int): Take[D] = Take(drop, dim.size.toInt)
+    /** Selects [D] elements starting from [drop] (D must be smaller than or equal than the current dimension in the shape) */
+    def apply[D <: Dim](dim: D, drop: Int): Take[D] = Take(drop, dim.size.toInt)
   }
   given givtake[D <: Dim, O]: Valid[D, Take[O]] with {
     type Apply = Tuple1[O]
