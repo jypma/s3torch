@@ -413,11 +413,16 @@ object Tensor {
     new ZerosApply(dtype.value, device.value, torch.torch_ones(_, _))
   def rand[T <: DType, D <: Device](using dtype: Default[T], device: Default[D], rnd:RandomSource) =
     rnd(new ZerosApply(dtype.value, device.value, torch.torch_rand(_, _)))
-  /** Returns a tensor filled with random integers generated uniformly between low (inclusive) and high (exclusive). */
-  def randint[T <: DType, D <: Device](low: Long, high: Long)(using dtype: Default[T], device: Default[D], rnd:RandomSource): ZerosApply[T, D] =
+  /** Returns a tensor filled with random integers generated uniformly between low (inclusive) and high (exclusive), as Int64 */
+  def randint[D <: Device](low: Long, high: Long)(using device: Default[D], rnd:RandomSource): ZerosApply[Int64, D] =
+    rnd(new ZerosApply(int64, device.value, torch.torch_randint(low, high, _, _)))
+  /** Returns a tensor filled with random integers generated uniformly between 0 (inclusive) and high (exclusive), as Int64. */
+  def randint[D <: Device](high: Long)(using device: Default[D], rnd:RandomSource): ZerosApply[Int64, D] = randint(0, high)
+  /** Returns a tensor filled with random integers generated uniformly between low (inclusive) and high (exclusive), which follows the Default[DType]. */
+  def randintD[T <: DType, D <: Device](low: Long, high: Long)(using dtype: Default[T], device: Default[D], rnd:RandomSource): ZerosApply[T, D] =
     rnd(new ZerosApply(dtype.value, device.value, torch.torch_randint(low, high, _, _)))
-  /** Returns a tensor filled with random integers generated uniformly between 0 (inclusive) and high (exclusive). */
-  def randint[T <: DType, D <: Device](high: Long)(using dtype: Default[T], device: Default[D], rnd:RandomSource): ZerosApply[T, D] = randint(0, high)
+  /** Returns a tensor filled with random integers generated uniformly between 0 (inclusive) and high (exclusive), which follows the Default[DType]. */
+  def randintD[T <: DType, D <: Device](high: Long)(using dtype: Default[T], device: Default[D], rnd:RandomSource): ZerosApply[T, D] = randintD(0, high)
   def randperm[T <: DType, D <: Device, N <: Dim](dim: N)(using dtype: Default[T], device: Default[D]): Tensor[Tuple1[N], T, D] =
     new Tensor(torch.torch_randperm(dim.size, Torch.tensorOptions(dtype.value, device.value)))
   def zeros[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =

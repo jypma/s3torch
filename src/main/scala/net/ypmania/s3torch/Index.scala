@@ -75,36 +75,36 @@ object Index extends IndexPrio0 {
 
   /** Selects elements exactly sized [D] (D must be smaller than or equal than the current dimension in the shape) */
   // TODO consider introducing the type D1 |<= D2 to prove that D1 is smaller than or equal to D2
-  case class Take[D] private (drop: Int, size: Int) extends Index {
+  case class Take[D] private (drop: Long, size: Long) extends Index {
     def toNative = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(Some(drop)), toSymInt(Some(drop + size)), toSymInt(None)))
   }
   case object Take {
     /** Selects [D] elements from the start (D must be smaller than or equal than the current dimension in the shape) */
-    def apply[D <: Dim](dim: Dim.Ref[D]): Take[D] = Take(0, dim.size.toInt)
+    def apply[D <: Dim](dim: Dim.Ref[D]): Take[D] = new Take(0, dim.size)
     /** Selects [D] elements from the start (D must be smaller than or equal than the current dimension in the shape) */
-    def apply[D <: Dim](dim: D): Take[D] = Take(0, dim.size.toInt)
+    def apply[D <: Dim](dim: D): Take[D] = new Take(0, dim.size)
     /** Selects [D] elements starting from [drop] (D must be smaller than or equal than the current dimension in the shape) */
-    def apply[D <: Dim](dim: Dim.Ref[D], drop: Int): Take[D] = Take(drop, dim.size.toInt)
+    def apply[D <: Dim](dim: Dim.Ref[D], drop: Long): Take[D] = new Take(drop, dim.size)
     /** Selects [D] elements starting from [drop] (D must be smaller than or equal than the current dimension in the shape) */
-    def apply[D <: Dim](dim: D, drop: Int): Take[D] = Take(drop, dim.size.toInt)
+    def apply[D <: Dim](dim: D, drop: Long): Take[D] = new Take(drop, dim.size)
   }
   given givtake[D <: Dim, O]: Valid[D, Take[O]] with {
     type Apply = Tuple1[O]
   }
 
   /** Selects a subset of a dimension. */
-  case class Slice(from: Option[Int], to: Option[Int], step: Option[Int]) extends Index {
+  case class Slice(from: Option[Long], to: Option[Long], step: Option[Long]) extends Index {
     def toNative = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(from), toSymInt(to), toSymInt(step)))
   }
   object Slice:
-    private def extract(index: Option[Int] | Int) = index match
-      case i: Option[Int] => i
-      case i: Int         => Option(i)
+    private def extract(index: Option[Long] | Long) = index match
+      case i: Option[Long] => i
+      case i: Long         => Option(i)
     def apply(
-        start: Option[Int] | Int = None,
-        end: Option[Int] | Int = None,
-        step: Option[Int] | Int = None
-    ): Slice = Slice(extract(start), extract(end), extract(step))
+        start: Option[Long] | Long = None,
+        end: Option[Long] | Long = None,
+        step: Option[Long] | Long = None
+    ): Slice = new Slice(extract(start), extract(end), extract(step))
 
   given [D <: Dim]: Valid[D, Slice] with {
     type Apply = Tuple1[Dim]
@@ -119,5 +119,5 @@ object Index extends IndexPrio0 {
     def apply(t: (D, Int)) = At(t._2)
   }
 
-  private def toSymInt(maybeInt: Option[Int]) = maybeInt.map(l => pytorch.SymIntOptional(pytorch.SymInt(l))).orNull
+  private def toSymInt(maybeInt: Option[Long]) = maybeInt.map(l => pytorch.SymIntOptional(pytorch.SymInt(l))).orNull
 }
