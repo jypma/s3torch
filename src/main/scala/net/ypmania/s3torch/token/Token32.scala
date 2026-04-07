@@ -16,6 +16,8 @@ trait Token32Type { self =>
   /** The Scala type for this token type */
   type S = Token32[DType]
 
+  def apply(value: Int): S = Token32(value)
+
   given Token[S] with {
     override def unknown = Token32(0)
     override def next(t: S) = Token32(t.value + 1)
@@ -39,12 +41,19 @@ object Token32 {
     type S = Token32[T]
     override def fromScalar(v: S): pytorch.Scalar = pytorch.Scalar(v.value)
     override def toPointer(v: Seq[S]) = new IntPointer(IntBuffer.wrap(v.map(_.value).toArray))
-    override def toScalar(t: pytorch.Tensor) = t.item_int.asInstanceOf[S]
-    override def copyToArray(t: pytorch.Tensor, a: Array[S]) = t.createBuffer[IntBuffer].get(a.map(_.value))
+    override def toScalar(t: pytorch.Tensor) = Token32(t.item_int)
+    override def copyToArray(t: pytorch.Tensor, a: Array[S]) = {
+      val buf = t.createBuffer[IntBuffer]
+      var idx = 0
+      while (idx < buf.limit()) {
+        a(idx) = Token32(buf.get(idx))
+        idx += 1
+      }
+    }
 
-    override def toValue(double: Double) = Token32(double.toInt).asInstanceOf[ScalaType]
+    override def toValue(double: Double) = Token32(double.toInt)
     override def toDouble(s: ScalaType) = s.value.toDouble
-    override def toValue(long: Long) = long.toByte.asInstanceOf[ScalaType]
+    override def toValue(long: Long) = Token32(long.toInt)
     override def toLong(s: ScalaType) = s.value.toLong
   }
 }
