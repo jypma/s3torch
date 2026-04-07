@@ -41,6 +41,7 @@ object Dim extends DimLowPriorityGivens {
 
   /** A dimension known to be 1 at compile time */
   type One = Static[1L]
+  val One = Static(1L)
 
   /** The statically-known size of a Dim */
   type StaticSize[D] <: Long = D match {

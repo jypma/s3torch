@@ -4,6 +4,7 @@ import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Dim./
 import net.ypmania.s3torch.Dim.|/
 
+/** Calculates the result of "splitting", or dividing, the given two dimensions */
 trait Split[D, N <: Dim] {
   type Out <: Tuple
 }

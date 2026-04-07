@@ -161,6 +161,10 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Returns the maximum across a given dimension, along with the indexes where that maximum was found. */
   val maxBy = new MaxReduceOp
 
+  /** Returns a tensor where each row contains num_samples indices sampled from the multinomial. */
+  def multinomial[NumSamples <: Dim](numSamples: NumSamples, replacement: Boolean = false)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[ev.Out[NumSamples], Int64, D] =
+    new Tensor(rnd(torch.multinomial(native, numSamples.size, replacement, new pytorch.GeneratorOptional)))
+
   /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
   def padTo[D <: Dim, V](dim: D, value: V, mode: PaddingMode = PaddingMode.Append)(using ops: DTypeOps.Scalar[T, V]): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
     val n = dim.size - size.last
@@ -490,8 +494,18 @@ object Tensor {
     def update[I1 <: Index, V](i: I1, value: V)(using Index.Valid[D1, I1])(using updateSource: UpdateSource[V, D]): Unit = {
       updateSource(t.native, tensorIndexArray(i), value)
     }
+
+    /** Executes the given function for every element in this vector, and stacking the result along the vector's dimension. */
+    // TODO: this operator can be extended to be defined for 1+ dimensions, but will have to be written as flatten -> stack -> unflatten
+    // TODO: see if we can write this in one go without the intermediate StackMapApply.
+    def stackMap[O](using ev: TensorValue[Tuple1[D1], T, Seq[O]])(using D =:= CPU.type): StackMapApply[D, D1, O] = new StackMapApply(ev(t.native))
   }
 
+  class StackMapApply[D <: Device, D1 <: Dim, O](seq: Seq[O]) {
+    def apply[S1 <: Tuple, T1 <: DType](fn: O => Tensor[S1, T1, D]): Tensor[D1 *: S1, T1, D] = {
+      Tensor.stack[D1](seq.map(fn))
+    }
+  }
   // ---- Methods on Tensor with 2 dimensions ---
   extension[T <: DType, D <: Device, D1 <: Dim, D2 <: Dim](t: Tensor[(D1, D2), T, D]) {
     def apply[I1 <: Index, I2 <: Index](v1: I1, v2: I2)(

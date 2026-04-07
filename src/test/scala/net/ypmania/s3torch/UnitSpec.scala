@@ -2,28 +2,11 @@ package net.ypmania.s3torch
 
 import org.scalatest.funspec.AnyFunSpec
 
-import org.bytedeco.pytorch
 import org.scalactic.Equality
 
 abstract class UnitSpec extends AnyFunSpec {
-  given RandomSource with {
-    override def apply[T](fn: => T) = withSeed(0) { fn }
+  given rnd:RandomSource = RandomSource.fixedSeed(0)
 
-    override def fork: RandomSource = new RandomSource {
-      var seed = 0L
-      def apply[T](fn: => T) = withSeed(seed) {
-        seed += 1
-        fn
-      }
-    }
-  }
-
-  private def withSeed[T](seed: Long)(fn: => T): T = {
-    UnitSpec.synchronized {
-      pytorch.global.torch.manual_seed(seed)
-      fn
-    }
-  }
   implicit val doubleEqual:Equality[Double] = new Equality[Double] {
     def areEqual(a: Double, b: Any): Boolean = b match {
       case d: Float if Math.abs(d - a) < 0.0001 => true

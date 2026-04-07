@@ -810,6 +810,29 @@ class TensorSpec extends UnitSpec {
       }
     }
 
+    describe("multinomial") {
+      it("can pick values from a vector distribution") {
+        val d = Tensor((0.1, 0.8, 0.1))
+        val r = d.multinomial(Dim.Static(2L))
+        val rType: Tensor[Tuple1[Static[2L]], Int64, CPU.type] = r
+        assert(r.dtype == int64)
+        assert(r.size == Seq(2L))
+        assert(r.value === Seq(1, 2))
+      }
+
+      it("can pick values from a matrix distribution") {
+        val d = Tensor((
+          ((0.1, 0.8, 0.1)),
+          ((0.1, 0.1, 0.8)),
+        ))
+        val r = d.multinomial(Dim.Static(2L))
+        val rType: Tensor[(Static[2L], Static[2L]), Int64, CPU.type] = r
+        assert(r.dtype == int64)
+        assert(r.size == Seq(2L, 2L))
+        assert(r.value === Seq(Seq(1, 2), Seq(2, 1)))
+      }
+    }
+
     describe("padTo") {
       it("can pad a vector to a higher length") {
         case object DimA extends Dim.Static[4L]
@@ -899,6 +922,16 @@ class TensorSpec extends UnitSpec {
         val size = t.sizeOf(DimA(_))
         val sizeT: DimA = size
         assert(size.size == 2)
+      }
+    }
+
+    describe("stackMap") {
+      it("can turn a vector into a matrix through a lambda") {
+        case object DimA extends Dim.Static[3L]
+        case object DimB extends Dim.Static[2L]
+        val m = Tensor.zeros(DimA).stackMap(v => Tensor.zeros(DimB))
+        val mType: Tensor[(DimA.type, DimB.type), Float32, CPU.type] = m
+        assert(m.size == Seq(DimA.size, DimB.size))
       }
     }
 
