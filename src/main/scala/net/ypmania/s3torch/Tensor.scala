@@ -161,8 +161,20 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Returns the maximum across a given dimension, along with the indexes where that maximum was found. */
   val maxBy = new MaxReduceOp
 
-  /** Returns a tensor where each row contains num_samples indices sampled from the multinomial. */
-  def multinomial[NumSamples <: Dim](numSamples: NumSamples, replacement: Boolean = false)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[ev.Out[NumSamples], Int64, D] =
+  /** Returns a tensor where last dimension is replaced with a single value sampled from the multinomial. */
+  def multinomial(using rnd: RandomSource, ev: Multinomial[S]): Tensor[Shape.RemoveLast[ev.Out[Dim.One]], Int64, D] =
+    multinomial(false)
+
+  /** Returns a tensor where last dimension is replaced with a single value sampled from the multinomial. */
+  def multinomial(replacement: Boolean)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[Shape.RemoveLast[ev.Out[Dim.One]], Int64, D] =
+    new Tensor(rnd(torch.multinomial(native, 1L, replacement, new pytorch.GeneratorOptional).squeeze(size.size - 1)))
+
+  /** Returns a tensor where last dimension contains num_samples indices sampled from the multinomial. */
+  def multinomial[NumSamples <: Dim](numSamples: NumSamples)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[ev.Out[NumSamples], Int64, D] =
+    multinomial(numSamples, replacement = false)
+
+  /** Returns a tensor where last dimension contains num_samples indices sampled from the multinomial. */
+  def multinomial[NumSamples <: Dim](numSamples: NumSamples, replacement: Boolean)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[ev.Out[NumSamples], Int64, D] =
     new Tensor(rnd(torch.multinomial(native, numSamples.size, replacement, new pytorch.GeneratorOptional)))
 
   /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
@@ -205,6 +217,12 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   val softmax = new DimOperator.Of1Tensor[S, T, D] {
     type Out[Idx <: Int] = S
     def run[Idx <: Int](idx: Int) = new Tensor(native.softmax(idx))
+  }
+
+  /** Removes a dimension of One */
+  val squeeze = new DimOperator.Of1TensorEv[S, T, D, [Idx <: Int] =>> Shape.Elem[S, Idx] =:= Dim.One] {
+    type Out[Idx <: Int] = Shape.Remove[S, Idx]
+    def run[Idx <: Int](idx: Int)(using ev: Shape.Elem[S, Idx] =:= Dim.One) = new Tensor(native.squeeze(idx))
   }
 
   def sum: Shaped[Scalar] = new Tensor(native.sum())

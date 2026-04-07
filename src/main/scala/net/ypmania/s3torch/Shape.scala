@@ -35,6 +35,8 @@ object Shape {
     case (_, dim *: tail) => dim *: Remove[tail, Idx - 1]
   }
 
+  type RemoveLast[S <: Shape] = Remove[S, Size[S] - 1]
+
   /** Replaces the dimension at [Idx] with the dimension [I] */
   type Replace[S <: Shape, I, Idx <: Int] <: Shape = Idx match {
     case -1 => S

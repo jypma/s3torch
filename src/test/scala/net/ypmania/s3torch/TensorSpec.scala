@@ -831,6 +831,27 @@ class TensorSpec extends UnitSpec {
         assert(r.size == Seq(2L, 2L))
         assert(r.value === Seq(Seq(1, 2), Seq(2, 1)))
       }
+
+      it("can pick a single value from a vector distribution") {
+        val d = Tensor((0.1, 0.8, 0.1))
+        val r = d.multinomial
+        val rType: Tensor[EmptyTuple.type, Int64, CPU.type] = r
+        assert(r.dtype == int64)
+        assert(r.size.isEmpty)
+        assert(r.value === 1)
+      }
+
+      it("can pick a single value from a matrix distribution") {
+        val d = Tensor((
+          ((0.1, 0.8, 0.1)),
+          ((0.1, 0.1, 0.8)),
+        ))
+        val r = d.multinomial
+        val rType: Tensor[Tuple1[Static[2L]], Int64, CPU.type] = r
+        assert(r.dtype == int64)
+        assert(r.size == Seq(2L))
+        assert(r.value === Seq(1, 2))
+      }
     }
 
     describe("padTo") {
@@ -942,6 +963,19 @@ class TensorSpec extends UnitSpec {
         val resType: Tensor[EmptyTuple, Float64, CPU.type] = res
         assert(res.size == Seq())
         assert(res.value == 1.0)
+      }
+    }
+
+    describe("squeeze") {
+      it("can remove a dimension of one") {
+        val t = Tensor((
+          Tuple1(1),
+          Tuple1(2),
+          Tuple1(3)
+        ))
+        val r = t.squeeze(Select.Last) // Select.First gives a nice compile error.
+        val rType: Tensor[Tuple1[Static[3L]], Int32, CPU.type] = r
+        assert(r.size == Seq(3L))
       }
     }
 
