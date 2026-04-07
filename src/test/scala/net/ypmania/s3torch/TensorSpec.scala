@@ -808,6 +808,15 @@ class TensorSpec extends UnitSpec {
         assert(res.size == Seq(1L, 3L))
         assert(res.value.toSeq == Seq(Seq(2.5, 0, 0)))
       }
+
+      it("can calculate the full mean") {
+        var t = Tensor.zeros(DimA, DimB)
+        t((0,0)) = 3.0
+        t((1,0)) = 2.0
+        val res = t.mean
+        val resType: Tensor[EmptyTuple, Float32, CPU.type] = res
+        assert(res.value === 0.8333)
+      }
     }
 
     describe("multinomial") {

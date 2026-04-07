@@ -494,6 +494,7 @@ object Tensor {
   extension[S <: Shape, T <: DType.Floaty, Dv <: Device](t: Tensor[S, T, Dv]) {
     def stdBy = new t.ReduceOp((idx, keep) => t.native.std(Array(idx), new pytorch.ScalarOptional, keep))
     def stdBy(correction: Double) = new t.ReduceOp((idx, keep) => t.native.std(Array(idx), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), keep))
+    def mean: t.Shaped[EmptyTuple] = new Tensor(t.native.mean(0.until(t.size.size).map(_.toLong).toArray, false, new ScalarTypeOptional))
     def meanBy = new t.ReduceOp((idx, keep) => t.native.mean(Array(idx), keep, new ScalarTypeOptional))
 
   }

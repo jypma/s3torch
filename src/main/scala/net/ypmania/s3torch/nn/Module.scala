@@ -96,6 +96,17 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
     native.train(trainingMode)
   }
 
+  /** Runs the given function in evaluation mode, switching back to the previous mode afterwards. */
+  def eval[T](fn: => T): T = {
+    val prev = native.is_training()
+    native.train(false)
+    try {
+      fn
+    } finally {
+      native.train(prev)
+    }
+  }
+
   /** Loads from the given file in pytorch "pt" format */
   def load(filename: String): this.type = {
     Using(new pytorch.InputArchive) { archive =>
