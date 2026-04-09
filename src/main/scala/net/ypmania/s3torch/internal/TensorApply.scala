@@ -48,13 +48,15 @@ object TensorApply {
 
       device.deviceType match {
         case DeviceType.CPU =>
+          val ptr = ops.toPointer(seq)
           torch
-            .from_blob(ops.toPointer(seq), Array(seq.length.toLong), Torch.tensorOptions(dType, device))
+            .from_blob(ptr._1, Array(seq.length.toLong), Torch.tensorOptions(dType, device))
             .clone() // from_blob, if running on CPU, retains a reference to the original ByteBuffer, which might be GC'ed.
         case _ =>
           val opts = Torch.tensorOptions(dType, Device.CPU)
+          val ptr = ops.toPointer(seq)
           torch
-            .from_blob(ops.toPointer(seq), Array(seq.length.toLong), opts)
+            .from_blob(ptr._1, Array(seq.length.toLong), opts)
             .to(device.native, opts.dtype())
       }
     }

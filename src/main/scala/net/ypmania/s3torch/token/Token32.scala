@@ -40,7 +40,10 @@ object Token32 {
   class Ops[T <: net.ypmania.s3torch.DType.Int32](val dType: T) extends DTypeOps[T, Token32[T]] {
     type S = Token32[T]
     override def fromScalar(v: S): pytorch.Scalar = pytorch.Scalar(v.value)
-    override def toPointer(v: Seq[S]) = new IntPointer(IntBuffer.wrap(v.map(_.value).toArray))
+    override def toPointer(v: Seq[S]) = {
+      val buf = IntBuffer.wrap(v.map(_.value).toArray)
+      (new IntPointer(buf), buf)
+    }
     override def toScalar(t: pytorch.Tensor) = Token32(t.item_int)
     override def copyToArray(t: pytorch.Tensor, a: Array[S]) = {
       val buf = t.createBuffer[IntBuffer]

@@ -2,8 +2,8 @@ package net.ypmania.s3torch.token
 
 import net.ypmania.s3torch.UnitSpec
 import net.ypmania.s3torch.Tensor
-import net.ypmania.s3torch.Device.CPU
 import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.Device.CPU
 
 class TokenSpec extends UnitSpec {
   describe("Token64Type") {

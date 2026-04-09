@@ -40,7 +40,10 @@ object Token64 {
   class Ops[T <: net.ypmania.s3torch.DType.Int64](val dType: T) extends DTypeOps[T, Token64[T]] {
     type S = Token64[T]
     override def fromScalar(v: S): pytorch.Scalar = pytorch.Scalar(v.value)
-    override def toPointer(v: Seq[S]) = new LongPointer(LongBuffer.wrap(v.map(_.value).toArray))
+    override def toPointer(v: Seq[S]) = {
+      val buf = LongBuffer.wrap(v.map(_.value).toArray)
+      (new LongPointer(buf), buf)
+    }
     override def toScalar(t: pytorch.Tensor) = Token64(t.item_long)
     override def copyToArray(t: pytorch.Tensor, a: Array[S]) = {
       val buf = t.createBuffer[LongBuffer]

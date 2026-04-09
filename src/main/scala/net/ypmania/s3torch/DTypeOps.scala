@@ -35,7 +35,10 @@ trait DTypeOps[T <: DType, S] extends DTypeOps.Scalar[T, S]{
   type ScalaType = S
   def dType: T
 
-  def toPointer(v: Seq[ScalaType]): Pointer
+  /** Converts the given Seq to a native Pointer, also returning any
+    * Java heap-based object that may be backing the pointer (so the
+    * former isn't GC'ed). */
+  def toPointer(v: Seq[ScalaType]): (Pointer, Any)
 
   def copyToArray(t: pytorch.Tensor, a: Array[ScalaType]): Unit
   def toArray(t: pytorch.Tensor)(using ClassTag[ScalaType]): Array[ScalaType] = {
@@ -85,8 +88,7 @@ object DTypeOps {
       for (idx <- 0.until(v.length)) {
         p.put(idx, v(idx))
       }
-      p
-
+      (p, null)
     }
     override def toScalar(t: pytorch.Tensor) = t.item_bool
     override def copyToArray(t: pytorch.Tensor, a: Array[Boolean]) = {
@@ -145,10 +147,15 @@ object DTypeOps {
     override def toLong(s: ScalaType) = s.toLong
   }
 
+  private def mkPointer[T, P <: Pointer](mk: => T)(fn: T => P): (P, T) = {
+    val t = mk
+    (fn(t), t)
+  }
+
   given float32: DTypeOps[Float32, Float] {
     def dType = DType.float32
     override def fromScalar(v: ScalaType): pytorch.Scalar = pytorch.Scalar(v)
-    override def toPointer(v: Seq[ScalaType]) = new FloatPointer(FloatBuffer.wrap(v.toArray))
+    override def toPointer(v: Seq[ScalaType]) = mkPointer(FloatBuffer.wrap(v.toArray))(new FloatPointer(_))
     override def toScalar(t: pytorch.Tensor) = t.item_float
     override def copyToArray(t: pytorch.Tensor, a: Array[ScalaType]) = t.createBuffer[FloatBuffer].get(a)
 
@@ -161,7 +168,7 @@ object DTypeOps {
   given float64: DTypeOps[Float64, Double] {
     def dType = DType.float64
     override def fromScalar(v: ScalaType): pytorch.Scalar = pytorch.Scalar(v)
-    override def toPointer(v: Seq[ScalaType]) = new DoublePointer(DoubleBuffer.wrap(v.toArray))
+    override def toPointer(v: Seq[ScalaType]) = mkPointer(DoubleBuffer.wrap(v.toArray))(new DoublePointer(_))
     override def toScalar(t: pytorch.Tensor) = t.item_double
     override def copyToArray(t: pytorch.Tensor, a: Array[ScalaType]) = t.createBuffer[DoubleBuffer].get(a)
 
@@ -198,7 +205,7 @@ object DTypeOps {
   // The int types are generic, to allow opaque types on top of them (for type-safe token-based tensors)
   class Int8Ops[T <: Int8, S <: Byte](val dType: T) extends DTypeOps[T, S] {
     override def fromScalar(v: ScalaType): pytorch.Scalar = pytorch.Scalar(v)
-    override def toPointer(v: Seq[ScalaType]) = new BytePointer(ByteBuffer.wrap(v.toArray))
+    override def toPointer(v: Seq[ScalaType]) = mkPointer(ByteBuffer.wrap(v.toArray))(new BytePointer(_))
     override def toScalar(t: pytorch.Tensor) = t.item_byte.asInstanceOf[S]
     override def copyToArray(t: pytorch.Tensor, a: Array[S]) = t.createBuffer[ByteBuffer].get(a.asInstanceOf[Array[Byte]])
 
@@ -212,7 +219,7 @@ object DTypeOps {
 
   class Int16Ops[T <: Int16, S <: Short](val dType: T) extends DTypeOps[T, S] {
     override def fromScalar(v: ScalaType): pytorch.Scalar = pytorch.Scalar(v)
-    override def toPointer(v: Seq[ScalaType]) = new ShortPointer(ShortBuffer.wrap(v.toArray))
+    override def toPointer(v: Seq[ScalaType]) = mkPointer(ShortBuffer.wrap(v.toArray))(new ShortPointer(_))
     override def toScalar(t: pytorch.Tensor) = t.item_short.asInstanceOf[S]
     override def copyToArray(t: pytorch.Tensor, a: Array[S]) = t.createBuffer[ShortBuffer].get(a.asInstanceOf[Array[Short]])
 
@@ -225,7 +232,7 @@ object DTypeOps {
 
   class Int32Ops[T <: Int32, S <: Int](val dType: T) extends DTypeOps[T, S] {
     override def fromScalar(v: S): pytorch.Scalar = pytorch.Scalar(v)
-    override def toPointer(v: Seq[S]) = new IntPointer(IntBuffer.wrap(v.toArray))
+    override def toPointer(v: Seq[S]) = mkPointer(IntBuffer.wrap(v.toArray))(new IntPointer(_))
     override def toScalar(t: pytorch.Tensor) = t.item_int.asInstanceOf[S]
     override def copyToArray(t: pytorch.Tensor, a: Array[S]) = t.createBuffer[IntBuffer].get(a.asInstanceOf[Array[Int]])
 
@@ -238,7 +245,7 @@ object DTypeOps {
 
   class Int64Ops[T <: Int64, S <: Long](val dType: T) extends DTypeOps[T, S] {
     override def fromScalar(v: ScalaType): pytorch.Scalar = pytorch.Scalar(v)
-    override def toPointer(v: Seq[ScalaType]) = new LongPointer(LongBuffer.wrap(v.toArray))
+    override def toPointer(v: Seq[ScalaType]) = mkPointer(LongBuffer.wrap(v.toArray))(new LongPointer(_))
     override def toScalar(t: pytorch.Tensor) = t.item_long.asInstanceOf[S]
     override def copyToArray(t: pytorch.Tensor, a: Array[S]) = t.createBuffer[LongBuffer].get(a.asInstanceOf[Array[Long]])
 

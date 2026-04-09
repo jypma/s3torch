@@ -4,9 +4,7 @@ import net.ypmania.s3torch.DType.Bool
 import net.ypmania.s3torch.DType.Float32
 import net.ypmania.s3torch.DType.Int32
 
-case class Default[+T](value: T) {
-
-}
+case class Default[+T](value: T)
 
 trait DefaultInactiveGivens {
   given cuda: Default[Device.CUDA.type] = Default(Device.CUDA)

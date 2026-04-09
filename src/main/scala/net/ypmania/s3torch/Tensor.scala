@@ -526,11 +526,11 @@ object Tensor {
     /** Executes the given function for every element in this vector, and stacking the result along the vector's dimension. */
     // TODO: this operator can be extended to be defined for 1+ dimensions, but will have to be written as flatten -> stack -> unflatten
     // TODO: see if we can write this in one go without the intermediate StackMapApply.
-    def stackMap[O](using ev: TensorValue[Tuple1[D1], T, Seq[O]])(using D =:= CPU.type): StackMapApply[D, D1, O] = new StackMapApply(ev(t.native))
+    def stackMap[O](using ev: TensorValue[Tuple1[D1], T, Seq[O]])(using D =:= CPU.type): StackMapApply[D1, O] = new StackMapApply(ev(t.native))
   }
 
-  class StackMapApply[D <: Device, D1 <: Dim, O](seq: Seq[O]) {
-    def apply[S1 <: Tuple, T1 <: DType](fn: O => Tensor[S1, T1, D]): Tensor[D1 *: S1, T1, D] = {
+  class StackMapApply[D1 <: Dim, O](seq: Seq[O]) {
+    def apply[S1 <: Tuple, T1 <: DType, D <: Device](fn: O => Tensor[S1, T1, D]): Tensor[D1 *: S1, T1, D] = {
       Tensor.stack[D1](seq.map(fn))
     }
   }
