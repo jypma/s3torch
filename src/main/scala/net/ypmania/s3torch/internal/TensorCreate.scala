@@ -10,12 +10,12 @@ import org.bytedeco.pytorch.global.torch
 
 import compiletime.ops.int.ToLong
 
-trait TensorApply[V] {
+trait TensorCreate[V] {
   type OutShape <: Tuple
   def apply[D <: Device](value: V, device: D): pytorch.Tensor
 }
 
-object TensorApply {
+object TensorCreate {
   /** Calculates the base type V of a Seq[Seq[...[V]]], or a Tuple(V, V, V) */
   type BaseType[V] = V match {
     case Seq[elem] => BaseType[elem]
@@ -30,7 +30,7 @@ object TensorApply {
     case _ => EmptyTuple
   }
 
-  abstract class Primitive[V](dType: DType, ops:DTypeOps[?, V]) extends TensorApply[V] {
+  abstract class Primitive[V](dType: DType, ops:DTypeOps[?, V]) extends TensorCreate[V] {
     type OutShape = EmptyTuple
 
     def apply[D <: Device](value: V, device: D) = {
@@ -40,7 +40,7 @@ object TensorApply {
       )
     }
   }
-  abstract class Seq1D[S, V](dType: DType, ops: DTypeOps[?, V])(using toSeq: ToSeq[S, V]) extends TensorApply[S] {
+  abstract class Seq1D[S, V](dType: DType, ops: DTypeOps[?, V])(using toSeq: ToSeq[S, V]) extends TensorCreate[S] {
     type OutShape = ToShape[S]
 
     def apply[D <: Device](value: S, device: D) = {
@@ -61,7 +61,7 @@ object TensorApply {
       }
     }
   }
-  abstract class Seq2D[S1, S2, V](dType: DType, ops: DTypeOps[?, V])(using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, V], toTensor: TensorApply[Seq[V]]) extends TensorApply[S1] {
+  abstract class Seq2D[S1, S2, V](dType: DType, ops: DTypeOps[?, V])(using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, V], toTensor: TensorCreate[Seq[V]]) extends TensorCreate[S1] {
     type OutShape = ToShape[S1]
 
     def apply[D <: Device](value: S1, device: D) = {
@@ -71,7 +71,7 @@ object TensorApply {
     }
   }
 
-  abstract class Seq3D[S1, S2, S3, V](dType: DType, ops: DTypeOps[?, V])(using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, S3], toSeq3: ToSeq[S3, V], toTensor: TensorApply[Seq[V]]) extends TensorApply[S1] {
+  abstract class Seq3D[S1, S2, S3, V](dType: DType, ops: DTypeOps[?, V])(using toSeq1: ToSeq[S1, S2], toSeq2: ToSeq[S2, S3], toSeq3: ToSeq[S3, V], toTensor: TensorCreate[Seq[V]]) extends TensorCreate[S1] {
     type OutShape = ToShape[S1]
 
     def apply[D <: Device](value: S1, device: D) = {
@@ -82,6 +82,6 @@ object TensorApply {
 
   given [V](using t:DTypeFor[V], ops: DTypeOps[t.Out, V]): Primitive[V](t.dType, ops)
   given [S, V](using t:DTypeFor[BaseType[S]], toSeq: ToSeq[S, V], ops: DTypeOps[t.Out, V]): Seq1D[S, V](t.dType, ops)
-  given [S1, S2, V](using t:DTypeFor[BaseType[S1]], ops: DTypeOps[t.Out, V])(using ToSeq[S1, S2], ToSeq[S2, V], TensorApply[Seq[V]]): Seq2D[S1, S2, V](t.dType, ops)
-  given [S1, S2, S3, V](using t:DTypeFor[BaseType[S1]], ops: DTypeOps[t.Out, V])(using ToSeq[S1, S2], ToSeq[S2, S3], ToSeq[S3, V], TensorApply[Seq[V]]): Seq3D[S1, S2, S3, V](t.dType, ops)
+  given [S1, S2, V](using t:DTypeFor[BaseType[S1]], ops: DTypeOps[t.Out, V])(using ToSeq[S1, S2], ToSeq[S2, V], TensorCreate[Seq[V]]): Seq2D[S1, S2, V](t.dType, ops)
+  given [S1, S2, S3, V](using t:DTypeFor[BaseType[S1]], ops: DTypeOps[t.Out, V])(using ToSeq[S1, S2], ToSeq[S2, S3], ToSeq[S3, V], TensorCreate[Seq[V]]): Seq3D[S1, S2, S3, V](t.dType, ops)
 }

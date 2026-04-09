@@ -22,6 +22,9 @@ trait IndexPrio0 {
   }
 }
 
+// Runtime: What does native index to with fewer than [size] slice arguments?
+// Syntax: Add tuple syntax, and default to "Index.All" for all dimensions that aren't given
+// Syntax: (for the above) Allow selection on Append[X] types, rather than only tuples.
 object Index extends IndexPrio0 {
   @implicitNotFound("Index is not valid for this tensor. Perhaps it is out of bounds?")
   trait Valid[D <: Dim, I <: Index] {

@@ -417,7 +417,7 @@ object Tensor {
   /** Creates a Tensor from the given value, which can be a scalar, a
     * (potentially) nested Seq, or a (potentially nested) tuple,
     * picking an appropriate shape and DType. */
-  def apply[V, T <: DType, D <: Device](value: V)(using t: DTypeFor[TensorApply.BaseType[V]], device: Default[D], ev:TensorApply[V]): Tensor[ev.OutShape, t.Out, D] = {
+  def apply[V, T <: DType, D <: Device](value: V)(using t: DTypeFor[TensorCreate.BaseType[V]], device: Default[D], ev:TensorCreate[V]): Tensor[ev.OutShape, t.Out, D] = {
     new Tensor(ev(value, device.value))
   }
 
