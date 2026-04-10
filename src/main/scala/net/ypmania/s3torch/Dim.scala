@@ -16,6 +16,11 @@ trait DimLowPriorityGivens {
 object Dim extends DimLowPriorityGivens {
   def apply(size: Long): Dynamic = new Dynamic(size)
 
+  extension [D <: Dim](dim: D) {
+    /** Compares this selected dimension and the given index into SelectAndIndex, which use used in Tensor.apply. */
+    def %[I <: Index](i: I) = SelectAndIndex(dim, i)
+  }
+
   /** A dimension known at compile time */
   abstract class Static[S <: Long](using ValueOf[S]) extends Dim {
     type Size = S

@@ -3,7 +3,7 @@ package net.ypmania.s3torch.transformer
 import net.ypmania.s3torch.Batched
 import net.ypmania.s3torch.DType._
 import net.ypmania.s3torch.Dim._
-import net.ypmania.s3torch.Shape.Select.Last
+import net.ypmania.s3torch.Select._
 import net.ypmania.s3torch._
 import net.ypmania.s3torch.internal.Broadcast
 import net.ypmania.s3torch.internal.Broadcastable
@@ -42,14 +42,14 @@ class Transformer[
   class PositionalEncoding[SeqLen <: Dim](seqLen: SeqLen, dropoutProb: Double) extends Module {
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
-    val position = Tensor.arangeOfD(seqLen).unsqueezeAfter(Last)
+    val position = Tensor.arangeOfD(seqLen).unsqueezeAfter(End)
     val indices = Tensor.arangeOf(dModel) /|/ 2L
     val phase_offset = (Tensor.arangeOf(dModel) % 2L).toDType * (Math.PI * 0.5)
     val div_term = exp(indices.toDType * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 
     def apply[B <: Dim, L <: Dim](in: Batch[B, L]): Batch[B, L] = {
-      val deltas = positionalEncodingDeltas(Index.Take(in.sizeOf[L]), Index.All)
+      val deltas = positionalEncodingDeltas(Index.Take(in.sizeOf(dim[L])), Index.All)
       dropout(in + deltas)
     }
   }
@@ -59,8 +59,8 @@ class Transformer[
     val bias = addParameter("bias", Tensor.zeros(1L))
 
     def apply[B <: Dim, SeqLen <: Dim](in: Batch[B, SeqLen]): Batch[B, SeqLen] = {
-      val mean = in.meanBy.keepDim(Last) // FIXME verify this, video says "everything after batch" but picks last.
-      val std = in.stdBy.keepDim(Last)
+      val mean = in.meanBy.keepDim(End) // FIXME verify this, video says "everything after batch" but picks last.
+      val std = in.stdBy.keepDim(End)
 
       alpha * (in - mean) / (std + eps) + bias
     }
@@ -90,10 +90,10 @@ class Transformer[
       * and NHeads dimensions, so each head looks at a sequence of
       * vectors with that head's part of the original DModel. */
     private def splitHeads[B <: Dim, SeqLen <: Dim](b: Batch[B, SeqLen]): Tn[(B, NHeads, SeqLen, DModel / NHeads)] =
-      b.view.split[DModel].into(nHeads).transpose[SeqLen, NHeads]
+      b.view.split(dModel).into(nHeads).transpose(dim[SeqLen], nHeads)
 
     private def joinHeads[B <: Dim, SeqLen <: Dim](h: Tn[(B, NHeads, SeqLen, DModel / NHeads)]) = {
-      h.transpose[NHeads, SeqLen].contiguous.view.merge[DModel / NHeads]
+      h.transpose(nHeads, dim[SeqLen]).contiguous.view.merge[DModel / NHeads]
     }
 
     /** Applies the MultiHeadAttention without a mask (attenting to all input values) */
@@ -123,7 +123,7 @@ class Transformer[
       //println(s"a2=${a2.summary(limit)}")
 
       val attentionScores = a2
-        .softmax(Last)
+        .softmax(End)
         ~> dropout.apply
 
       //println(s"s=${attentionScores.summary(limit)}")
@@ -215,7 +215,7 @@ class Transformer[
 
     def apply[B <: Shape, S <: Shape](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* VocabSize] = {
       import b.given
-      proj(in).log_softmax[VocabSize]
+      proj(in).log_softmax(vocabSize)
     }
   }
 

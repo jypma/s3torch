@@ -8,11 +8,13 @@ import Dim.Dynamic
 import scala.reflect.ClassTag
 import DType.*
 import net.ypmania.s3torch.Dim.*
-import net.ypmania.s3torch.Shape.Select
+import net.ypmania.s3torch.Select
+import net.ypmania.s3torch.Select.dim
 import net.ypmania.s3torch.Shape.Scalar
 import net.ypmania.s3torch.internal.Broadcast
 import internal.MatMul
 import Device.CPU
+import Tuple.:*
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -361,10 +363,12 @@ class TensorSpec extends UnitSpec {
 
     describe("apply") {
       val v = Tensor((1, 2, 3))
+      trait Row extends Dim.Dynamic
+      trait Column extends Dim.Dynamic
       val m = Tensor((
         ((1, 2, 3)),
         ((0, 2, 0))
-      ))
+      )).shaped[(Row, Column)]
 
       it("can select one element from a static vector statically") {
         // v(3) will nicely give a compile error here.
@@ -395,7 +399,41 @@ class TensorSpec extends UnitSpec {
         assert(r.size == Seq(3L))
       }
 
-      it("can select one element from a matrix") {
+      it("can select one row from a matrix using explicit dimensions") {
+        val r = m(dim[Row] % 0)
+        val rType: Tensor[Tuple1[Column], Int32, CPU.type] = r
+        assert(r.size == Seq(3L))
+        assert(r.value === Seq(1, 2, 3))
+      }
+
+      it("can select one column from a matrix using explcit dimensions") {
+        val r = m(dim[Column] % 0)
+        val rType: Tensor[Tuple1[Row], Int32, CPU.type] = r
+        assert(r.size == Seq(2L))
+        assert(r.value === Seq(1, 0))
+      }
+
+      it("can select one element from a matrix using explicit dimensions") {
+        val r = m(
+          dim[Row] % 0,
+          dim[Column] % 1
+        )
+        val rType: Tensor[EmptyTuple, Int32, CPU.type] = r
+        assert(r.size == Seq())
+        assert(r.value == 2)
+      }
+
+      it("can select one element from a matrix using explicit dimensions and Index subclasses") {
+        val r = m(
+          dim[Row] % Index.First,
+          dim[Column] % Index.Last
+        )
+        val rType: Tensor[EmptyTuple, Int32, CPU.type] = r
+        assert(r.size == Seq())
+        assert(r.value == 3)
+      }
+
+      it("can select one element from a matrix using positions") {
         val r = m(0, 1)
         val rType: Tensor[EmptyTuple, Int32, CPU.type] = r
         assert(r.size == Seq())
@@ -404,14 +442,14 @@ class TensorSpec extends UnitSpec {
 
       it("can select one column from a matrix") {
         val r = m(0, Index.All)
-        val rType: Tensor[Tuple1[Static[3L]], Int32, CPU.type] = r
+        val rType: Tensor[Tuple1[Column], Int32, CPU.type] = r
         assert(r.size == Seq(3L))
         assert(r.value === Seq(1, 2, 3))
       }
 
       it("can select one row from a matrix") {
         val r = m(Index.All, 0)
-        val rType: Tensor[Tuple1[Static[2L]], Int32, CPU.type] = r
+        val rType: Tensor[Tuple1[Row], Int32, CPU.type] = r
         assert(r.size == Seq(2L))
         assert(r.value === Seq(1, 0))
       }
@@ -435,17 +473,136 @@ class TensorSpec extends UnitSpec {
       it("can reduce a dimension to the Dim of another tensor") {
         case object D2 extends Dim.Static[2L]
         val t2 = Tensor.zeros(D2)
-        val r = v(Index.Take(t2.sizeOf[D2.type]))
+        val r = v(Index.Take(t2.sizeOf(dim[D2.type])))
         val rType: Tensor[Tuple1[D2.type], Int32, CPU.type] = r
         assert(r.size == Seq(2L))
         assert(r.value === Seq(1, 2))
       }
     }
 
+    describe("1-arg apply, when used on a batched one-dim tensor") {
+      def doIt[B <: Shape, L1 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using Batched1[B, L1, S]): Tensor[B, T, CPU.type] = {
+        val r = t(dim[L1] % Index.Last)
+        val rType: Tensor[B, T, CPU.type] = r
+        r
+      }
+
+      it("should accept a vector") {
+        case object DimA extends Dim.Static[3L]
+        val m1 = Tensor.arangeOf(DimA)
+        val r1 = doIt(m1)
+        assert(r1.value == 2)
+      }
+
+      it("should accept a matrix") {
+        val m2 = Tensor(
+          (1, 2, 3),
+          (4, 5, 6)
+        )
+        val r2 = doIt(m2)
+        assert(r2.value == Seq(3, 6))
+      }
+    }
+
+    describe("1-arg apply, when used on a batched one-dim tensor with extra appended dim") {
+      def doIt[B <: Shape, L1 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using b:Batched1[B, L1, S]): Tensor[B :* Dim.One, T, CPU.type] = {
+        import b.given
+
+        val appended = t.unsqueezeAfterEnd
+        val r = appended(dim[L1] % Index.Last) // This removes the L1 dimension, leaving the unsqueezed Dim.One.
+
+        val rType: Tensor[B :* Dim.One, T, CPU.type] = r
+
+        // Tests for all DimOperator variants accepting batches:
+        // FIXME assert these results for a matrix.
+        appended.sumBy(dim[Dim.One])
+        appended.maxBy(dim[Dim.One])
+        t.cat(rType)(dim[L1])
+
+        r
+      }
+
+      it("should accept a vector") {
+        case object DimA extends Dim.Static[3L]
+        val m1 = Tensor.arangeOf(DimA)
+        val r1 = doIt(m1)
+        assert(r1.value == Seq(2))
+      }
+    }
+
+    describe("1-arg apply, when used on a batched two-dim tensor") {
+      def doIt[B <: Shape, L1 <: Dim, L2 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using Batched[B, (L1, L2), S]): Tensor[B :* L2, T, CPU.type] = {
+        val r = t(dim[L1] % Index.Last)
+        val rType: Tensor[B :* L2, T, CPU.type] = r
+        r
+      }
+
+      it("should accept a matrix") {
+        val m2 = Tensor(
+          (1, 2, 3),
+          (4, 5, 6)
+        )
+        val r2 = doIt(m2)
+        assert(r2.value == Seq(4, 5, 6))
+      }
+
+      it("should accept a 3D tensor") {
+        val m3 = Tensor(
+          (
+            (1, 2, 3),
+            (4, 5, 6),
+          ),(
+            (7, 8, 9),
+            (10, 11, 12),
+          )
+        )
+        val r3 = doIt(m3)
+        assert(r3.value == Seq(
+          Seq(4, 5, 6),
+          Seq(10, 11, 12)
+        ))
+      }
+    }
+
+    describe("2-arg apply, when used on a batched two-dim tensor") {
+      def doIt[B <: Shape, L1 <: Dim, L2 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using Batched[B, (L1, L2), S]): Tensor[B, T, CPU.type] = {
+        val r = t(
+          dim[L1] % Index.Last,
+          dim[L2] % Index.First
+        )
+        val rType: Tensor[B, T, CPU.type] = r
+        r
+      }
+
+      it("should accept a matrix") {
+        val m2 = Tensor(
+          (1, 2, 3),
+          (4, 5, 6)
+        )
+        val r2 = doIt(m2)
+        assert(r2.value == 4)
+      }
+
+      it("should accept a 3D tensor") {
+        val m3 = Tensor(
+          (
+            (1, 2, 3),
+            (4, 5, 6),
+          ),(
+            (7, 8, 9),
+            (10, 11, 12),
+          )
+        )
+        val r3 = doIt(m3)
+        assert(r3.value == Seq(4, 10))
+      }
+    }
+
+
     describe("cat") {
       it("can concatenate two equal matrices along the second dimension") {
         val m = Tensor.zeros(2L, 3L)
-        val r = m.cat(m)((Shape.Select.Idx(1)))
+        val r = m.cat(m)((Select.Idx(1)))
         val rType: Tensor[(Static[2L], Dim.Dynamic), Float32, CPU.type] = r
         assert(r.size == Seq(2L, 6L))
       }
@@ -453,7 +610,7 @@ class TensorSpec extends UnitSpec {
       it("can concatenate two unequal matrices along the first dimension") {
         val m1 = Tensor.zeros(1L, 3L)
         val m2 = Tensor.zeros(2L, 3L)
-        val r = m1.cat(m2)((Shape.Select.Idx(0)))
+        val r = m1.cat(m2)((Select.Idx(0)))
         val rType: Tensor[(Dim.Dynamic, Static[3L]), Float32, CPU.type] = r
         assert(r.size == Seq(3L, 3L))
       }
@@ -469,7 +626,7 @@ class TensorSpec extends UnitSpec {
       it("can concatenate two unequal matrices along the second dimension") {
         val m1 = Tensor.zeros(2L, 3L)
         val m2 = Tensor.zeros(2L, 1L)
-        val r = m1.cat(m2)((Shape.Select.Idx(1)))
+        val r = m1.cat(m2)((Select.Idx(1)))
         val rType: Tensor[(Static[2L], Dim.Dynamic), Float32, CPU.type] = r
         assert(r.size == Seq(2L, 4L))
       }
@@ -478,7 +635,7 @@ class TensorSpec extends UnitSpec {
         class Row(size:Long) extends Dim.Dynamic(size)
         class Column(size:Long) extends Dim.Dynamic(size)
         val m = Tensor.zeros(2L, 3L).shaped[(Row, Column)]
-        val r = m.cat(m)((Shape.Select.Idx(1)))
+        val r = m.cat(m)((Select.Idx(1)))
         val rType: Tensor[(Row, Column), Float32, CPU.type] = r
       }
     }
@@ -753,7 +910,7 @@ class TensorSpec extends UnitSpec {
       )).shaped[(Row, Column)]
 
       it("can find the maximum for each row in a matrix") {
-        val r = t.maxBy[Row]
+        val r = t.maxBy(dim[Row])
         val v = r.result
         val vType: Tensor[Column *: EmptyTuple.type, Float64, CPU.type] = v
         assert(v.size == Seq(3L))
@@ -767,7 +924,7 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can find the maximum for each column in a matrix") {
-        val r = t.maxBy[Column]
+        val r = t.maxBy(dim[Column])
         val v = r.result
         val vType: Tensor[Row *: EmptyTuple.type, Float64, CPU.type] = v
         assert(v.size == Seq(2L))
@@ -944,8 +1101,8 @@ class TensorSpec extends UnitSpec {
       val t = Tensor.zeros(DimA(2), DimB(3))
 
       it("can return the size of a selected dimension") {
-        assert(t.sizeOf[DimA].size == 2L)
-        assert(t.sizeOf[DimB].size == 3L)
+        assert(t.sizeOf(dim[DimA]).size == 2L)
+        assert(t.sizeOf(dim[DimB]).size == 3L)
       }
 
       it("can reify a dimension") {
@@ -968,7 +1125,7 @@ class TensorSpec extends UnitSpec {
     describe("std") {
       it("can calculate standard deviation") {
         var t = Tensor((1.0, 2.0, 3.0))
-        val res = t.stdBy(Shape.Select.First)
+        val res = t.stdBy(Select.Start)
         val resType: Tensor[EmptyTuple, Float64, CPU.type] = res
         assert(res.size == Seq())
         assert(res.value == 1.0)
@@ -982,7 +1139,7 @@ class TensorSpec extends UnitSpec {
           Tuple1(2),
           Tuple1(3)
         ))
-        val r = t.squeeze(Select.Last) // Select.First gives a nice compile error.
+        val r = t.squeeze(Select.End) // Select.First gives a nice compile error.
         val rType: Tensor[Tuple1[Static[3L]], Int32, CPU.type] = r
         assert(r.size == Seq(3L))
       }
@@ -1044,7 +1201,7 @@ class TensorSpec extends UnitSpec {
           ))
         ))
         val aType: Tensor[(Static[2L], Static[2L], Static[3L]), Int32, CPU.type] = a
-        val b = a.transpose(Shape.Select.Idx(0), Shape.Select.Idx(2))
+        val b = a.transpose(Select.Idx(0), Select.Idx(2))
         val bType: Tensor[(Static[3L], Static[2L], Static[2L]), Int32, CPU.type] = b
         assert(b.value == Seq(
           Seq(
@@ -1151,7 +1308,7 @@ class TensorSpec extends UnitSpec {
       val matrix = Tensor.zeros(DimA, DimB)
 
       it("can unsqueeze after last") {
-        val r = vector.unsqueezeAfter(Shape.Select.Last)
+        val r = vector.unsqueezeAfter(Select.End)
         val rType: Tensor[(DimA.type, Static[1L]), Float32, CPU.type] = r
         assert(r.size == Seq(2L, 1L))
         assert(r.value.toSeq == Seq(Seq(0), Seq(0)))
@@ -1159,7 +1316,7 @@ class TensorSpec extends UnitSpec {
 
       it("can unsqueeze after the last dim of a matrix") {
         // Verify that we can unsqueeze by type as well
-        val r2 = matrix.unsqueezeAfter[DimB.type]
+        val r2 = matrix.unsqueezeAfter(dim[DimB.type])
         val r2Type: Tensor[(DimA.type, DimB.type, Static[1L]), Float32, CPU.type] = r2
 
         val r = matrix.unsqueezeAfter(DimB)
@@ -1186,14 +1343,14 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can unsqueeze before first") {
-        val r = vector.unsqueezeBefore(Shape.Select.First)
+        val r = vector.unsqueezeBefore(Select.Start)
         val rType: Tensor[(Static[1L], DimA.type), Float32, CPU.type] = r
         assert(r.size == Seq(1L, 2L))
         assert(r.value.toSeq == Seq(Seq(0, 0)))
       }
 
       it("can unsqueeze before first (by index)") {
-        val r = vector.unsqueezeBefore(Shape.Select.Idx(0))
+        val r = vector.unsqueezeBefore(Select.Idx(0))
         val rType: Tensor[(Static[1L], DimA.type), Float32, CPU.type] = r
         assert(r.size == Seq(1L, 2L))
         assert(r.value.toSeq == Seq(Seq(0, 0)))
@@ -1266,12 +1423,12 @@ class TensorSpec extends UnitSpec {
           0,0,0
         ).map(_.toFloat))
 
-        val spl = res.view.split[DimA.type * DimB.type].into(DimA)
+        val spl = res.view.split(dim[DimA.type * DimB.type]).into(DimA)
         val splType: Tensor[(DimA.type, DimB.type), Float32, CPU.type] = spl
         assert(spl.size == Seq(DimA.size, DimB.size))
 
         // Test that we can swap the dimensions by splitting into the other dimension
-        val spl2 = res.view.split[ProductDim[DimA.type, DimB.type]].into(DimB)
+        val spl2 = res.view.split(dim[DimA.type * DimB.type]).into(DimB)
         val spl2Type: Tensor[(DimB.type, DimA.type), Float32, CPU.type] = spl2
         assert(spl2.size == Seq(DimB.size, DimA.size))
       }

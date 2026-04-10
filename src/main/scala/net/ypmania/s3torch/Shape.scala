@@ -13,6 +13,13 @@ object Shape {
 
   type Size[X <: Shape] = Tuple.Size[X]
 
+  /** Just some simplifications over plain Tuple.Concat to get the worst types out of the way. */
+  type Concat[X <: Shape, Y <: Shape] = Y match {
+    case EmptyTuple => X
+    case d1 *: EmptyTuple => X :* d1
+    case _ => Tuple.Concat[X, Y]
+  }
+
   /** The shape of S is widened to accomodate the dimensions of To, by prepending static dimensions of one. */
   type Widen[S <: Tuple, To <: Tuple] <: Tuple = Size[S] < Size[To] match {
     case true => Widen[Dim.One *: S, To]
@@ -98,61 +105,4 @@ object Shape {
   type AOf[S <: Shape] = Last[Init[S]]
   /** The "B" matrix dimension, i.e. the second one */
   type BOf[S <: Shape] = Last[S]
-
-  /** Can be pulled in as a given to get "Idx" as the index of a selected dimension on a shape, by
-    * the dimension's type, First or Last, or compile-time specific numeric index Idx. */
-  trait Select[S <: Shape, D, Idx <: Int] {
-    type I = Idx
-  }
-
-  object Select {
-    /** Selects the first dimension (with index 0) */
-    case object First
-    given first[S <: Shape]: Select[S, First.type, 0] with {}
-
-    /** Selects the last dimension (with the highest index) */
-    case object Last
-    given last[S <: Shape]: Select[S, Last.type, Tuple.Size[S] - 1] with {}
-
-    /** Selects a dimension by their exact type. */
-    given dimFound[Head <: Dim, Tail <: Shape]: Select[Head *: Tail, Head, 0] with {}
-    import scala.util.NotGiven
-    given dimNotFound[Head <: Dim, Tail <: Shape, D <: Dim, Idx <: Int](using Select[Tail, D, Idx], NotGiven[Head =:= D]): Select[Head *: Tail, D, Idx + 1] with {}
-
-    // TODO add implicit conversion like Dim.fromLongStatic so we can do "3" instead of "Idx(3)"
-    /** Selects the dimension at the given index, starting from 0 */
-    case class Idx[I <: Int & Singleton](i: I)
-    given int[S <: Shape, I <: Int & Singleton]: Select[S, Idx[I], I] with {}
-
-    /** Selects a specific dimension by type, for which no value might be available. */
-    trait At[D <: Dim]
-    object At {
-      def apply[D <: Dim]: At[D] = new At {}
-      def apply[D <: Dim](d: D): At[D] = new At {}
-    }
-    given atDim[S <: Shape, D <: Dim, Idx <: Int](using Select[S, D, Idx]): Select[S, At[D], Idx] with {}
-  }
-
-
-  trait SelectIdx[S <: Shape, D] {
-    type Idx <: Int
-    def idx: Int
-  }
-  object SelectIdx {
-    given g[S <: Shape, D, I <: Int](using s:Select[S, D, I], i:ValueOf[I]): SelectIdx[S, D] with {
-      type Idx = I
-      def idx = i.value
-    }
-
-    given concat[B <: Shape, N <: Shape, D, I <: Int](using n:Select[N, D, I], i:ValueOf[I], b: ValueOf[Size[B]]): SelectIdx[B ++ N, D] with {
-      type Idx = Size[B] + I
-      def idx = summon[ValueOf[Size[B]]].value + summon[ValueOf[I]].value
-    }
-
-    given append[B <: Shape, N <: Dim, D](using n:Select[Tuple1[N], D, 0], b: ValueOf[Size[B]]): SelectIdx[B :* N, D] with {
-      type Idx = Size[B]
-      def idx = summon[ValueOf[Size[B]]].value
-    }
-
-  }
 }

@@ -2,6 +2,10 @@ package net.ypmania.s3torch
 
 import net.ypmania.s3torch.Shape.Elem
 import net.ypmania.s3torch.Shape.SameSize
+import net.ypmania.s3torch.Shape.Concat
+import net.ypmania.s3torch.Shape.Remove
+import net.ypmania.s3torch.Shape.Replace
+import net.ypmania.s3torch.Shape.ReplaceWithTuple
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.ScalarTypeOptional
 import org.bytedeco.pytorch.global.torch
@@ -16,6 +20,7 @@ import Shape.Scalar
 import DType._
 import Device.CPU
 import Tuple.++
+import Tuple.:*
 
 /**
   * A tensor is a multidimensional structure of values, wrapping pytorch's tensor. A tensor has the following properties, all of
@@ -37,16 +42,17 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** A differently-shaped tensor, with different DType, on the same Device */
   type ShapedT[S1 <: Tuple, T1 <: DType] = Tensor[S1, T1, D]
   type This = Tensor[S, T, D]
+  protected val dimOp = new DimOperator[S, T, D]
 
   /** An operation that reduces the tensor across a given dimension. */
-  class ReduceOp(op: ((Long, Boolean) => pytorch.Tensor)) extends DimOperator.Of1Tensor[S, T, D] {
-    type Out[Idx <: Int] = Shape.Remove[S, Idx]
-    protected def run[Idx <: Int](idx: Int) = new Tensor(op(idx, false))
+  class ReduceOp(op: ((Long, Boolean) => pytorch.Tensor)) extends dimOp.Of1Tensor {
+    type OutT[L <: Tuple, Idx <: Int] = Shape.Remove[L, Idx]
+    protected def runT(idx: Int) = op(idx, false)
 
     /** Variant of this operation that keeps the targeted dimension (reduced to one), rather than removing it. */
-    case object keepDim extends DimOperator.Of1Tensor[S, T, D] {
-      type Out[Idx <: Int] = Shape.Replace[S, Dim.One, Idx]
-      protected def run[Idx <: Int](idx: Int) = new Tensor(op(idx, true))
+    case object keepDim extends dimOp.Of1Tensor {
+      type OutT[L <: Tuple, Idx <: Int] = Shape.Replace[L, Dim.One, Idx]
+      protected def runT(idx: Int) = op(idx, true)
     }
   }
 
@@ -55,15 +61,54 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     * writing several layers of neural network transformations calling into each other. */
   def ~>[U](f: This => U) = f(this)
 
+  /** Selects elements from this Tensor by picking an explicit dimension and index, e.g.:
+    *     myTensor(Pick[MyDim] % Last)
+    * will pick the last element in [MyDim] (removing that dimension), retaining all other dimensions.
+    */
+  def apply[B <: Tuple, L <: Tuple, S1, I1 <: Index](t1: SelectAndIndex[S1, I1])(using
+    b: Batched[B, L, S],
+    s1: SelectIdx[L, S1], v1: Index.Valid[Elem[L, s1.Idx], I1]
+  ): Shaped[Concat[B, ReplaceWithTuple[L, v1.Apply, s1.Idx]]] =
+    new Tensor(applyIndex(Map(
+      s1.idx -> v1.toIndex(t1.i)
+    ), b.batchSize.value))
+
+  /** Selects elements from this Tensor by picking an explicit dimension and index, e.g.:
+    *     myTensor(Pick[MyDim] % Last, Pick[OtherDim] % First)
+    * will pick elements in those dimensions (removing them), retaining all other dimensions.
+    */
+  def apply[B <: Tuple, L <: Tuple, S1, I1 <: Index, S2, I2 <: Index](
+    t: (SelectAndIndex[S1, I1], SelectAndIndex[S2, I2])
+  )(using
+    b: Batched[B, L, S],
+    s1:SelectIdx[L, S1], v1: Index.Valid[Elem[L, s1.Idx], I1],
+    s2in:SelectIdx[L, S2],
+    s2:SelectIdx[ReplaceWithTuple[L, v1.Apply, s1.Idx], S2], v2: Index.Valid[Elem[ReplaceWithTuple[L, v1.Apply, s1.Idx], s2.Idx], I2]
+  ): Shaped[Concat[B, ReplaceWithTuple[ReplaceWithTuple[L, v1.Apply, s1.Idx], v2.Apply, s2.Idx]]] =
+    new Tensor(applyIndex(Map(
+      s1.idx -> v1.toIndex(t._1.i),
+      s2in.idx -> v2.toIndex(t._2.i)
+    ), b.batchSize.value))
+
+  private def applyIndex(selected: Map[Int, Index], batchSize: Int): pytorch.Tensor = {
+    val indices = (0.until(size.size - batchSize)).map(i => selected.get(i).getOrElse(Index.All))
+    val allIndices = (0.until(batchSize)).map(_ => Index.All) ++ indices
+    native.index(new pytorch.TensorIndexVector(allIndices.map(_.toNative)*))
+  }
+
   class CatApply[U <: Tuple](that: Shaped[U]) {
-    type Out[Idx <: Int, O] = Shape.Replace[S, O, Idx]
-    type Pick[Idx <: Int] = Cat.PickDynamic[Tuple.Elem[S, Idx], Tuple.Elem[U, Idx]]
+    type Out[L <: Tuple, Idx <: Int, O] = Shape.Replace[L, O, Idx]
+    type Pick[L <: Tuple, LU <: Tuple, Idx <: Int] = Cat.PickDynamic[Tuple.Elem[L, Idx], Tuple.Elem[LU, Idx]]
 
     protected def cat(a: pytorch.Tensor, b: pytorch.Tensor, idx: Int) = torch.cat(new pytorch.TensorVector(native, that.native), idx)
 
-    def apply[Dm](d: Dm)(using sel: Shape.SelectIdx[S,Dm], pick: Pick[sel.Idx])(using VerifyShape[Out[sel.Idx, pick.Out]], Cat[S, U, sel.Idx]): Shaped[Out[sel.Idx, pick.Out]] = new Tensor(cat(native, that.native, sel.idx))
+    def apply[B <: Tuple, L <: Tuple, LU <: Tuple, Dm](d: Dm)(using
+      tb:Batched[B, L, S],
+      ub:Batched[B, LU, U],
+      sel: SelectIdx[L, Dm],
+      pick: Pick[L, LU, sel.Idx]
+    )(using VerifyShape[Out[L, sel.Idx, pick.Out]], Cat[L, LU, sel.Idx]): Shaped[Concat[B, Out[L, sel.Idx, pick.Out]]] = new Tensor(cat(native, that.native, sel.idx))
 
-    def apply[Dm](using sel: Shape.SelectIdx[S,Dm], pick: Pick[sel.Idx])(using VerifyShape[Out[sel.Idx, pick.Out]], Cat[S, U, sel.Idx]): Shaped[Out[sel.Idx, pick.Out]]  = new Tensor(cat(native, that.native, sel.idx))
   }
 
   /** Concatenates two tensors along a given dimension:
@@ -113,9 +158,9 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   def floor: This = new Tensor(native.floor())
 
-  val log_softmax = new DimOperator.Of1Tensor[S, T, D] {
-    type Out[Idx <: Int] = S
-    def run[Idx <: Int](idx: Int) = new Tensor(native.log_softmax(idx))
+  val log_softmax = new dimOp.Of1Tensor {
+    type OutT[L <: Tuple, Idx <: Int] = L
+    def runT(idx: Int) = native.log_softmax(idx)
   }
 
   /** Fills elements of self tensor with value where mask is true. */
@@ -141,17 +186,17 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   case class MaxResult[S <: Tuple](result: Shaped[S], indices: Tensor[S, Int64, D])
 
   // Special variant of ReduceOp that returns a Tuple (MaxResult), rather than a single tensor.
-  class MaxReduceOp extends DimOperator.Of1[S, T] {
-    type Out[Idx <: Int] = MaxResult[Shape.Remove[S, Idx]]
-    protected def run[Idx <: Int](idx: Int) = {
+  class MaxReduceOp extends dimOp.Of1 {
+    type Out[B <: Shape, L <: Shape, Idx <: Int] = MaxResult[Concat[B, Remove[L, Idx]]]
+    protected def run[B <: Shape, L <: Shape, Idx <: Int](idx: Int) = {
       val res = torch.max(native, idx, false)
       MaxResult(new Tensor(res.get0()), new Tensor(res.get1()))
     }
 
     /** Variant of this operation that keeps the targeted dimension (reduced to one), rather than removing it. */
-    case object keepDim extends DimOperator.Of1[S, T] {
-      type Out[Idx <: Int] = MaxResult[Shape.Replace[S, Dim.One, Idx]]
-      protected def run[Idx <: Int](idx: Int) = {
+    case object keepDim extends dimOp.Of1 {
+      type Out[B <: Shape, L <: Shape, Idx <: Int] = MaxResult[Concat[B, Replace[L, Dim.One, Idx]]]
+      protected def run[B <: Shape, L <: Shape, Idx <: Int](idx: Int) = {
         val res = torch.max(native, idx, true)
         MaxResult(new Tensor(res.get0()), new Tensor(res.get1()))
       }
@@ -160,22 +205,6 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   /** Returns the maximum across a given dimension, along with the indexes where that maximum was found. */
   val maxBy = new MaxReduceOp
-
-  /** Returns a tensor where last dimension is replaced with a single value sampled from the multinomial. */
-  def multinomial(using rnd: RandomSource, ev: Multinomial[S]): Tensor[Shape.RemoveLast[ev.Out[Dim.One]], Int64, D] =
-    multinomial(false)
-
-  /** Returns a tensor where last dimension is replaced with a single value sampled from the multinomial. */
-  def multinomial(replacement: Boolean)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[Shape.RemoveLast[ev.Out[Dim.One]], Int64, D] =
-    new Tensor(rnd(torch.multinomial(native, 1L, replacement, new pytorch.GeneratorOptional).squeeze(size.size - 1)))
-
-  /** Returns a tensor where last dimension contains num_samples indices sampled from the multinomial. */
-  def multinomial[NumSamples <: Dim](numSamples: NumSamples)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[ev.Out[NumSamples], Int64, D] =
-    multinomial(numSamples, replacement = false)
-
-  /** Returns a tensor where last dimension contains num_samples indices sampled from the multinomial. */
-  def multinomial[NumSamples <: Dim](numSamples: NumSamples, replacement: Boolean)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[ev.Out[NumSamples], Int64, D] =
-    new Tensor(rnd(torch.multinomial(native, numSamples.size, replacement, new pytorch.GeneratorOptional)))
 
   /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
   def padTo[D <: Dim, V](dim: D, value: V, mode: PaddingMode = PaddingMode.Append)(using ops: DTypeOps.Scalar[T, V]): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
@@ -206,23 +235,18 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   }
 
   /** Returns the size of one dimension selected by D, as a Dim.Ref (since we can't create an actual instance of a Dim). */
-  def sizeOf = new DimOperator.Of1[S, T] {
-    type Out[Idx <: Int] = Dim.Ref[Elem[S, Idx]]
-    def run[Idx <: Int](idx: Int) = Dim.Ref(size(idx))
+  def sizeOf = new dimOp.Of1 {
+    type Out[B <: Shape, L <: Shape, Idx <: Int] = Dim.Ref[Elem[L, Idx]]
+    def run[B <: Shape, L <: Shape, Idx <: Int](idx: Int) = Dim.Ref(size(idx))
   }
 
   /** Returns the size of one dimension typed D, using [dim] to create the instance of D holding the result. */
-  def sizeOf[D <: Dim, Idx <: Int](dim: Long => D)(using sel: Shape.SelectIdx[S,D]): D = dim(size(sel.idx))
-
-  val softmax = new DimOperator.Of1Tensor[S, T, D] {
-    type Out[Idx <: Int] = S
-    def run[Idx <: Int](idx: Int) = new Tensor(native.softmax(idx))
-  }
+  def sizeOf[D <: Dim, Idx <: Int](dim: Long => D)(using sel: SelectIdx[S,D]): D = dim(size(sel.idx))
 
   /** Removes a dimension of One */
-  val squeeze = new DimOperator.Of1TensorEv[S, T, D, [Idx <: Int] =>> Shape.Elem[S, Idx] =:= Dim.One] {
-    type Out[Idx <: Int] = Shape.Remove[S, Idx]
-    def run[Idx <: Int](idx: Int)(using ev: Shape.Elem[S, Idx] =:= Dim.One) = new Tensor(native.squeeze(idx))
+  val squeeze = new dimOp.Of1TensorEv[[L <: Tuple, Idx <: Int] =>> Shape.Elem[L, Idx] =:= Dim.One] {
+    type OutT[L <: Tuple, Idx <: Int] = Shape.Remove[L, Idx]
+    def runT[L <: Tuple, Idx <: Int](idx: Int)(using ev: Shape.Elem[L, Idx] =:= Dim.One) = native.squeeze(idx)
   }
 
   def sum: Shaped[Scalar] = new Tensor(native.sum())
@@ -290,9 +314,9 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   def triu(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.triu(diagonal))
 
   /** Swaps the given two dimensions. */
-  val transpose = new DimOperator.Of2Tensor[S, T, D] {
-    type Out[I1 <: Int, I2 <: Int] = Shape.Swap[S, I1, I2]
-    def run[I1 <: Int, I2 <: Int](i1: Int, i2: Int) = new Tensor(native.transpose(i1, i2))
+  val transpose = new dimOp.Of2Tensor {
+    type Out[L <: Shape, I1 <: Int, I2 <: Int] = Shape.Swap[L, I1, I2]
+    def run[L <: Shape, I1 <: Int, I2 <: Int](i1: Int, i2: Int) = native.transpose(i1, i2)
   }
 
   /** Swaps the last two dimensions. Tensor must have >= 2 dimensions. */
@@ -323,28 +347,31 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Returns a view of this Tensor with 5 dimensions, or None if the tensor has a different number of dimensions. */
   def untyped5D: Option[Shaped[(Dim, Dim, Dim, Dim, Dim)]] = Option.when(size.length == 5)(new Tensor(native))
 
+  /** Inserts a dimension of One after all other dimensions. */
+  def unsqueezeAfterEnd: Shaped[S :* Dim.One] = new Tensor(native.unsqueeze(size.size))
+
   /** Inserts a dimension of One after D */
-  val unsqueezeAfter = new DimOperator.Of1Tensor[S, T, D] {
-    type Out[Idx <: Int] = Shape.InsertAfter[S, Dim.One, Idx]
-    def run[Idx <: Int](idx: Int) = new Tensor(native.unsqueeze(idx + 1))
+  val unsqueezeAfter = new dimOp.Of1Tensor {
+    type OutT[L <: Tuple, Idx <: Int] = Shape.InsertAfter[L, Dim.One, Idx]
+    def runT(idx: Int) = native.unsqueeze(idx + 1)
   }
 
   /** Inserts a dimension of One before D */
-  val unsqueezeBefore = new DimOperator.Of1Tensor[S, T, D] {
-    type Out[Idx <: Int] = Shape.InsertBefore[S, Dim.One, Idx]
-    def run[Idx <: Int](idx: Int) = new Tensor(native.unsqueeze(idx))
+  val unsqueezeBefore = new dimOp.Of1Tensor {
+    type OutT[L <: Tuple, Idx <: Int] = Shape.InsertBefore[L, Dim.One, Idx]
+    def runT(idx: Int) = native.unsqueeze(idx)
   }
 
   /** Provides alternative views to this Tensor, without changing the underlying storage. */
   case object view {
     /** Transforms a split version of this tensor, split across dimension D in N parts. */
-    val split = new DimOperator.Of1[S, T] {
-      type Out[Idx <: Int] = SplitApply[Idx, Elem[S, Idx]]
-      def run[Idx <: Int](idx: Int) = new SplitApply(idx)
+    val split = new dimOp.Of1 {
+      type Out[B <: Shape, L <: Shape, Idx <: Int] = SplitApply[B, L, Idx, Elem[S, Idx]]
+      def run[B <: Shape, L <: Shape, Idx <: Int](idx: Int) = new SplitApply(idx)
     }
-    class SplitApply[Idx <: Int, D](private[s3torch] val idx: Int) {
+    class SplitApply[B <: Shape, L <: Shape, Idx <: Int, D](private[s3torch] val idx: Int) {
       /** Splits the selected dimension into N parts, i.e. the dimension D gets split into two dimensions (N, D / N) */
-      def into[N <: Dim](n: N)(using ev:Split[D, N]): Shaped[Shape.ReplaceWithTuple[S, ev.Out, Idx]] = {
+      def into[N <: Dim](n: N)(using ev:Split[D, N]): Shaped[Concat[B, Shape.ReplaceWithTuple[L, ev.Out, Idx]]] = {
         val (before, after) = size.splitAt(idx)
         val dimsize = after.head
         val sizes = before :+ n.size :+ (dimsize / n.size) :++ after.tail
@@ -358,7 +385,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     /** Merges the selected dimension with the one before it, by
       * multiplying the dimensions. If these have been previously split using
       * split(), this operation performs the reverse. */
-    def merge[D](using sel: Shape.SelectIdx[S, D], ev: Merge[sel.Idx]): Shaped[Merged[sel.Idx, ev.Out]] = {
+    def merge[D](using sel: SelectIdx[S, D], ev: Merge[sel.Idx]): Shaped[Merged[sel.Idx, ev.Out]] = {
       val (before, after) = size.splitAt(sel.idx - 1)
       val sizes = before :+ (after(0) * after(1)) :++ after.drop(2)
       new Tensor(native.view(sizes.toArray*))
@@ -366,12 +393,12 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     /** Merges the selected dimension with the one before it, by
       * multiplying the dimensions. If these have been previously split using
       * split(), this operation performs the reverse. */
-    def merge[D](d: D)(using sel: Shape.SelectIdx[S, D], ev: Merge[sel.Idx]): Shaped[Merged[sel.Idx, ev.Out]] = merge[D]
+    def merge[D](d: D)(using sel: SelectIdx[S, D], ev: Merge[sel.Idx]): Shaped[Merged[sel.Idx, ev.Out]] = merge[D]
   }
 
   def value[O](using ev: TensorValue[S, T, O])(using D =:= CPU.type): O = ev(native)
   def value_=[V](v: V)(using updateSource: UpdateSource[V, D]): Unit = {
-    updateSource(native, Tensor.tensorIndexArray(), v)
+    updateSource(native, new pytorch.TensorIndexArrayRef (new pytorch.TensorIndexVector()), v)
   }
 
   /** Applies [f] to [this] and the [opt] (if defined), or just returns [this] (if empty) */
@@ -407,13 +434,6 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   * approximated mathemetical notation better than "x.sin", even
   * though the latter would be more idiomatic Scala. */
 object Tensor {
-  // TODO nicer .apply:
-  // - Reshaping or creating with known dimension:
-  //   Tensor.shaped(Tuple(AnyDim))((Values))     // return option if too big?
-  //   Tensor.shaped[Tuple(StaticDim)]((Values))  // return option if too big?
-  //   Tensor.shaped[Tuple(StaticDim)]((tuple))   // staticaly checked
-  //   OR just do this in .shaped instance method.
-
   /** Creates a Tensor from the given value, which can be a scalar, a
     * (potentially) nested Seq, or a (potentially nested) tuple,
     * picking an appropriate shape and DType. */
@@ -497,6 +517,27 @@ object Tensor {
     def mean: t.Shaped[EmptyTuple] = new Tensor(t.native.mean(0.until(t.size.size).map(_.toLong).toArray, false, new ScalarTypeOptional))
     def meanBy = new t.ReduceOp((idx, keep) => t.native.mean(Array(idx), keep, new ScalarTypeOptional))
 
+    /** Applies the Softmax function to an n-dimensional input Tensor. */
+    def softmax = new t.dimOp.Of1Tensor {
+      type OutT[L <: Tuple, Idx <: Int] = L
+      def runT(idx: Int) = t.native.softmax(idx)
+    }
+
+    /** Returns a tensor where last dimension is replaced with a single value sampled from the multinomial. */
+    def multinomial(using rnd: RandomSource, ev: Multinomial[S]): Tensor[Shape.RemoveLast[ev.Out[Dim.One]], Int64, Dv] =
+      multinomial(false)
+
+    /** Returns a tensor where last dimension is replaced with a single value sampled from the multinomial. */
+    def multinomial(replacement: Boolean)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[Shape.RemoveLast[ev.Out[Dim.One]], Int64, Dv] =
+      new Tensor(rnd(torch.multinomial(t.native, 1L, replacement, new pytorch.GeneratorOptional).squeeze(t.size.size - 1)))
+
+    /** Returns a tensor where last dimension contains num_samples indices sampled from the multinomial. */
+    def multinomial[NumSamples <: Dim](numSamples: NumSamples)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[ev.Out[NumSamples], Int64, Dv] =
+      multinomial(numSamples, replacement = false)
+
+    /** Returns a tensor where last dimension contains num_samples indices sampled from the multinomial. */
+    def multinomial[NumSamples <: Dim](numSamples: NumSamples, replacement: Boolean)(using rnd: RandomSource, ev: Multinomial[S]): Tensor[ev.Out[NumSamples], Int64, Dv] =
+      new Tensor(rnd(torch.multinomial(t.native, numSamples.size, replacement, new pytorch.GeneratorOptional)))
   }
 
   // ---- Methods on Tensor that only exist on scalars
@@ -515,13 +556,13 @@ object Tensor {
 
   // ---- Methods on Tensor with 1 dimension ---
   extension[T <: DType, D <: Device, D1 <: Dim](t: Tensor[Tuple1[D1], T, D]) {
+    /** Selects elements for all dimensions of this tensor, where the argument position implies the dimension being indexed. */
     def apply[I1 <: Index](v1: I1)(using i1: Index.Valid[D1, I1]): t.Shaped[i1.Apply] = {
       new Tensor(t.native.index(new pytorch.TensorIndexVector(v1.toNative)))
     }
 
-    def update[I1 <: Index, V](i: I1, value: V)(using Index.Valid[D1, I1])(using updateSource: UpdateSource[V, D]): Unit = {
-      updateSource(t.native, tensorIndexArray(i), value)
-    }
+    def update[I1 <: Index, V](i: I1, value: V)(using Index.Valid[D1, I1])(using updateSource: UpdateSource[V, D]): Unit =
+      updateSource(t.native, tensorIndexArray(i.toNative), value)
 
     /** Executes the given function for every element in this vector, and stacking the result along the vector's dimension. */
     // TODO: this operator can be extended to be defined for 1+ dimensions, but will have to be written as flatten -> stack -> unflatten
@@ -536,6 +577,7 @@ object Tensor {
   }
   // ---- Methods on Tensor with 2 dimensions ---
   extension[T <: DType, D <: Device, D1 <: Dim, D2 <: Dim](t: Tensor[(D1, D2), T, D]) {
+    /** Selects elements for all dimensions of this tensor, where the argument position implies the dimension being indexed. */
     def apply[I1 <: Index, I2 <: Index](v1: I1, v2: I2)(
       using i1: Index.Valid[D1, I1], i2: Index.Valid[D2, I2]
     ): t.Shaped[i1.Apply ++ i2.Apply] = {
@@ -546,13 +588,12 @@ object Tensor {
       using Index.Valid[D1, I1], Index.Valid[D2, I2]
     )(
       using updateSource: UpdateSource[V, D]
-    ): Unit = {
-      updateSource(t.native, tensorIndexArray(i._1, i._2), value)
-    }
+    ): Unit = updateSource(t.native, tensorIndexArray(i._1.toNative, i._2.toNative), value)
   }
 
   // ---- Methods on Tensor with 3 dimensions ---
   extension[T <: DType, D <: Device, D1 <: Dim, D2 <: Dim, D3 <: Dim](t: Tensor[(D1, D2, D3), T, D]) {
+    /** Selects elements for all dimensions of this tensor, where the argument position implies the dimension being indexed. */
     def apply[I1 <: Index, I2 <: Index, I3 <: Index](v1: I1, v2: I2, v3: I3)(
       using i1: Index.Valid[D1, I1], i2: Index.Valid[D2, I2], i3: Index.Valid[D3, I3]
     ): t.Shaped[i1.Apply ++ i2.Apply ++ i3.Apply] = {
@@ -563,10 +604,14 @@ object Tensor {
       using Index.Valid[D1, I1], Index.Valid[D2, I2], Index.Valid[D3, I3]
     )(
       using updateSource: UpdateSource[V, D]
-    ): Unit = {
-      updateSource(t.native, tensorIndexArray(i._1, i._2, i._3), value)
-    }
+    ): Unit = updateSource(t.native, tensorIndexArray(i._1.toNative, i._2.toNative, i._3.toNative), value)
   }
 
-  private[Tensor] def tensorIndexArray(i: Index*) = pytorch.TensorIndexArrayRef (new pytorch.TensorIndexVector(i.map(_.toNative)*))
+  private def tensorIndexArray(is: pytorch.TensorIndex*) = {
+    val v = new pytorch.TensorIndexVector // explicitly, so we don't end up wrapping a Java array which might be GC'ed
+    for (i <- is) {
+      v.push_back(i)
+    }
+    new pytorch.TensorIndexArrayRef(v)
+  }
 }

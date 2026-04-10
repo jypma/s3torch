@@ -10,7 +10,7 @@ import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Dim.|/
 import net.ypmania.s3torch.HeapExternal.scoped
 import net.ypmania.s3torch.Index
-import net.ypmania.s3torch.Shape.Select.First
+import net.ypmania.s3torch.Select.Start
 import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.nn.CrossEntropy
 import net.ypmania.s3torch.optim.Adam
@@ -86,14 +86,14 @@ class Translator[
         val label = batch(_.label)
         val encoderMask = batch { x =>
           // We need to add SeqLen and NHeads to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
-          val r = x.encoderMask.unsqueezeBefore(First).unsqueezeBefore(First)
+          val r = x.encoderMask.unsqueezeBefore(Start).unsqueezeBefore(Start)
           // Somehow, doesn't compile when inlined.
           r
         }
         val decoderMask = batch { x =>
           // We need to add NHeads to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
           //println("decoderMask: " + x.decoderMask.to(Device.CPU).value.map(_.mkString(",")).mkString("\n"))
-          val r = x.decoderMask.unsqueezeBefore(First)
+          val r = x.decoderMask.unsqueezeBefore(Start)
           r
         }
 
@@ -133,9 +133,9 @@ class Translator[
         scoped {
           // TODO refactor encode and decode to use Batched, so we can remove the batch dimension here entirely.
           val encoderInput = x.encoderInput
-            .unsqueezeBefore(First) // add BatchSize of 1
+            .unsqueezeBefore(Start) // add BatchSize of 1
           val encoderMask = x.encoderMask
-            .unsqueezeBefore(First).unsqueezeBefore(First).unsqueezeBefore(First) // add NHeads, SeqLen, BatchSize
+            .unsqueezeBefore(Start).unsqueezeBefore(Start).unsqueezeBefore(Start) // add NHeads, SeqLen, BatchSize
 
           // Note: start of greedy_decode
           val source = encoderInput
@@ -149,7 +149,7 @@ class Translator[
           while (inputLength <= sequenceLength && !decoderInput(Index.Last).equal(Tensor(dst.eos))) {
             val nextToken = scoped {
               val decoderMask = causalMask(inputLength)
-              val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(First)) // Add BatchSize
+              val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(Start)) // Add BatchSize
 
               // TODO investigate Dim -> Index tuple syntax here, so we can remove the comment
               val in = out(Index.First, Index.Last, Index.All) // Grab the First (only) batch, and only the  Last token in that batch

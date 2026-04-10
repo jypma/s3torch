@@ -17,8 +17,16 @@ trait IndexPrio0 {
   given fromIntDynamic: Conversion[Int, Index.At] with {
     def apply(i: Int) = Index.At(i)
   }
+  given tupleFromIntDynamic[D <: Dim]: Conversion[(D, Int), (D, Index.At)] with {
+    def apply(t: (D, Int)) = (t._1 -> Index.At(t._2))
+  }
   given validAnyDim[D <: Dim, I <: Int & Singleton](using NotGiven[Index.Invalid[D, Index.Idx[I]]]): Index.Valid[D, Index.Idx[I]] with {
     type Apply = EmptyTuple
+    def toIndex(i: Index.Idx[I]) = i
+  }
+  given append[B <: Tuple, L1 <: Dim, I](using v:Index.Valid[L1, I]): Index.Valid[Tuple.Elem[Tuple.Append[B, L1], Tuple.Size[B]], I] with {
+    type Apply = v.Apply
+    def toIndex(i: I) = v.toIndex(i)
   }
 }
 
@@ -27,8 +35,9 @@ trait IndexPrio0 {
 // Syntax: (for the above) Allow selection on Append[X] types, rather than only tuples.
 object Index extends IndexPrio0 {
   @implicitNotFound("Index is not valid for this tensor. Perhaps it is out of bounds?")
-  trait Valid[D <: Dim, I <: Index] {
+  trait Valid[D, I] {
     type Apply <: Tuple
+    def toIndex(i: I): Index
   }
 
   trait Invalid[D <: Dim, I <: Index]
@@ -49,6 +58,11 @@ object Index extends IndexPrio0 {
   }
   given [D <: Dim]: Valid[D, At] with {
     type Apply = EmptyTuple
+    def toIndex(i: At) = i
+  }
+  given [D <: Dim]: Valid[D, Int] with {
+    type Apply = EmptyTuple
+    def toIndex(i: Int) = At(i)
   }
 
   // FIXME Align Select.First and Index.First
@@ -58,6 +72,7 @@ object Index extends IndexPrio0 {
   }
   given [D <: Dim]: Valid[D, First.type] with {
     type Apply = EmptyTuple
+    def toIndex(i: First.type) = i
   }
 
   /** Selects the last element in that dimension */
@@ -66,6 +81,7 @@ object Index extends IndexPrio0 {
   }
   given [D <: Dim]: Valid[D, Last.type] with {
     type Apply = EmptyTuple
+    def toIndex(i: Last.type) = i
   }
 
   /** Selects the full dimension */
@@ -74,6 +90,7 @@ object Index extends IndexPrio0 {
   }
   given [D <: Dim]: Valid[D, All.type] with {
     type Apply = Tuple1[D]
+    def toIndex(i: All.type) = i
   }
 
   /** Selects elements exactly sized [D] (D must be smaller than or equal than the current dimension in the shape) */
@@ -93,6 +110,7 @@ object Index extends IndexPrio0 {
   }
   given givtake[D <: Dim, O]: Valid[D, Take[O]] with {
     type Apply = Tuple1[O]
+    def toIndex(i: Take[O]) = i
   }
 
   /** Selects a subset of a dimension. */
@@ -111,6 +129,7 @@ object Index extends IndexPrio0 {
 
   given [D <: Dim]: Valid[D, Slice] with {
     type Apply = Tuple1[Dim]
+    def toIndex(i: Slice) = i
   }
 
   // Allow a tuple with the actual dimension type, instead of just the value

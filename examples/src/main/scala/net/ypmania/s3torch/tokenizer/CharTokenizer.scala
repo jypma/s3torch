@@ -10,7 +10,6 @@ object CharData {
 
 class CharTokenizer[A: Token](data: CharData[A]) extends Tokenizer[A] {
   private val t = summon[Token[A]]
-  import CharTokenizer._
   private var nextReservedToken = t.max(data.known.values)
 
   protected def reservedToken: A = {
