@@ -15,6 +15,7 @@ import net.ypmania.s3torch.internal.Broadcast
 import internal.MatMul
 import Device.CPU
 import Tuple.:*
+import scala.Tuple.Concat
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -199,6 +200,12 @@ class TensorSpec extends UnitSpec {
         val tType: Tensor[Tuple1[Dim], Float32, CPU.type] = t
         assert(t.size == Seq(10L))
         assert(t.value.toSeq == Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
+      }
+
+      it("can create a range from a Dim.Ref") {
+        val dim = Dim.Ref(ExampleStatic)
+        val t = Tensor.arangeOfD(dim)
+        val tType: Tensor[Tuple1[ExampleStatic.type], Float32, CPU.type] = t
       }
     }
 
@@ -1093,6 +1100,53 @@ class TensorSpec extends UnitSpec {
         val r = a + b
         assert(r.size == Seq(4L, 4L))
       }
+
+      it("can add a known-dim tensor to a valid batch") {
+        import Tuple.++
+        def doIt[B <: Shape, L1 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using b:Batched1[B, L1, S]): Tensor[B ++ (L1, Static[1L]), Promoted[T, Float32], CPU.type] = {
+          val appended = t.unsqueezeAfterEnd
+          val toAdd = Tensor.ones(1L, 1L)
+
+          appended + toAdd
+        }
+
+        val r1 = doIt(Tensor.ones(3L))
+        val r1Type: Tensor[(Static[3L], Static[1L]), Float32, CPU.type] = r1
+        assert(r1.size == Seq(3L, 1L))
+        assert(r1.value.toSeq == Seq(
+          Seq(2.0),
+          Seq(2.0),
+          Seq(2.0)
+        ))
+
+        val r2 = doIt(Tensor.ones(3L, 2L))
+        val r2Type: Tensor[(Static[3L], Static[2L], Static[1L]), Float32, CPU.type] = r2
+        assert(r2.size == Seq(3L, 2L, 1L))
+        assert(r2.value.toSeq == Seq(
+          Seq(Seq(2.0), Seq(2.0)),
+          Seq(Seq(2.0), Seq(2.0)),
+          Seq(Seq(2.0), Seq(2.0))
+        ))
+      }
+
+      it("can add a scalar to a valid batch") {
+        def doIt[B <: Shape, L1 <: Dim, S <: Shape](t: Tensor[S, Float32, CPU.type])(using b:Batched1[B, L1, S]) = {
+          val appended = t.unsqueezeAfterEnd
+
+          appended + 5.0
+        }
+
+        val r1 = doIt(Tensor.ones(3L))
+        val r1Type: Tensor[(Static[3L], One), Float32, CPU.type] = r1
+        assert(r1.size == Seq(3L, 1L))
+        assert(r1.value.toSeq == Seq(
+          Seq(6.0),
+          Seq(6.0),
+          Seq(6.0)
+        ))
+      }
+
+
     }
 
     describe("sizeOf") {

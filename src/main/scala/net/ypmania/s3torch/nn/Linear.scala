@@ -19,6 +19,9 @@ class Linear[In <: Dim, Out <: Dim, D <: Device, T <: DType] private (native: py
 }
 
 object Linear {
-  def apply[In <: Dim, Out <: Dim, D <: Device, T <: DType.Floaty](in: In, out: Out)(using rnd: RandomSource, t: Default[T], d: Default[D]): Linear[In, Out, D, T] =
-    rnd(new Linear(new pytorch.LinearImpl(in.size, out.size))).toDeviceDType
+  def apply[In <: Dim, Out <: Dim, D <: Device, T <: DType.Floaty](in: In, out: Out, bias: Boolean = true)(using rnd: RandomSource, t: Default[T], d: Default[D]): Linear[In, Out, D, T] = {
+    val opts = new pytorch.LinearOptions(in.size, out.size)
+    opts.bias.put(bias)
+    rnd(new Linear(new pytorch.LinearImpl(opts))).toDeviceDType
+  }
 }

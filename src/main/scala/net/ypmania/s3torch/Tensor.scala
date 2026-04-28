@@ -6,6 +6,7 @@ import net.ypmania.s3torch.Shape.Concat
 import net.ypmania.s3torch.Shape.Remove
 import net.ypmania.s3torch.Shape.Replace
 import net.ypmania.s3torch.Shape.ReplaceWithTuple
+import net.ypmania.s3torch.Dim.UnRef
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.ScalarTypeOptional
 import org.bytedeco.pytorch.global.torch
@@ -310,7 +311,9 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   /** Converts the Tensor to the DType of another tensor */
   def toDTypeOf[T1 <: DType](that: Tensor[?, T1, ?]): Tensor[S, T1, D] = new Tensor(native.to(that.dtype.native))
 
+  /** Returns the lower triangular part of the matrix (2-D tensor) or batch of matrices input, the other elements of the result tensor out are set to 0. */
   def tril(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.tril(diagonal))
+  /** Returns the upper triangular part of the matrix (2-D tensor) or batch of matrices input, the other elements of the result tensor out are set to 0. */
   def triu(diagonal: Long = 0)(using Shape.Size[S] >= 2 =:= true): This = new Tensor(native.triu(diagonal))
 
   /** Swaps the given two dimensions. */
@@ -442,11 +445,11 @@ object Tensor {
   }
 
   /** Creates a range, returning a DType that follows the Default[DType] */
-  def arangeOfD[D <: Dim, T <: DType, Dv <: Device](dim: D)(using device: Default[Dv], dType: Default[T], ops: DTypeOps.Scalar[T, ?]): Tensor[Tuple1[D], T, Dv] = arangeD(0L, dim.size, 1L)(using ops = DTypeOps.ScalarFromLong(ops)).unsafeWithShape
+  def arangeOfD[D <: Dim, T <: DType, Dv <: Device](dim: D)(using device: Default[Dv], dType: Default[T], ops: DTypeOps.Scalar[T, ?], u: UnRef[D]): Tensor[Tuple1[u.Out], T, Dv] = arangeD(0L, dim.size, 1L)(using ops = DTypeOps.ScalarFromLong(ops)).unsafeWithShape
 
   /** Creates a range of Int64 DType (since dimensions are Long) */
   // TODO: For static din, auto-pick Int32, Int16 or Int8 for lower values.
-  def arangeOf[D <: Dim, Dv <: Device](dim: D)(using Default[Dv]): Tensor[Tuple1[D], Int64, Dv] = arange(0L, dim.size, 1L).unsafeWithShape
+  def arangeOf[D <: Dim, Dv <: Device](dim: D)(using Default[Dv])(using u: UnRef[D]): Tensor[Tuple1[u.Out], Int64, Dv] = arange(0L, dim.size, 1L).unsafeWithShape
 
   /** Creates a range, returning a DType that follows the Default[DType] */
   def arangeD[V, T <: DType, Dv <: Device](start: V, end: V, step: V)(using dType: Default[T], ops: DTypeOps.Scalar[T, V], dv: Default[Dv]): Tensor[Tuple1[Dim.Dynamic], T, Dv] = {

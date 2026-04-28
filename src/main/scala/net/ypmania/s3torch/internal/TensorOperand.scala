@@ -6,6 +6,8 @@ import net.ypmania.s3torch.DTypeOps
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Tensor
 import org.bytedeco.pytorch
+import net.ypmania.s3torch.Batched
+import Tuple.++
 
 /** Type class that exists for V where V can be the operand to an operation on a tensor with either a scalar (resulting in the same shaped tensor), or another tensor (resulting in Broadcast being applied), with the result being the same or promoted DType of the two tensors. */
 trait TensorOperand[S <: Tuple, T <: DType, D <: Device, V] {
@@ -14,13 +16,19 @@ trait TensorOperand[S <: Tuple, T <: DType, D <: Device, V] {
 }
 
 object TensorOperand {
-  given scalar[S <: Tuple, T <: DType, D <: Device, V](using ops: DTypeOps.Scalar[T, V]): TensorOperand[S, T, D, V] with {
+  given scalar[S <: Tuple, T <: DType, D <: Device, V](using
+    ops: DTypeOps.Scalar[T, V]
+  ): TensorOperand[S, T, D, V] with {
     type Out = Tensor[S, T, D]
     override def apply(t: Tensor[S, T, D], v: V, withScalar: (pytorch.Tensor, pytorch.Scalar) => pytorch.Tensor, withTensor: (pytorch.Tensor, pytorch.Tensor) => pytorch.Tensor) = new Tensor(withScalar(t.native, ops.fromScalar(v)))
   }
 
-  given tensor[S <: Tuple, T <: DType, S2 <: Tuple, T2 <: DType, D <: Device, R <: Tuple](using Broadcast[S, S2, R]): TensorOperand[S, T, D, Tensor[S2, T2, D]] with {
-    type Out = Tensor[R, Promoted[T, T2], D]
+  // Only the left operand can be a batch. Right must be fully known. For the moment.
+  given tensor[B <: Tuple, L <: Tuple, S <: Tuple, T <: DType, S2 <: Tuple, T2 <: DType, D <: Device, R <: Tuple](using
+    Batched[B, L, S],
+    Broadcast[L, S2, R]
+  ): TensorOperand[S, T, D, Tensor[S2, T2, D]] with {
+    type Out = Tensor[B ++ R, Promoted[T, T2], D]
     override def apply(t: Tensor[S, T, D], v: Tensor[S2, T2, D], withScalar: (pytorch.Tensor, pytorch.Scalar) => pytorch.Tensor, withTensor: (pytorch.Tensor, pytorch.Tensor) => pytorch.Tensor) = new Tensor(withTensor(t.native, v.native))
   }
 }

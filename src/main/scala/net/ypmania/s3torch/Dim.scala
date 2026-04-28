@@ -71,4 +71,18 @@ object Dim extends DimLowPriorityGivens {
   /** A Dim that references the type of another Dim, of which the value is known, but no instance to
     * the actual Dim subclass is available. */
   case class Ref[D](size: Long) extends Dim
+  object Ref {
+    def apply[D <: Dim](target: D) = new Ref[D](target.size)
+  }
+
+  trait UnRef[D <: Dim] {
+    type Out <: Dim
+  }
+  trait UnRefLowPrio {
+    given [D <: Dim]: UnRef[D] with { type Out = D }
+  }
+  object UnRef extends UnRefLowPrio {
+    given [D <: Dim]: UnRef[Ref[D]] with { type Out = D }
+  }
+
 }

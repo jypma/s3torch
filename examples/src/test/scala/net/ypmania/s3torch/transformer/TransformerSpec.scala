@@ -83,16 +83,16 @@ class TransformerSpec extends UnitSpec {
     val mh = new transformer.MultiHeadAttention(0.5)
 
     it("should apply key and value to the batch") {
-      val in = Tensor.zeros(BatchSize, QSeqLen, DModel)
-      val key = Tensor.zeros(BatchSize, KVSeqLen, DModel)
-      val value = Tensor.zeros(BatchSize, KVSeqLen, DModel)
+      val in = Tensor.ones(BatchSize, QSeqLen, DModel)
+      val key = Tensor.ones(BatchSize, KVSeqLen, DModel)
+      val value = Tensor.ones(BatchSize, KVSeqLen, DModel)
       val res = mh(in, key, value)
 
       assert(res.value === Seq(
         Seq(
-          Seq(0.5045, 0.2997, -0.2170, -0.4354),
-          Seq(0.4513, 0.2983, -0.2376, -0.3063),
-          Seq(0.5574, 0.2168, -0.2085, -0.5011)
+          Seq(0.4659, -0.1081, 0.1835, -0.0433),
+          Seq(0.4060, -0.2036, 0.1394, -0.1349),
+          Seq(0.7117, -0.3054, 0.2641, 0.10833)
         )
       ))
     }
@@ -113,9 +113,9 @@ class TransformerSpec extends UnitSpec {
       val res0 = enc(mask0)(in)
       assert(res0.value === Seq(
         Seq(
-          Seq(0.0, 0.0, -1.5036, 0.0),
-          Seq(1.0, 0.0, -1.0851, -0.1405),
-          Seq(0.0, 1.2741, -1.2967, -0.4214)
+          Seq(0.0, 0.0, -1.0696, 0.0),
+          Seq(1.0, 0.0, -0.4250, 0.5522),
+          Seq(0.0, 0.2822, -0.6762, 0.5279)
         )
       ))
 
@@ -123,9 +123,9 @@ class TransformerSpec extends UnitSpec {
       val res1 = enc(mask1)(in)
       assert(res1.value === Seq(
         Seq(
-          Seq(0.7046, 1.6113, -1.3998, -0.7747),
-          Seq(1.0, 0.9744, -1.1116, 0.0),
-          Seq(0.0, 1.7767, 0.0, -0.0540)
+          Seq(0.2684, 0.8138, -0.3668, 0.4645),
+          Seq(1.0, 0.4022, -0.3337, 0.0),
+          Seq(0.0, 0.6519, 0.0, 0.4944)
         )
       ))
     }

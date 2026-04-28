@@ -73,17 +73,17 @@ class Transformer[
 
     def apply[B <: Shape, SeqLen <: Dim, S <: Shape](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* DModel] = {
       import b.given
-      in ~> l1.apply ~> relu ~> dropout.apply ~> l2.apply
+      in ~> l1.apply ~> relu ~> dropout.apply ~> l2.apply // AK is same, but without dropout.
     }
   }
 
   type AttentionScores[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim] = (B, NHeads, QSeqLen, KVSeqLen)
 
   class MultiHeadAttention(dropoutProb: Double) extends Module {
-    val queryWeights = addModule("queryWeights", Linear(dModel, dModel)) // FIXME Maybe there should be no bias here if it's just a mul.
-    val keyWeights = addModule("keyWeights", Linear(dModel, dModel))
-    val valueWeights = addModule("valueWeights", Linear(dModel, dModel))
-    val outputWeights = addModule("outputWeights", Linear(dModel, dModel))
+    val queryWeights = addModule("queryWeights", Linear(dModel, dModel, bias = false))
+    val keyWeights = addModule("keyWeights", Linear(dModel, dModel, bias = false))
+    val valueWeights = addModule("valueWeights", Linear(dModel, dModel, bias = false))
+    val outputWeights = addModule("outputWeights", Linear(dModel, dModel, bias = false)) // TODO is this output linear layer always present?
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
     /** Splits the dModel dimension into NHeads heads, and swap the SeqLen
@@ -102,6 +102,7 @@ class Transformer[
     ): Batch[B, QSeqLen] =
       apply(query, key, value, None.asInstanceOf[Option[MaskTn[(QSeqLen, KVSeqLen)]]])
 
+    // TODO The mask seems to only ever be a "causal" mask (triangular matrix). Perhaps just make it an enum.
     /** @param mask If given, should be true for values we want to give attention to, and false for values to ignore. */
     def apply[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim, M <: Shape](
       query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen], mask: Option[MaskTn[M]]
@@ -112,21 +113,11 @@ class Transformer[
       val k = key ~> keyWeights.apply ~> splitHeads
       val v = value ~> valueWeights.apply ~> splitHeads
 
-      val limit = 1000
-      //println(s"q=${q.summary(limit)}")
-      //println(s"k=${k.summary(limit)}")
-      //println(s"v=${v.summary(limit)}")
-      //println(s"m=${mask.map(_.summary(limit))}")
-
-      val a1 = (q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.size))
-      val a2 = a1.when(mask.map(_ #== false))(_.maskedFilled(_, 1e-20))
-      //println(s"a2=${a2.summary(limit)}")
-
-      val attentionScores = a2
-        .softmax(End)
-        ~> dropout.apply
-
-      //println(s"s=${attentionScores.summary(limit)}")
+      val attentionScores =
+        (q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.size))
+          .when(mask.map(_ #== false))(_.maskedFilled(_, 1e-20))
+          .softmax(End)
+      ~> dropout.apply
 
       // TODO save the attention scores somehow, they're apparently needed for visualization later.
       attentionScores
@@ -144,7 +135,7 @@ class Transformer[
     val norm = addModule("norm", new LayerNormalization)
 
     def apply[B <: Dim, SeqLen <: Dim](sublayer: Batch[B, SeqLen] => Batch[B, SeqLen]): Batch[B, SeqLen] => Batch[B, SeqLen] =
-      in => (in ~> norm.apply ~> sublayer ~> dropout.apply) + in
+      in => (in ~> norm.apply ~> sublayer ~> dropout.apply) + in // AK just does "plus" here, and then some projection (linear) layer BEFORE going back.... and no dropout.
   }
 
   class EncoderBlock(attention: MultiHeadAttention, feedForward: FeedForward, dropoutProb: Double) extends Module {

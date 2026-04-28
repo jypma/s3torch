@@ -19,15 +19,15 @@ trait BatchedPrio0 {
     b = ValueOf((b.batchSize.value + 1).asInstanceOf[Size[B :* D1]]),
     t = ValueOf((b.tailSize.value - 1).asInstanceOf[Size[T]])
   ) with {}
+  given concat[B <: Tuple, T <: Tuple](using ValueOf[Size[B]], ValueOf[Size[T]]): Batched[B, T, B ++ T] with {}
 }
 
-trait BatchedPrio1 {
+trait BatchedPrio1 extends BatchedPrio0 {
   given append2[B <: Tuple, S <: Tuple, D1, D2](using b:Batched[B, Tuple1[D1], S]): Batched[B, (D1, D2), S :* D2](using b = b.batchSize) with {}
-  given concat[B <: Tuple, T <: Tuple](using ValueOf[Size[B]], ValueOf[Size[T]]): Batched[B, T, B ++ T] with {}
   given shapeConcat[B <: Tuple, T <: Tuple](using ValueOf[Size[B]], ValueOf[Size[T]]): Batched[B, T, Shape.Concat[B, T]] with {}
 }
 
-object Batched extends BatchedPrio0 with BatchedPrio1 {
+object Batched extends BatchedPrio1 {
   given append[B <: Tuple, D](using ValueOf[Size[B]]): Batched[B, Tuple1[D], B :* D] with {}
 
   given d1[D <: Dim]: Batched[EmptyTuple, Tuple1[D], Tuple1[D]] with {}
