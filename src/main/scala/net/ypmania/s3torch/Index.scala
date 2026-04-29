@@ -65,7 +65,6 @@ object Index extends IndexPrio0 {
     def toIndex(i: Int) = At(i)
   }
 
-  // FIXME Align Select.First and Index.First
   /** Selects the first element in that dimension */
   case object First extends Index {
     def toNative = new pytorch.TensorIndex(0)

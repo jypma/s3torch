@@ -91,6 +91,8 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
       s2in.idx -> v2.toIndex(t._2.i)
     ), b.batchSize.value))
 
+  // TODO add variant with 3 selected indexes
+
   private def applyIndex(selected: Map[Int, Index], batchSize: Int): pytorch.Tensor = {
     val indices = (0.until(size.size - batchSize)).map(i => selected.get(i).getOrElse(Index.All))
     val allIndices = (0.until(batchSize)).map(_ => Index.All) ++ indices

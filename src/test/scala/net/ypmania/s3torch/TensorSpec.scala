@@ -9,13 +9,14 @@ import scala.reflect.ClassTag
 import DType.*
 import net.ypmania.s3torch.Dim.*
 import net.ypmania.s3torch.Select
+import net.ypmania.s3torch.Select.First
+import net.ypmania.s3torch.Select.Last
 import net.ypmania.s3torch.Select.dim
 import net.ypmania.s3torch.Shape.Scalar
 import net.ypmania.s3torch.internal.Broadcast
 import internal.MatMul
 import Device.CPU
 import Tuple.:*
-import scala.Tuple.Concat
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -1155,6 +1156,7 @@ class TensorSpec extends UnitSpec {
       val t = Tensor.zeros(DimA(2), DimB(3))
 
       it("can return the size of a selected dimension") {
+        assert(t.sizeOf(First).size == 2L)
         assert(t.sizeOf(dim[DimA]).size == 2L)
         assert(t.sizeOf(dim[DimB]).size == 3L)
       }
@@ -1179,7 +1181,7 @@ class TensorSpec extends UnitSpec {
     describe("std") {
       it("can calculate standard deviation") {
         var t = Tensor((1.0, 2.0, 3.0))
-        val res = t.stdBy(Select.Start)
+        val res = t.stdBy(First)
         val resType: Tensor[EmptyTuple, Float64, CPU.type] = res
         assert(res.size == Seq())
         assert(res.value == 1.0)
@@ -1193,7 +1195,7 @@ class TensorSpec extends UnitSpec {
           Tuple1(2),
           Tuple1(3)
         ))
-        val r = t.squeeze(Select.End) // Select.First gives a nice compile error.
+        val r = t.squeeze(Last) // Select.First gives a nice compile error.
         val rType: Tensor[Tuple1[Static[3L]], Int32, CPU.type] = r
         assert(r.size == Seq(3L))
       }
@@ -1362,7 +1364,7 @@ class TensorSpec extends UnitSpec {
       val matrix = Tensor.zeros(DimA, DimB)
 
       it("can unsqueeze after last") {
-        val r = vector.unsqueezeAfter(Select.End)
+        val r = vector.unsqueezeAfter(Last)
         val rType: Tensor[(DimA.type, Static[1L]), Float32, CPU.type] = r
         assert(r.size == Seq(2L, 1L))
         assert(r.value.toSeq == Seq(Seq(0), Seq(0)))
@@ -1397,7 +1399,7 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can unsqueeze before first") {
-        val r = vector.unsqueezeBefore(Select.Start)
+        val r = vector.unsqueezeBefore(First)
         val rType: Tensor[(Static[1L], DimA.type), Float32, CPU.type] = r
         assert(r.size == Seq(1L, 2L))
         assert(r.value.toSeq == Seq(Seq(0, 0)))

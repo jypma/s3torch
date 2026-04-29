@@ -7,10 +7,11 @@ import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Default.cuda
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Dim
+import net.ypmania.s3torch.Dim.One
 import net.ypmania.s3torch.Dim.|/
 import net.ypmania.s3torch.HeapExternal.scoped
-import net.ypmania.s3torch.Index
-import net.ypmania.s3torch.Select.Start
+import net.ypmania.s3torch.Select._
+import net.ypmania.s3torch.Index._
 import net.ypmania.s3torch.Tensor
 import net.ypmania.s3torch.nn.CrossEntropy
 import net.ypmania.s3torch.optim.Adam
@@ -86,14 +87,14 @@ class Translator[
         val label = batch(_.label)
         val encoderMask = batch { x =>
           // We need to add SeqLen and NHeads to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
-          val r = x.encoderMask.unsqueezeBefore(Start).unsqueezeBefore(Start)
+          val r = x.encoderMask.unsqueezeBefore(First).unsqueezeBefore(First)
           // Somehow, doesn't compile when inlined.
           r
         }
         val decoderMask = batch { x =>
           // We need to add NHeads to match the attention scores (Batch, NHeads, SeqLen, SeqLen).
           //println("decoderMask: " + x.decoderMask.to(Device.CPU).value.map(_.mkString(",")).mkString("\n"))
-          val r = x.decoderMask.unsqueezeBefore(Start)
+          val r = x.decoderMask.unsqueezeBefore(First)
           r
         }
 
@@ -133,9 +134,9 @@ class Translator[
         scoped {
           // TODO refactor encode and decode to use Batched, so we can remove the batch dimension here entirely.
           val encoderInput = x.encoderInput
-            .unsqueezeBefore(Start) // add BatchSize of 1
+            .unsqueezeBefore(First) // add BatchSize of 1
           val encoderMask = x.encoderMask
-            .unsqueezeBefore(Start).unsqueezeBefore(Start).unsqueezeBefore(Start) // add NHeads, SeqLen, BatchSize
+            .unsqueezeBefore(First).unsqueezeBefore(First).unsqueezeBefore(First) // add NHeads, SeqLen, BatchSize
 
           // Note: start of greedy_decode
           val source = encoderInput
@@ -146,13 +147,16 @@ class Translator[
           var decoderInput = Tensor(dst.sos :: Nil).shaped[InputSequenceLength]
           def inputLength = decoderInput.sizeOf(InputSequenceLength(_))
 
-          while (inputLength <= sequenceLength && !decoderInput(Index.Last).equal(Tensor(dst.eos))) {
+          while (inputLength <= sequenceLength && !decoderInput(Last).equal(Tensor(dst.eos))) {
             val nextToken = scoped {
               val decoderMask = causalMask(inputLength)
-              val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(Start)) // Add BatchSize
+              val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(First)) // Add BatchSize
 
-              // TODO investigate Dim -> Index tuple syntax here, so we can remove the comment
-              val in = out(Index.First, Index.Last, Index.All) // Grab the First (only) batch, and only the  Last token in that batch
+              // Grab the First (only) batch, and only the Last token in that batch
+              val in = out(
+                dim[One] % First,
+                dim[InputSequenceLength] % Last
+              )
               val prob = model.project(in)
               val p = prob.to(Device.CPU).value.toSeq.zipWithIndex.sortBy(_._1).reverse.take(10)
               val next = prob.maxBy(DstVocabSize).indices.to(Dst.dType).unsqueeze

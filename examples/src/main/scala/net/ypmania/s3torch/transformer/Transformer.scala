@@ -42,7 +42,7 @@ class Transformer[
   class PositionalEncoding[SeqLen <: Dim](seqLen: SeqLen, dropoutProb: Double) extends Module {
     val dropout = addModule("dropout", Dropout(dropoutProb))
 
-    val position = Tensor.arangeOfD(seqLen).unsqueezeAfter(End)
+    val position = Tensor.arangeOfD(seqLen).unsqueezeAfter(Last)
     val indices = Tensor.arangeOf(dModel) /|/ 2L
     val phase_offset = (Tensor.arangeOf(dModel) % 2L).toDType * (Math.PI * 0.5)
     val div_term = exp(indices.toDType * (-Math.log(10000.0) / dModel.size))
@@ -59,8 +59,8 @@ class Transformer[
     val bias = addParameter("bias", Tensor.zeros(1L))
 
     def apply[B <: Dim, SeqLen <: Dim](in: Batch[B, SeqLen]): Batch[B, SeqLen] = {
-      val mean = in.meanBy.keepDim(End) // FIXME verify this, video says "everything after batch" but picks last.
-      val std = in.stdBy.keepDim(End)
+      val mean = in.meanBy.keepDim(Last) // FIXME verify this, video says "everything after batch" but picks last.
+      val std = in.stdBy.keepDim(Last)
 
       alpha * (in - mean) / (std + eps) + bias
     }
@@ -116,7 +116,7 @@ class Transformer[
       val attentionScores =
         (q `@` k.t / Math.sqrt(dModel.size.toDouble / nHeads.size))
           .when(mask.map(_ #== false))(_.maskedFilled(_, 1e-20))
-          .softmax(End)
+          .softmax(Last)
       ~> dropout.apply
 
       // TODO save the attention scores somehow, they're apparently needed for visualization later.

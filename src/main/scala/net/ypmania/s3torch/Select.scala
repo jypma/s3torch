@@ -11,12 +11,12 @@ trait Select[S <: Shape, D, Idx <: Int] {
 
 object Select {
   /** Selects the first dimension (with index 0) */
-  case object Start
-  given first[S <: Shape]: Select[S, Start.type, 0] with {}
+  val First = Index.First // reuse so we don't have to make a new name here
+  given first[S <: Shape]: Select[S, First.type, 0] with {}
 
   /** Selects the last dimension (with the highest index) */
-  case object End
-  given last[S <: Shape]: Select[S, End.type, Tuple.Size[S] - 1] with {}
+  val Last = Index.Last  // reuse so we don't have to make a new name here
+  given last[S <: Shape]: Select[S, Last.type, Tuple.Size[S] - 1] with {}
 
   /** Selects a dimension by their exact type. */
   given dimFound[Head <: Dim, Tail <: Shape]: Select[Head *: Tail, Head, 0] with {}
