@@ -373,11 +373,21 @@ class TensorSpec extends UnitSpec {
       val v = Tensor((1, 2, 3))
       trait Row extends Dim.Dynamic
       trait Column extends Dim.Dynamic
+      trait ZPos extends Dim.Dynamic
       val m = Tensor((
         ((1, 2, 3)),
         ((0, 2, 0))
       )).shaped[(Row, Column)]
-
+      val cube = Tensor((
+        ((
+          ((1, 2, 3)),
+          ((4, 5, 6))
+        )),
+        ((
+          ((7, 8, 9)),
+          ((10, 11, 12))
+        ))
+      )).shaped[(ZPos, Row, Column)]
       it("can select one element from a static vector statically") {
         // v(3) will nicely give a compile error here.
         val r = v(0)
@@ -439,6 +449,27 @@ class TensorSpec extends UnitSpec {
         val rType: Tensor[EmptyTuple, Int32, CPU.type] = r
         assert(r.size == Seq())
         assert(r.value == 3)
+      }
+
+      it("can select one element from a cube using explicit dimensions and Index subclasses") {
+        val r = cube(
+          dim[ZPos] % Index.First,
+          dim[Row] % Index.First,
+          dim[Column] % Index.Last,
+        )
+        val rType: Tensor[EmptyTuple, Int32, CPU.type] = r
+        assert(r.size == Seq())
+        assert(r.value == 3)
+      }
+
+      it("can select one vector from a cube using 2 explicit dimensions") {
+        val r = cube(
+          dim[ZPos] % Index.First,
+          dim[Column] % Index.Last,
+        )
+        val rType: Tensor[Row *: EmptyTuple.type, Int32, CPU.type] = r
+        assert(r.size == Seq(2))
+        assert(r.value === Seq(3, 6))
       }
 
       it("can select one element from a matrix using positions") {

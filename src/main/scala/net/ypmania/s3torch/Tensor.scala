@@ -91,7 +91,26 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
       s2in.idx -> v2.toIndex(t._2.i)
     ), b.batchSize.value))
 
-  // TODO add variant with 3 selected indexes
+  /** Selects elements from this Tensor by picking an explicit dimension and index, e.g.:
+    *     myTensor(Pick[MyDim] % Last, Pick[OtherDim] % First, Pick[ThirdDim] % 0)
+    * will pick elements in those dimensions (removing them), retaining all other dimensions.
+    */
+  def apply[B <: Tuple, L <: Tuple, S1, I1 <: Index, S2, I2 <: Index, S3, I3 <: Index](
+    t: (SelectAndIndex[S1, I1], SelectAndIndex[S2, I2], SelectAndIndex[S3, I3])
+  )(using
+    b:Batched[B, L, S],
+    s1:SelectIdx[L, S1], v1: Index.Valid[Elem[L, s1.Idx], I1],
+    s2in:SelectIdx[L, S2],
+    s2:SelectIdx[ReplaceWithTuple[L, v1.Apply, s1.Idx], S2], v2: Index.Valid[Elem[ReplaceWithTuple[L, v1.Apply, s1.Idx], s2.Idx], I2],
+    //s3in:SelectIdx[ReplaceWithTuple[L, v1.Apply, s1.Idx], S3],
+    s3in:SelectIdx[L, S3],
+    s3:SelectIdx[ReplaceWithTuple[ReplaceWithTuple[L, v1.Apply, s1.Idx], v2.Apply, s2.Idx], S3], v3: Index.Valid[Elem[ReplaceWithTuple[ReplaceWithTuple[L, v1.Apply, s1.Idx], v2.Apply, s2.Idx], s3.Idx], I3]
+  ): Shaped[Concat[B, ReplaceWithTuple[ReplaceWithTuple[ReplaceWithTuple[L, v1.Apply, s1.Idx], v2.Apply, s2.Idx], v3.Apply, s3.Idx]]] =
+    new Tensor(applyIndex(Map(
+      s1.idx -> v1.toIndex(t._1.i),
+      s2in.idx -> v2.toIndex(t._2.i),
+      s3in.idx -> v3.toIndex(t._3.i)
+    ), b.batchSize.value))
 
   private def applyIndex(selected: Map[Int, Index], batchSize: Int): pytorch.Tensor = {
     val indices = (0.until(size.size - batchSize)).map(i => selected.get(i).getOrElse(Index.All))
