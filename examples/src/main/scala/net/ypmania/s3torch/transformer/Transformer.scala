@@ -48,7 +48,7 @@ class Transformer[
     val div_term = exp(indices.toDType * (-Math.log(10000.0) / dModel.size))
     val positionalEncodingDeltas = addBuffer("pe", sin(position * div_term + phase_offset))
 
-    def apply[B <: Dim, L <: Dim](in: Batch[B, L]): Batch[B, L] = {
+    def apply[B <: Dim, L <: Dim](in: Batch[B, L])(using L |<= SeqLen): Batch[B, L] = {
       val deltas = positionalEncodingDeltas(Index.Take(in.sizeOf(dim[L])), Index.All)
       dropout(in + deltas)
     }
@@ -236,15 +236,20 @@ class Transformer[
 
     // TODO Why only int32, not also int64 or other ints?
     def encode[B <: Dim, M <: Shape, T <: Int32, SrcLen <: Dim](src: Tensor[(B, SrcLen), T, D], srcMask: MaskTn[M])(
-      using Broadcastable[AttentionScores[B, SrcLen, SrcLen], M]
+      using Broadcastable[AttentionScores[B, SrcLen, SrcLen], M], SrcLen |<= SrcSeqLen
     ): Batch[B, SrcLen] = {
       src ~> sourceEmb.apply ~> sourcePos.apply ~> encoder(srcMask)
     }
 
-    def decode[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EM <: Shape, DM <: Shape, T <: Int32]
-      (encoderOutput: Batch[B, SrcLen], encoderMask: MaskTn[EM], decoderMask: MaskTn[DM])(tgt: Tensor[(B, TgtLen), T, D])
-      (using Broadcastable[AttentionScores[B, TgtLen, TgtLen], DM], Broadcastable[AttentionScores[B, TgtLen, SrcLen], EM])
-        : Batch[B, TgtLen] = {
+    def decode[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EM <: Shape, DM <: Shape, T <: Int32] (
+      encoderOutput: Batch[B, SrcLen], encoderMask: MaskTn[EM], decoderMask: MaskTn[DM]
+    )(
+      tgt: Tensor[(B, TgtLen), T, D]
+    )(using
+      Broadcastable[AttentionScores[B, TgtLen, TgtLen], DM],
+      Broadcastable[AttentionScores[B, TgtLen, SrcLen], EM],
+      TgtLen |<= TgtSeqLen
+    ) : Batch[B, TgtLen] = {
       tgt ~> targetEmb.apply ~> targetPos.apply ~> decoder(encoderOutput, encoderMask, decoderMask)
     }
 

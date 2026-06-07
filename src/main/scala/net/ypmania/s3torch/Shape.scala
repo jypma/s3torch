@@ -105,4 +105,17 @@ object Shape {
   type AOf[S <: Shape] = Last[Init[S]]
   /** The "B" matrix dimension, i.e. the second one */
   type BOf[S <: Shape] = Last[S]
+
+  /** Given that can be pulled in to get the last dimension of [S], as a Dim. */
+  trait LastDim[S <: Shape] {
+    type D <: Dim
+  }
+  object LastDim {
+    given [A <: Dim]: LastDim[Tuple1[A]] with {
+      type D = A
+    }
+    given [S <: Tuple, A <: Dim](using l: LastDim[S]): LastDim[A *: S] with {
+      type D = l.D
+    }
+  }
 }

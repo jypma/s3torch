@@ -3,6 +3,12 @@ package net.ypmania.s3torch
 import scala.compiletime.ops.int.ToLong
 import scala.compiletime.ops.long._
 
+/**
+  * One of a Tensor's dimensions. Since dimensions are ideally used as unique types as well as values, a Dim subtype should only have one value.
+  * For example:
+  * - Dim.Static (its size is known at compile time, so all values are equivalent)
+  * - Dim.Dynamic (have a class extend that, and only create a single value of that type, with the actual run-time dimension value)
+  */
 trait Dim extends Ordered[Dim] {
   def size: Long
   override def compare(that: Dim) = java.lang.Long.compare(this.size, that.size)
@@ -19,6 +25,19 @@ object Dim extends DimLowPriorityGivens {
   extension [D <: Dim](dim: D) {
     /** Compares this selected dimension and the given index into SelectAndIndex, which use used in Tensor.apply. */
     def %[I <: Index](i: I) = SelectAndIndex(dim, i)
+
+    /** Gathers evidence that this dimension is less than or equal to [that], which can be imported as a given, using e.g.:
+      * for (ev <- thisDim |<= thatDim) {
+      *   import ev.given
+      *   ???
+      * }
+      * Returns None if this is in fact larger than that.
+      */
+    def |<=[B <: Dim](that: B): Option[KnownLessThan[D, B]] = Option.when(dim.size <= that.size)(new KnownLessThan[D, B] {})
+  }
+
+  trait KnownLessThan[A <: Dim, B <: Dim] {
+    given proof: A |<= B with {}
   }
 
   /** A dimension known at compile time */
@@ -62,11 +81,25 @@ object Dim extends DimLowPriorityGivens {
   object DivisibleBy {
     given [A <: Dim, B <: Dim](using StaticSize[A] % StaticSize[B] =:= 0L): DivisibleBy[A, B] with {}
   }
+  /** Proof that D is divisible by L */
   infix type |/[+D <: Dim, +L <: Dim] = DivisibleBy[D, L]
 
   /** A Dim that is the result of dividing two other Dims */
   trait DividedDim[D <: Dim, L <: Dim] extends Dim {}
+  /** A Dim that is the result of dividing two other Dims */
   infix type /[D <: Dim, L <: Dim] = DividedDim[D, L]
+
+  /** Proof that A is less than or equal to B */
+  trait LessOrEqual[A <: Dim, B <: Dim] {}
+  trait LessOrEqualPrio0 {
+    given [A <: Dim, B <: Dim](using StaticSize[A] <= StaticSize[B] =:= true): LessOrEqual[A, B] with {}
+    given [A <: Dim]: LessOrEqual[A, A] with {}
+  }
+  object LessOrEqual extends LessOrEqualPrio0 {
+    given refB[A <: Dim, B <: Dim](using LessOrEqual[A, Ref[B]]): LessOrEqual[A, B] with {}
+  }
+  /** Proof that A is less than or equal to B */
+  infix type |<=[A <: Dim, B <: Dim] = LessOrEqual[A, B]
 
   /** A Dim that references the type of another Dim, of which the value is known, but no instance to
     * the actual Dim subclass is available. */
@@ -74,6 +107,10 @@ object Dim extends DimLowPriorityGivens {
   object Ref {
     def apply[D <: Dim](target: D) = new Ref[D](target.size)
   }
+  extension [D <: Dim](dim: Ref[D]) {
+    def |<=[B <: Dim](that: B): Option[KnownLessThan[D, B]] = Option.when(dim.size <= that.size)(new KnownLessThan[D, B] {})
+  }
+
 
   trait UnRef[D <: Dim] {
     type Out <: Dim

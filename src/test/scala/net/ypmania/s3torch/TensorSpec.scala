@@ -17,6 +17,7 @@ import net.ypmania.s3torch.internal.Broadcast
 import internal.MatMul
 import Device.CPU
 import Tuple.:*
+import Control.whileDefined
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -660,6 +661,18 @@ class TensorSpec extends UnitSpec {
         val r = m1 ++ m2
         val rType: Tensor[(Dim.Dynamic, Static[3L]), Float32, CPU.type] = r
         assert(r.size == Seq(3L, 3L))
+      }
+
+      it("can concatenate a dynamic dimension in a loop, up to another dimension") {
+        class L(size: Long) extends Dim.Dynamic(size)
+        case object MaxDim extends Dim.Static[5L]
+        var r = Tensor.zeros(1L).shaped[Tuple1[L]]
+        whileDefined(r.sizeOf(dim[L]) |<= MaxDim) { ev =>
+          import ev.given
+          val proof = summon[L |<= MaxDim.type]
+          r ++= Tensor.zeros(1L)
+        }
+        assert(r.size == Seq(6L))
       }
 
       it("can concatenate two unequal matrices along the second dimension") {

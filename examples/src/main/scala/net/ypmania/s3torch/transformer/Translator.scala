@@ -9,6 +9,7 @@ import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Dim.One
 import net.ypmania.s3torch.Dim.|/
+import net.ypmania.s3torch.Dim.|<=
 import net.ypmania.s3torch.HeapExternal.scoped
 import net.ypmania.s3torch.Select._
 import net.ypmania.s3torch.Index._
@@ -148,6 +149,8 @@ class Translator[
           def inputLength = decoderInput.sizeOf(InputSequenceLength(_))
 
           while (inputLength <= sequenceLength && !decoderInput(Last).equal(Tensor(dst.eos))) {
+            given InputSequenceLength |<= SequenceLength with {}
+
             val nextToken = scoped {
               val decoderMask = causalMask(inputLength)
               val out = model.decode(encoderOutput, sourceMask, decoderMask)(decoderInput.unsqueezeBefore(First)) // Add BatchSize

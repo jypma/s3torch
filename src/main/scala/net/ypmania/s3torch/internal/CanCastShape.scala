@@ -24,7 +24,10 @@ trait CanShaped[I <: Shape, O] {
   type Out <: Shape
 }
 
-object CanShaped {
+trait CanShapedPrio0 {
   given tuple[I <: Shape, O <: Shape](using CanCastShape[I, O]): CanShaped[I, O] with { type Out = O }
+}
+
+object CanShaped extends CanShapedPrio0 {
   given single[I <: Dim, O <: Dim](using CanCastShape.CanCastDim[I, O]): CanShaped[Tuple1[I], O] with { type Out = Tuple1[O] }
 }

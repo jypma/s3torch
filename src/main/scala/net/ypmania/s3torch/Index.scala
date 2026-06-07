@@ -8,6 +8,8 @@ import scala.compiletime.ops.int.ToLong
 import scala.compiletime.ops.long.<
 import scala.util.NotGiven
 
+import Dim.|<=
+
 /** A way to specify an index, or range of indexes, into a given dimension. */
 trait Index {
   def toNative: pytorch.TensorIndex
@@ -30,9 +32,6 @@ trait IndexPrio0 {
   }
 }
 
-// Runtime: What does native index to with fewer than [size] slice arguments?
-// Syntax: Add tuple syntax, and default to "Index.All" for all dimensions that aren't given
-// Syntax: (for the above) Allow selection on Append[X] types, rather than only tuples.
 object Index extends IndexPrio0 {
   @implicitNotFound("Index is not valid for this tensor. Perhaps it is out of bounds?")
   trait Valid[D, I] {
@@ -93,7 +92,6 @@ object Index extends IndexPrio0 {
   }
 
   /** Selects elements exactly sized [D] (D must be smaller than or equal than the current dimension in the shape) */
-  // TODO consider introducing the type D1 |<= D2 to prove that D1 is smaller than or equal to D2
   case class Take[D] private (drop: Long, size: Long) extends Index {
     def toNative = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(Some(drop)), toSymInt(Some(drop + size)), toSymInt(None)))
   }
@@ -107,7 +105,7 @@ object Index extends IndexPrio0 {
     /** Selects [D] elements starting from [drop] (D must be smaller than or equal than the current dimension in the shape) */
     def apply[D <: Dim](dim: D, drop: Long): Take[D] = new Take(drop, dim.size)
   }
-  given givtake[D <: Dim, O]: Valid[D, Take[O]] with {
+  given givtake[D <: Dim, O <: Dim](using O |<= D): Valid[D, Take[O]] with {
     type Apply = Tuple1[O]
     def toIndex(i: Take[O]) = i
   }

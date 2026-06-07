@@ -3,6 +3,7 @@ package net.ypmania.s3torch.internal
 import net.ypmania.s3torch.Dim.Dynamic
 import net.ypmania.s3torch.Dim.One
 import net.ypmania.s3torch.Dim.Static
+import net.ypmania.s3torch.Dim.|<=
 import net.ypmania.s3torch._
 
 import scala.util.NotGiven
@@ -32,7 +33,10 @@ object Broadcast {
     given oneA[D <: Dim]: Max[One, D, D] with {}
     given oneB[D <: Dim]: Max[D, One, D] with {}
   }
-  object Max extends MaxPrio2 {
+  trait MaxPrio3 extends MaxPrio2 {
+    given lt[A <: Dim, B <: Dim](using A |<= B): Max[A, B, B] with {}
+  }
+  object Max extends MaxPrio3 {
     // Same type => pick any
     given same[A <: Dim, B <: Dim](using A =:= B): Max[A, B, A] with {}
   }

@@ -3,10 +3,12 @@ package net.ypmania.s3torch
 import net.ypmania.s3torch.Shape.Elem
 import net.ypmania.s3torch.Shape.SameSize
 import net.ypmania.s3torch.Shape.Concat
+import net.ypmania.s3torch.Shape.LastDim
 import net.ypmania.s3torch.Shape.Remove
 import net.ypmania.s3torch.Shape.Replace
 import net.ypmania.s3torch.Shape.ReplaceWithTuple
 import net.ypmania.s3torch.Dim.UnRef
+import net.ypmania.s3torch.Dim.|<=
 import org.bytedeco.pytorch
 import org.bytedeco.pytorch.ScalarTypeOptional
 import org.bytedeco.pytorch.global.torch
@@ -229,7 +231,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   val maxBy = new MaxReduceOp
 
   /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
-  def padTo[D <: Dim, V](dim: D, value: V, mode: PaddingMode = PaddingMode.Append)(using ops: DTypeOps.Scalar[T, V]): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
+  def padTo[D <: Dim, V](dim: D, value: V, mode: PaddingMode = PaddingMode.Append)(using ops: DTypeOps.Scalar[T, V], last: LastDim[S], ev: last.D |<= D): Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]] = {
     val n = dim.size - size.last
     if (n == 0) new Tensor(native) else {
       assert(n > 0, s"Can't pad dimension of size ${size.last} to lower size ${dim.size}")
@@ -244,7 +246,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   /** Returns a new tensor with the last dimension padded to [dim]. If the source is bigger than [dim], returns None. */
   def padToOption[D <: Dim, V](dim: D, value: V, mode: PaddingMode = PaddingMode.Append)(using ops:DTypeOps.Scalar[T, V]): Option[Shaped[Shape.Replace[S, D, Shape.LastIdx[S]]]] = {
-    Option.when(dim.size - size.last >= 0)(padTo(dim, value, mode))
+    Option.when(dim.size - size.last >= 0)(padTo(dim, value, mode)(using last = null, ev = null))
   }
 
   /** Casts the shape of this tensor into compatible shape [O] (which must be a Tuple of Dim's, or a single Dim) */
@@ -342,6 +344,9 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     type Out[L <: Shape, I1 <: Int, I2 <: Int] = Shape.Swap[L, I1, I2]
     def run[L <: Shape, I1 <: Int, I2 <: Int](i1: Int, i2: Int) = native.transpose(i1, i2)
   }
+
+  /** Swaps the last two dimensions. Tensor must have >= 2 dimensions. Alias for "t". */
+  def ⊤[R <: Tuple](using Transpose[S, R]): Shaped[R] = t
 
   /** Swaps the last two dimensions. Tensor must have >= 2 dimensions. */
   def t[R <: Tuple](using Transpose[S, R]): Shaped[R] = {
