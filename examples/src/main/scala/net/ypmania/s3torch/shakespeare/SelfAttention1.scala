@@ -19,6 +19,7 @@ import net.ypmania.s3torch.Select.dim
 import net.ypmania.s3torch.internal.Multinomial
 import net.ypmania.s3torch.nn.Linear
 import net.ypmania.s3torch.Index.Take
+import scala.Tuple.:*
 
 // DModel (number of embedding dimensions): 32
 // Note for presentation: Video timestamp 1:21:13
@@ -29,14 +30,16 @@ class SelfAttention1[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: 
     val value = addModule("value", Linear(dModel, size, bias = false))
     val tril = addBuffer("tril", Tensor.ones(maxBlockSize, maxBlockSize).tril())
 
-    def apply[B <: Dim, L <: Dim](x: Tensor[(B, L, DModel), Float32, D])(using L |<= MaxBlockSize) = {
+    def apply[S <: Tuple, B <: Tuple, L <: Dim](x: Tensor[S, Float32, D])(using b: Batched[B, (L, DModel), S])(using L |<= MaxBlockSize) = {
+      import b.given
+
       val k = key(x)
       val q = query(x)
       // Let's take only the part of tril up to [L]
       val trilPart = tril(Take(x.sizeOf(dim[L])), Take(x.sizeOf(dim[L])))
       val wei =
         ((q `@` k.t) / Math.sqrt(dModel.size.toDouble))
-          .maskedFilled(trilPart #== 0.0, 1e-20 /* -Inf in video */)
+          .maskedFilled(trilPart #== 0.0, Double.NegativeInfinity) //  1e-20 works a LOT worse here.
           .softmax(Last)
 
       val v = value(x)
@@ -55,8 +58,10 @@ class SelfAttention1[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: 
     CrossEntropy(predicted, actual)
   }
 
-  // TODO rewrite, this actually extends Length with one.
-  def extend[B <: Dim, Length <: Dim.Dynamic, T <: Int64](idx: Tensor[(B, Length), T, D])(using Length |<= MaxBlockSize): Tensor[(B, Length), T, D] = {
+  // TODO rewrite, this actually extends Length with one, so |<= isn't guaranteed.
+  def extend[S <: Tuple, B <: Tuple, Length <: Dim.Dynamic, T <: Int64](idx: Tensor[S, T, D])(using b: Batched1[B, Length, S])(using Length |<= MaxBlockSize): Tensor[S, T, D] = {
+    import b.given
+
     val predicted = logits(idx)(dim[Length] % Last)
     val probs = predicted.softmax(vocabSize)
     val next = probs.multinomial(Dim.One).toDTypeOf(idx)
@@ -64,7 +69,8 @@ class SelfAttention1[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: 
     idx.cat(next)(dim[Length])
   }
 
-  private def logits[B <: Dim, Length <: Dim, T <: Int64](idx: Tensor[(B, Length), T, D])(using Length |<= MaxBlockSize): Tensor[(B, Length, VocabSize), Float32, D] = {
+  private def logits[S <: Tuple, B <: Tuple, Length <: Dim, T <: Int64](idx: Tensor[S, T, D])(using b: Batched1[B, Length, S])(using Length |<= MaxBlockSize): Tensor[B :* Length :* VocabSize, Float32, D] = {
+    import b.given
 
     val tok = tokenEmbedding(idx)
     val len = idx.sizeOf(dim[Length])

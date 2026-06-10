@@ -17,7 +17,10 @@ import net.ypmania.s3torch.internal.Broadcast
 import internal.MatMul
 import Device.CPU
 import Tuple.:*
+import Tuple.++
 import Control.whileDefined
+import net.ypmania.s3torch.Shape.Size
+import scala.Tuple.Concat
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -814,6 +817,18 @@ class TensorSpec extends UnitSpec {
         ))
       }
 
+      it("can find broadcast types in a batched invocation of unknown batch type") {
+        def doIt1[B <: Tuple, L <: Dim](a: Tensor[B :* L, Float32, CPU.type], b: Tensor[Tuple1[L], Bool, CPU.type]) = {
+          val r = a.maskedFilled(b, 0.0)
+          val rType: Tensor[B :* L, Float32, CPU.type] = r
+        }
+
+        def doIt2[B <: Tuple, L <: Dim](a: Tensor[B ++ (L, L), Float32, CPU.type], b: Tensor[(L, L), Bool, CPU.type]) = {
+          val r = a.maskedFilled(b, 0.0)
+          val rType: Tensor[B ++(L, L), Float32, CPU.type] = r
+        }
+      }
+
     }
 
     describe("maskedFilled") {
@@ -895,7 +910,7 @@ class TensorSpec extends UnitSpec {
         assert(r.size == Seq(1L, DimA.size, DimC.size))
       }
 
-      it("can broadcast uneqeual batches of matrices") {
+      it("can broadcast unequal batches of matrices") {
         val a = Tensor.zeros(1L, DimA, DimB)
         val b = Tensor.zeros(2L, DimB, DimC)
         val r = a.matmul(b)
@@ -941,6 +956,23 @@ class TensorSpec extends UnitSpec {
         val r = a.matmul(b)
         val rType: Tensor[(Static[2L], DimA.type, DimC.type), Float32, CPU.type] = r
         assert(r.size == Seq(2L, DimA.size, DimC.size))
+      }
+
+      it("can multiply appended matrixes in an unknown batch") {
+        def doIt[B <: Tuple, T1 <: Dim, T2 <: Dim, S1 <: Tuple, S2 <: Tuple](a: Tensor[S1, Float32, CPU.type], b: Tensor[S2, Float32, CPU.type])(using b1: Batched[B, (T1, T2), S1], b2: Batched[B, (T2, T1), S2]) = {
+          import b1.given
+          //val b1 = summon[Batched[B, (T1, T2), B :* T1 :* T2]]
+
+          val r = a `@` b
+          val rType: Tensor[B ++ (T1, T1), Float32, CPU.type] = r
+          r
+        }
+
+        val a = Tensor.zeros(3L, 1L, 2L)
+        val b = Tensor.zeros(3L, 2L, 1L)
+        val r = doIt(a, b)
+        val rType: Tensor[(Static[3L], Static[1L], Static[1L]), Float32, CPU.type] = r
+        assert(r.size == Seq(3L, 1L, 1L))
       }
     }
 
@@ -1337,6 +1369,16 @@ class TensorSpec extends UnitSpec {
       it("can transpose a batched matrix") {
         val m = Tensor.zeros(1L, 2L, 3L)
         val r = m.t
+        val rType: Tensor[(Static[1L], Static[3L], Static[2L]), Float32, CPU.type] = r
+        assert(r.size == Seq(1L, 3L, 2L))
+      }
+
+      it("can transpose a batched matrix, where the batch is a given and unknown") {
+        def doIt[S <: Shape, B <: Shape](x: Tensor[S, Float32, CPU.type])(using b: Batched[B, (Static[2L], Static[3L]), S]) = {
+          x.t
+        }
+        val m = Tensor.zeros(1L, 2L, 3L)
+        val r = doIt(m)
         val rType: Tensor[(Static[1L], Static[3L], Static[2L]), Float32, CPU.type] = r
         assert(r.size == Seq(1L, 3L, 2L))
       }

@@ -7,11 +7,17 @@ import net.ypmania.s3torch.Shape.BOf
 import net.ypmania.s3torch.Shape.BatchOf
 
 import Tuple._
+import net.ypmania.s3torch.Batched
 
 trait MatMul[S1 <: Tuple, S2 <: Tuple, R <: Tuple]
 
+trait MatMulPrio0 {
+  // Multiply two matrices, if both are batched in the same way
+  given batchd2[BT <: Tuple, SA <: Tuple, SB <: Tuple, A <: Dim, B <: Dim, Z <: Dim](using Batched[BT, (A, Z), SA], Batched[BT, (Z, B), SB]): MatMul[SA, SB, BT ++ (A, B)] with {}
+}
+
 // Comments come from https://docs.pytorch.org/docs/stable/generated/torch.matmul.html
-object MatMul {
+object MatMul extends MatMulPrio0 {
   //If both tensors are 1-dimensional, the dot product (scalar) is returned.
   given d1[D <: Dim]: MatMul[Tuple1[D], Tuple1[D], Shape.Scalar] with {}
 
@@ -29,6 +35,8 @@ object MatMul {
   // 1-dimensional, the matrix-vector product is returned.
   // So, AxB matmul B, returning A
   given d1b[A <: Dim, B <: Dim]: MatMul[(A, B), Tuple1[B], Tuple1[A]] with {}
+
+  // The below "batching" variants are still included as fallbacks, since they define matrix multiplication for non-equal batches.
 
   // Broadcast for matrices
   given bt[D1 <: Tuple, D2 <: Tuple, R <: Tuple, BR <: Tuple](using

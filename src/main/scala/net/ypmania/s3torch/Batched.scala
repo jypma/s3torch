@@ -1,7 +1,6 @@
 package net.ypmania.s3torch
 
 import Tuple._
-import scala.compiletime.ops.int.+
 
 /** Proof that shape [S] is in fact the concatenation of (potentially call-site unknown) batch dimensions [B] with actual, known dimensions [T] */
 abstract class Batched[B <: Tuple, T <: Tuple, S <: Tuple](using b:ValueOf[Size[B]], t:ValueOf[Size[T]]) {
@@ -19,15 +18,18 @@ trait BatchedPrio0 {
     b = ValueOf((b.batchSize.value + 1).asInstanceOf[Size[B :* D1]]),
     t = ValueOf((b.tailSize.value - 1).asInstanceOf[Size[T]])
   ) with {}
-  given concat[B <: Tuple, T <: Tuple](using ValueOf[Size[B]], ValueOf[Size[T]]): Batched[B, T, B ++ T] with {}
 }
 
 trait BatchedPrio1 extends BatchedPrio0 {
+  given concat[B <: Tuple, T <: Tuple](using ValueOf[Size[B]], ValueOf[Size[T]]): Batched[B, T, B ++ T] with {}
+}
+
+trait BatchedPrio2 extends BatchedPrio1 {
   given append2[B <: Tuple, S <: Tuple, D1, D2](using b:Batched[B, Tuple1[D1], S]): Batched[B, (D1, D2), S :* D2](using b = b.batchSize) with {}
   given shapeConcat[B <: Tuple, T <: Tuple](using ValueOf[Size[B]], ValueOf[Size[T]]): Batched[B, T, Shape.Concat[B, T]] with {}
 }
 
-object Batched extends BatchedPrio1 {
+object Batched extends BatchedPrio2 {
   given append[B <: Tuple, D](using ValueOf[Size[B]]): Batched[B, Tuple1[D], B :* D] with {}
 
   given d1[D <: Dim]: Batched[EmptyTuple, Tuple1[D], Tuple1[D]] with {}

@@ -16,10 +16,11 @@ import net.ypmania.s3torch.HeapExternal.scoped
 import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Dim.Ref
 import net.ypmania.s3torch.Dim.KnownLessThan
+import net.ypmania.s3torch.Control.whileDefined
 
-//import net.ypmania.s3torch.Default.cuda
-//type Dv = CUDA.type
-type Dv = CPU.type
+import net.ypmania.s3torch.Default.cuda
+type Dv = CUDA.type
+//type Dv = CPU.type
 
 object ShakespeareGen {
   case object Tok extends Token64Type
@@ -29,11 +30,14 @@ object ShakespeareGen {
   type TokT[S <: Tuple] = Tensor[S, Tok.DType, Dv]
 
   // for Bigram, ~2.4 loss
-  case object BatchSize extends Dim.Static[32L]
+  // for SelfAttention, 2.7 loss after 40000
+  // for SelfAttention1, 2.7 loss after 40000, but drops faster
+  case object BatchSize extends Dim.Static[64L]
   val trainingRounds = 40000
   val printLossEvery = 1000
-  // val learningRate = 1e-4 // SelfAttention1
-  val learningRate = 1e-5 // SelfAttention
+  val learningRate = 1e-5 // SelfAttention1
+  // val learningRate = 1e-5 // SelfAttention
+  // val learningRate = 1e-4 // Bigram
 
   case class Batch(
     x: TokT[(BatchSize.type, BlockSize.type)],
@@ -77,7 +81,8 @@ object ShakespeareGen {
       println(VocabSize) // 66
       case object MaxBlockSize extends Dim.Static[92L]
       case object DModel extends Dim.Static[32L]
-      //val model = new Bigram(VocabSize)
+      // val model = new Bigram(VocabSize)
+      //val model = new SelfAttention(VocabSize, MaxBlockSize, DModel)
       val model = new SelfAttention1(VocabSize, MaxBlockSize, DModel)
 
       def estimateLoss[D <: Dim.Dynamic](data: TokT[Tuple1[D]])(using BlockSize.type |<= D) =
@@ -109,8 +114,11 @@ object ShakespeareGen {
       }
 
       println("final loss: " + finalLoss)
-      var gen = Tensor(Tokenizer.tokenize("\n"))
-      while (gen.sizeOf(Idx(0)) < MaxBlockSize) {
+
+      class ExampleSize(size: Long) extends Dim.Dynamic(size)
+      var gen = Tensor(Tokenizer.tokenize("\n")).shaped[Tuple1[ExampleSize]]
+      whileDefined(gen.sizeOf(ExampleSize(_)) |<= MaxBlockSize) { ev =>
+        import ev.given
         gen = model.extend(gen)
       }
       println(Tokenizer.untokenize(gen.to(CPU).value))
