@@ -34,10 +34,28 @@ object Dim extends DimLowPriorityGivens {
       * Returns None if this is in fact larger than that.
       */
     def |<=[B <: Dim](that: B): Option[KnownLessThan[D, B]] = Option.when(dim.size <= that.size)(new KnownLessThan[D, B] {})
+
+    /** Gathers evidence that this dimension is divisable by [that], which can be imported as a given, using e.g.:
+      * for (ev <- thisDim |/ thatDim) {
+      *   import ev.given
+      *   ???
+      * }
+      * Returns None otherwise.
+      */
+    def |/[B <: Dim](that: B): Option[KnownDivisibleBy[D, B]] = Option.when(dim.size <= that.size)(new KnownDivisibleBy[D, B] {})
+
+    /** Returns a Dim representing this dim divided by [that], given that this dim is dividable by that. */
+    def /[B <: Dim](that: B)(using D |/ B): D / B = new DividedDim[D, B] {
+      def size = dim.size / that.size
+    }
   }
 
   trait KnownLessThan[A <: Dim, B <: Dim] {
     given proof: A |<= B with {}
+  }
+
+  trait KnownDivisibleBy[A <: Dim, B <: Dim] {
+    given proof: A |/ B with {}
   }
 
   /** A dimension known at compile time */

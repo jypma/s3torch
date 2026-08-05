@@ -31,12 +31,13 @@ case object Columns extends Static[10L]
 
 A tensor has the following type signature:
 ```scala
-class Tensor[S <: Tuple, T <: DType]
+class Tensor[S <: Tuple, T <: DType, D <: Device]
 ```
 
 where
-- `T` is the data type. `DType` is modeled, much like `storch`, as a simple enumeration-like sealed trait with entries like `Float32` or `Int8`.
 - `S` is the "shape", or dimensions, of the tensor. This is a `Tuple`, where each element must be a subclass of `Dim`. 
+- `T` is the data type. `DType` is modeled, much like `storch`, as a simple enumeration-like sealed trait with entries like `Float32` or `Int8`.
+- `D` is the device on which the tensor lives (typically `CPU`, but can be `CUDA` for a graphics card). Only tensors on the same device can interact.
 
 ## Examples of type safety
 

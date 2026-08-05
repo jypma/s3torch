@@ -7,7 +7,7 @@ import Dim.Static
 import Dim.Dynamic
 import scala.reflect.ClassTag
 import DType.*
-import net.ypmania.s3torch.Dim.*
+import net.ypmania.s3torch.Dim.{*}
 import net.ypmania.s3torch.Select
 import net.ypmania.s3torch.Select.First
 import net.ypmania.s3torch.Select.Last
@@ -19,8 +19,7 @@ import Device.CPU
 import Tuple.:*
 import Tuple.++
 import Control.whileDefined
-import net.ypmania.s3torch.Shape.Size
-import scala.Tuple.Concat
+import scala.Tuple.Append
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -256,6 +255,45 @@ class TensorSpec extends UnitSpec {
           Seq(1, 2, 3),
           Seq(4, 5, 6)
         ))
+      }
+    }
+
+    describe("cat") {
+      case object CatDim extends Dim.Static[3L]
+      val ts = TensorValue.arangeOf(CatDim).map(_ => Tensor.zeros(4L, 5L, 6L))
+
+      it("can concatenate tensors along first dim") {
+        val r = Tensor.cat(ts, First)
+        val rType: Tensor[(CatDim.type * Static[4L], Static[5L], Static[6L]), Float32, CPU.type] = r
+        assert(r.size == Seq(CatDim.size * 4L, 5L, 6L))
+      }
+
+      it("can concatenate tensors along last dim") {
+        val r = Tensor.cat(ts, Last)
+        val rType: Tensor[(Static[4L], Static[5L], CatDim.type * Static[6L]), Float32, CPU.type] = r
+        assert(r.size == Seq(4L, 5L, CatDim.size * 6L))
+      }
+
+      describe("when operating on a batched method") {
+        def doIt[B <: Shape, L1 <: Dim, L2 <: Dim, S <: Shape, T <: DType](t: TensorValue[Tuple1[L1], Tensor[S, T, CPU.type]])(using Batched1[B, L2, S]) = {
+          val r = Tensor.cat(t, Last)
+          val rType: Tensor[B :* (L1 * L2), T, CPU.type] = r
+          r
+        }
+
+        it("can process a value of vectors") {
+          val ts = TensorValue.arangeOf(CatDim).map(_ => Tensor.zeros(4L))
+          val r = doIt(ts)
+          val rType: Tensor[Tuple1[CatDim.type * Static[4L]], Float32, CPU.type] = r
+          assert(r.size == Seq(CatDim.size * 4L))
+        }
+
+        it("can process a value of matrices") {
+          val ts = TensorValue.arangeOf(CatDim).map(_ => Tensor.zeros(4L, 5L))
+          val r = doIt(ts)
+          val rType: Tensor[(Static[4L], CatDim.type * Static[5L]), Float32, CPU.type] = r
+          assert(r.size == Seq(4L, CatDim.size * 5L))
+        }
       }
     }
 
@@ -960,8 +998,6 @@ class TensorSpec extends UnitSpec {
 
       it("can multiply appended matrixes in an unknown batch") {
         def doIt[B <: Tuple, T1 <: Dim, T2 <: Dim, S1 <: Tuple, S2 <: Tuple](a: Tensor[S1, Float32, CPU.type], b: Tensor[S2, Float32, CPU.type])(using b1: Batched[B, (T1, T2), S1], b2: Batched[B, (T2, T1), S2]) = {
-          import b1.given
-          //val b1 = summon[Batched[B, (T1, T2), B :* T1 :* T2]]
 
           val r = a `@` b
           val rType: Tensor[B ++ (T1, T1), Float32, CPU.type] = r
@@ -1244,13 +1280,40 @@ class TensorSpec extends UnitSpec {
       }
     }
 
-    describe("stackMap") {
+    describe("mapStack") {
       it("can turn a vector into a matrix through a lambda") {
         case object DimA extends Dim.Static[3L]
         case object DimB extends Dim.Static[2L]
-        val m = Tensor.zeros(DimA).stackMap(v => Tensor.zeros(DimB))
+        val m = Tensor.zeros(DimA).mapStack(v => Tensor.zeros(DimB))
         val mType: Tensor[(DimA.type, DimB.type), Float32, CPU.type] = m
         assert(m.size == Seq(DimA.size, DimB.size))
+      }
+    }
+
+    describe("mapCat") {
+      it("can turn a vector into longer vector through a lambda") {
+        case object DimA extends Dim.Static[3L]
+        case object DimB extends Dim.Static[2L]
+        val r = Tensor.zeros(DimA).mapCat(v => Tensor.zeros(DimB), Last)
+        val rType: Tensor[Tuple1[DimA.type * DimB.type], Float32, CPU.type] = r
+        assert(r.size == Seq(DimA.size * DimB.size))
+      }
+
+      it("can turn a vector into longer vector through a lambda without specifying dimension") {
+        case object DimA extends Dim.Static[3L]
+        case object DimB extends Dim.Static[2L]
+        val r = Tensor.zeros(DimA).mapCat(v => Tensor.zeros(DimB))
+        val rType: Tensor[Tuple1[DimA.type * DimB.type], Float32, CPU.type] = r
+        assert(r.size == Seq(DimA.size * DimB.size))
+      }
+
+      it("can turn a vector into longer matrix through a lambda") {
+        case object DimA extends Dim.Static[3L]
+        case object DimB extends Dim.Static[2L]
+        case object DimC extends Dim.Static[4L]
+        val r = Tensor.zeros(DimA).mapCat(v => Tensor.zeros(DimB, DimC), Last)
+        val rType: Tensor[(DimB.type, DimA.type * DimC.type), Float32, CPU.type] = r
+        assert(r.size == Seq(DimB.size, DimA.size * DimC.size))
       }
     }
 

@@ -425,7 +425,7 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     def merge[D](d: D)(using sel: SelectIdx[S, D], ev: Merge[sel.Idx]): Shaped[Merged[sel.Idx, ev.Out]] = merge[D]
   }
 
-  def value[O](using ev: TensorValue[S, T, O])(using D =:= CPU.type): O = ev(native)
+  def value[O](using ev: GetNativeValue[S, T, O])(using D =:= CPU.type): O = ev(native)
   def value_=[V](v: V)(using updateSource: UpdateSource[V, D]): Unit = {
     updateSource(native, new pytorch.TensorIndexArrayRef (new pytorch.TensorIndexVector()), v)
   }
@@ -522,8 +522,9 @@ object Tensor {
   def zeros[T <: DType, D <: Device](using dtype: Default[T], device: Default[D]) =
     new ZerosApply(dtype.value, device.value, torch.torch_zeros(_, _))
 
-  /** Concatenates a sequence of tensors along a new dimension. */
+  /** Concatenates a sequence of tensors along a new dimension typed [B], assuming that [sensors] has the correct number of elements. */
   def stack[B <: Dim] = new StackApply[B](None)
+  /** Concatenates a sequence of tensors along a new dimension [batchDim]. */
   def stack[B <: Dim](batchDim: B) = new StackApply[B](Some(batchDim.size.toInt))
   class StackApply[B <: Dim](expected: Option[Int]) {
     def apply[S <: Tuple, T <: DType, D <: Device](tensors: Iterable[Tensor[S, T, D]]): Tensor[B *: S, T, D] = {
@@ -532,6 +533,30 @@ object Tensor {
       }
       new Tensor(torch.stack(new pytorch.TensorVector(tensors.map(_.native).toArray*)))
     }
+  }
+
+  /** Concatenates a sequence of tensors along an existing dimension, by replacing that dimension with [D] times
+    * [alongDim]. */
+  /*
+  def cat[D <: Dim, S <: Tuple, T <: DType, Dv <: Device, A](
+    tensors: TensorValue[Tuple1[D], Tensor[S, T, Dv]],
+    alongDim: A
+  )(using
+    idx: SelectIdx[S, A],
+    unsplit: Unsplit[D, Shape.Elem[S, idx.Idx]]
+  ): Tensor[Shape.Replace[S, unsplit.Out, idx.Idx], T, Dv] = {
+    new Tensor(torch.cat(new pytorch.TensorVector(tensors.map(_.native).toArray*), idx.idx))
+  }
+   */
+  def cat[D <: Dim, S <: Tuple, B <: Tuple, S1 <: Tuple, T <: DType, Dv <: Device, A](
+    tensors: TensorValue[Tuple1[D], Tensor[S, T, Dv]],
+    alongDim: A
+  )(using
+    b: Batched[B, S1, S],
+    idx: SelectIdx[S1, A],
+    unsplit: Unsplit[D, Shape.Elem[S1, idx.Idx]]
+  ): Tensor[Concat[B, Shape.Replace[S1, unsplit.Out, idx.Idx]], T, Dv] = {
+    new Tensor(torch.cat(new pytorch.TensorVector(tensors.map(_.native).toArray*), b.batchSize.value + idx.idx))
   }
 
   /** Runs the given block with gradients disabled. All computations will be performed as if having set requiresGrad == false, even if true was passed. */
@@ -593,10 +618,13 @@ object Tensor {
     def update[I1 <: Index, V](i: I1, value: V)(using Index.Valid[D1, I1])(using updateSource: UpdateSource[V, D]): Unit =
       updateSource(t.native, tensorIndexArray(i.toNative), value)
 
-    /** Executes the given function for every element in this vector, and stacking the result along the vector's dimension. */
+    /** Executes the given function for every element in this vector, and stacks the result along the vector's dimension. */
     // TODO: this operator can be extended to be defined for 1+ dimensions, but will have to be written as flatten -> stack -> unflatten
     // TODO: see if we can write this in one go without the intermediate StackMapApply.
-    def stackMap[O](using ev: TensorValue[Tuple1[D1], T, Seq[O]])(using D =:= CPU.type): StackMapApply[D1, O] = new StackMapApply(ev(t.native))
+    def mapStack[O](using ev: GetNativeValue[Tuple1[D1], T, Seq[O]])(using D =:= CPU.type): StackMapApply[D1, O] = new StackMapApply(ev(t.native))
+
+    /** Executes the given function for every element in this vector, and concatenates the result along a chosen dimension. */
+    def mapCat[O](using ev: GetNativeValue[Tuple1[D1], T, Seq[O]])(using D =:= CPU.type): CatMapApply[D1, O] = new CatMapApply(ev(t.native))
   }
 
   class StackMapApply[D1 <: Dim, O](seq: Seq[O]) {
@@ -604,6 +632,25 @@ object Tensor {
       Tensor.stack[D1](seq.map(fn))
     }
   }
+
+  class CatMapApply[D1 <: Dim, O](seq: Seq[O]) {
+    /** Concatenates along the last dimension */
+    def apply[S <: Tuple, T <: DType, D <: Device, A](fn: O => Tensor[S, T, D])(using
+      idx: SelectIdx[S, Select.Last.type], unsplit: Unsplit[D1, Shape.Elem[S, idx.Idx]]
+    ): Tensor[Shape.Replace[S, unsplit.Out, idx.Idx], T, D] = {
+      val tensors = seq.map(fn)
+      new Tensor(torch.cat(new pytorch.TensorVector(tensors.map(_.native).toArray*), idx.idx))
+    }
+
+    /** Concatenates along the given dimension */
+    def apply[S <: Tuple, T <: DType, D <: Device, A](fn: O => Tensor[S, T, D], alongDim: A)(using
+      idx: SelectIdx[S, A], unsplit: Unsplit[D1, Shape.Elem[S, idx.Idx]]
+    ): Tensor[Shape.Replace[S, unsplit.Out, idx.Idx], T, D] = {
+      val tensors = seq.map(fn)
+      new Tensor(torch.cat(new pytorch.TensorVector(tensors.map(_.native).toArray*), idx.idx))
+    }
+  }
+
   // ---- Methods on Tensor with 2 dimensions ---
   extension[T <: DType, D <: Device, D1 <: Dim, D2 <: Dim](t: Tensor[(D1, D2), T, D]) {
     /** Selects elements for all dimensions of this tensor, where the argument position implies the dimension being indexed. */

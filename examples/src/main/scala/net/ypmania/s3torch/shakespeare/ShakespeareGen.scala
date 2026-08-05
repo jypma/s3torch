@@ -32,8 +32,9 @@ object ShakespeareGen {
   // for Bigram, ~2.4 loss
   // for SelfAttention, 2.7 loss after 40000
   // for SelfAttention1, 2.7 loss after 40000, but drops faster
+  // for SelfAttention2, 2.61 loss after 40000. 2.4 after 100000. 2.28 after 250000. Somehow 2.2 in video after only 4000...
   case object BatchSize extends Dim.Static[64L]
-  val trainingRounds = 40000
+  val trainingRounds = 250000
   val printLossEvery = 1000
   val learningRate = 1e-5 // SelfAttention1
   // val learningRate = 1e-5 // SelfAttention
@@ -51,8 +52,8 @@ object ShakespeareGen {
       import ev.given
 
       val ix = Tensor.randint(data.size(0) - BlockSize.size - 1)(BatchSize)
-      val xb = ix.to(CPU).stackMap(idx => data(Take(BlockSize, drop = idx)))
-      val yb = ix.to(CPU).stackMap(idx => data(Take(BlockSize, drop = idx + 1)))
+      val xb = ix.to(CPU).mapStack(idx => data(Take(BlockSize, drop = idx)))
+      val yb = ix.to(CPU).mapStack(idx => data(Take(BlockSize, drop = idx + 1)))
       Batch(xb, yb)
     }.getOrElse {
       throw new IllegalArgumentException("too little training data")
@@ -81,14 +82,16 @@ object ShakespeareGen {
       println(VocabSize) // 66
       case object MaxBlockSize extends Dim.Static[92L]
       case object DModel extends Dim.Static[32L]
+      case object NHeads extends Dim.Static[4L]
       // val model = new Bigram(VocabSize)
       //val model = new SelfAttention(VocabSize, MaxBlockSize, DModel)
-      val model = new SelfAttention1(VocabSize, MaxBlockSize, DModel)
+      //val model = new SelfAttention1(VocabSize, MaxBlockSize, DModel)
+      val model = new SelfAttention2(VocabSize, MaxBlockSize, DModel, NHeads)
 
       def estimateLoss[D <: Dim.Dynamic](data: TokT[Tuple1[D]])(using BlockSize.type |<= D) =
         Tensor.noGrad {
           model.eval {
-            val loss = Tensor.zeros(using device = Default(CPU))(64L).stackMap { _ =>
+            val loss = Tensor.zeros(using device = Default(CPU))(64L).mapStack { _ =>
               val b = createBatch(data)
               model(b.x, b.y)
             }

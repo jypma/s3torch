@@ -22,7 +22,7 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
   }
 
   /** Registers the given modules as a sub-module list (so their state is loaded/saved together), and returns the same list. */
-  protected def addModules[M <: AbstractModule[D, T]](name: String, children: Seq[M]): Seq[M] = {
+  protected def addModules[M <: AbstractModule[D, T], S <: Iterable[M]](name: String, children: S): S = {
     val list = new pytorch.ModuleListImpl
     for (child <- children) {
       list.push_back(child.native)
