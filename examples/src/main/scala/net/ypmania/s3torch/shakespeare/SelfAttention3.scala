@@ -12,6 +12,7 @@ import net.ypmania.s3torch.Dim.|/
 import net.ypmania.s3torch.Select
 import net.ypmania.s3torch.Device
 import net.ypmania.s3torch.Tensor
+import net.ypmania.s3torch.Tensor.relu
 import net.ypmania.s3torch.TensorValue
 import net.ypmania.s3torch.DType.Int64
 import net.ypmania.s3torch.Default
@@ -23,12 +24,12 @@ import net.ypmania.s3torch.nn.Linear
 import net.ypmania.s3torch.Index.Take
 import scala.Tuple.:*
 import scala.Tuple.++
-import scala.Tuple.Concat
+import net.ypmania.s3torch.DType
 
-// Add multi head
+// Add FeedForward
 // DModel (number of embedding dimensions): 32
 // Note for presentation: Video timestamp 1:23:37
-class SelfAttention2[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: Device, N <: Dim](vocabSize: VocabSize, maxBlockSize: MaxBlockSize, dModel: DModel, nHeads: N)(using Default[D], DModel |/ N) extends Module {
+class SelfAttention3[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: Device, N <: Dim](vocabSize: VocabSize, maxBlockSize: MaxBlockSize, dModel: DModel, nHeads: N)(using Default[D], DModel |/ N) extends Module {
   class Head[Size <: Dim](size: Size) extends Module {
     val key = addModule("key", Linear(dModel, size, bias = false))
     val query = addModule("query", Linear(dModel, size, bias = false))
@@ -36,7 +37,7 @@ class SelfAttention2[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: 
     val tril = addBuffer("tril", Tensor.ones(maxBlockSize, maxBlockSize).tril())
 
     // This variant of multi-head applies all heads on all of the input DModel dimensions (instead of each head only looking at a part).
-    def apply[S <: Tuple, B <: Tuple, L <: Dim](x: Tensor[S, Float32, D])(using b: Batched[B, (L, DModel), S])(using L |<= MaxBlockSize): Tensor[Concat[B, (L, Size)], Float32, D] = {
+    def apply[S <: Tuple, B <: Tuple, L <: Dim](x: Tensor[S, Float32, D])(using b: Batched[B, (L, DModel), S])(using L |<= MaxBlockSize) = {
       import b.given
 
       val k = key(x)
@@ -65,10 +66,17 @@ class SelfAttention2[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: 
     }
   }
 
+  class FeedForward[Size <: Dim](size: Size) extends Module {
+    val linear = addModule("linear", Linear(size, size))
+
+    def apply[S <: Tuple, B <: Tuple, T <: DType.Floaty](in: Tensor[S, T, D])(using Batched1[B, Size, S]) = relu(linear(in))
+  }
+
   val tokenEmbedding = addModule("tokenEmbedding", Embedding(vocabSize, dModel))
   val positionEmbedding = addModule("positionEmbedding", Embedding(maxBlockSize, dModel))
   val lmHead = addModule("lmHead", Linear(dModel, vocabSize))
   val saHeads = addModule("saHead", new MultiHead)
+  val ffwd = addModule("ffwd", new FeedForward(dModel))
 
   def apply[B <: Dim, Length <: Dim, T <: Int64](idx: Tensor[(B, Length), T, D], targets: Tensor[(B, Length), T, D])(using Length |<= MaxBlockSize): Tensor[EmptyTuple.type, Float32, D] = {
     val predicted = logits(idx).view.merge[Length]
@@ -94,9 +102,6 @@ class SelfAttention2[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: 
     val len = idx.sizeOf(dim[Length])
     val pos = positionEmbedding(Tensor.arangeOfD(len))
     val r = tok + pos
-    lmHead(saHeads(r))
+    r ~> saHeads.apply ~> ffwd.apply ~> lmHead.apply
   }
-}
-
-object SelfAttention2 {
 }

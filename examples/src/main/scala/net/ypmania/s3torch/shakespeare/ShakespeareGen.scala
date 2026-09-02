@@ -33,10 +33,12 @@ object ShakespeareGen {
   // for SelfAttention, 2.7 loss after 40000
   // for SelfAttention1, 2.7 loss after 40000, but drops faster
   // for SelfAttention2, 2.61 loss after 40000. 2.4 after 100000. 2.28 after 250000. Somehow 2.2 in video after only 4000...
+  // for SelfAttention3, 2.3 loss after 1000000, but gibberish
   case object BatchSize extends Dim.Static[64L]
-  val trainingRounds = 250000
+  val trainingRounds = 1000000
   val printLossEvery = 1000
-  val learningRate = 1e-5 // SelfAttention1
+  val learningRate = 0.2e-5 // SelfAttention3
+  //val learningRate = 1e-5 // SelfAttention1 and 2
   // val learningRate = 1e-5 // SelfAttention
   // val learningRate = 1e-4 // Bigram
 
@@ -86,7 +88,8 @@ object ShakespeareGen {
       // val model = new Bigram(VocabSize)
       //val model = new SelfAttention(VocabSize, MaxBlockSize, DModel)
       //val model = new SelfAttention1(VocabSize, MaxBlockSize, DModel)
-      val model = new SelfAttention2(VocabSize, MaxBlockSize, DModel, NHeads)
+      //val model = new SelfAttention2(VocabSize, MaxBlockSize, DModel, NHeads)
+      val model = new SelfAttention3(VocabSize, MaxBlockSize, DModel, NHeads)
 
       def estimateLoss[D <: Dim.Dynamic](data: TokT[Tuple1[D]])(using BlockSize.type |<= D) =
         Tensor.noGrad {
@@ -106,6 +109,9 @@ object ShakespeareGen {
           val b = createBatch(trainData)
           val loss = model(b.x, b.y)
           optimizer.zeroGrad(setToNone = true)
+          if (loss.isNan.sum.to(CPU).value) {
+            throw new RuntimeException("Loss became NaN")
+          }
           loss.backward()
           optimizer.step()
           finalLoss = loss.to(CPU).value

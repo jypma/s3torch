@@ -537,17 +537,6 @@ object Tensor {
 
   /** Concatenates a sequence of tensors along an existing dimension, by replacing that dimension with [D] times
     * [alongDim]. */
-  /*
-  def cat[D <: Dim, S <: Tuple, T <: DType, Dv <: Device, A](
-    tensors: TensorValue[Tuple1[D], Tensor[S, T, Dv]],
-    alongDim: A
-  )(using
-    idx: SelectIdx[S, A],
-    unsplit: Unsplit[D, Shape.Elem[S, idx.Idx]]
-  ): Tensor[Shape.Replace[S, unsplit.Out, idx.Idx], T, Dv] = {
-    new Tensor(torch.cat(new pytorch.TensorVector(tensors.map(_.native).toArray*), idx.idx))
-  }
-   */
   def cat[D <: Dim, S <: Tuple, B <: Tuple, S1 <: Tuple, T <: DType, Dv <: Device, A](
     tensors: TensorValue[Tuple1[D], Tensor[S, T, Dv]],
     alongDim: A

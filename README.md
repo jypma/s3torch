@@ -4,6 +4,10 @@ This is a Scala library on top of `libtorch`. It provides full dimensional type 
 
 This started out as a branch of [storch](https://github.com/bytedeco/storch), but currently is its own thing, to allow more freedom in re-modeling the `Tensor` class without having to fix a lot of usages.
 
+## Prerequisites
+
+Due to specific usages of JNI, currently only JDK 21 is tested.
+
 ## Dimension
 
 A dimension is represented by the type `Dim`. Anything that extends `Dim` can represent a dimension. Dimensions are usually referred to by their type. 
