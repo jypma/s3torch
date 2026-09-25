@@ -19,6 +19,9 @@ object DType {
   // enum instances that don't equal the constants we use below.
   private var fromNative = Map.empty[Byte, DType]
 
+  // Supported on CUDA devices with major version >= 8
+  // https://github.com/pytorch/pytorch/blob/5eb87fdd0ab88b4b6cc91ec5bfcf4de22d6a6c49/torch/cuda/__init__.py#L244
+  // which probably refers to "Compute Capability" in  https://developer.nvidia.com/cuda/gpus
   abstract class BFloat16 extends DType(torch.ScalarType.BFloat16)
   val bfloat16 = new BFloat16 {}
   abstract class Bool extends DType(torch.ScalarType.Bool)

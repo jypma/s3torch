@@ -19,7 +19,6 @@ import Device.CPU
 import Tuple.:*
 import Tuple.++
 import Control.whileDefined
-import scala.Tuple.Append
 
 class TensorSpec extends UnitSpec {
   case object ExampleStatic extends Static[10L]
@@ -408,6 +407,38 @@ class TensorSpec extends UnitSpec {
           Seq(true, true, true),
           Seq(false, true, false)
         ))
+      }
+    }
+
+    describe("plus") {
+      it("can plus a matrix with a vector") {
+        val m = Tensor((
+          ((1, 2, 3)),
+          ((0, 4, 0))
+        ))
+        val v = Tensor((1, 2, 3))
+        val res = m + v
+        val resType: Tensor[(Static[2L], Static[3L]), Int32, CPU.type] = res
+        assert(res.size == Seq(2L, 3L))
+        assert(res.value.toSeq == Seq(
+          Seq(2, 4, 6),
+          Seq(1, 6, 3)
+        ))
+
+        // Test symmetry
+        assert((v + m).value.toSeq == Seq(
+          Seq(2, 4, 6),
+          Seq(1, 6, 3)
+        ))
+      }
+
+      it("can plus an int vector with a float vector") {
+        val v1 = Tensor((1, 2, 3))
+        val v2 = Tensor((1.0, 2.0, 3.0))
+        val res = v1 + v2
+        val resType: Tensor[Tuple1[Static[3L]], Float64, CPU.type] = res
+        assert(res.size == Seq(3L))
+        assert(res.value.toSeq == Seq(2.0, 4.0, 6.0))
       }
     }
 
@@ -1609,6 +1640,7 @@ class TensorSpec extends UnitSpec {
         assert(res.value(0)(1)(1) == 1.0)
 
         val un = res.view.merge[DimA.type / Dim.Static[2L]]
+        val unType: Tensor[(DimA.type, DimB.type), Float32, CPU.type] = un
         assert(un.size == Seq(6L, 3L))
         assert(un.value(1)(1) == 1.0)
       }

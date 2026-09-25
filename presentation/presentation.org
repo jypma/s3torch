@@ -1,0 +1,584 @@
+* Type-safe tensors for human learning
+** Introduction to tensors
+*** Tensor
+Wikipedia:
+
+    /An *algebraic object* that describes a *multilinear* relationship between sets of *algebraic objects* associated with a *vector space*./
+
+For our cause:
+
+    /A multidimensional linear data structure of numbers/
+*** Dimensionality examples
+- A *matrix* is a tensor with 2 dimensions
+#+BEGIN_SRC scala
+((
+  ((1, 2, 3)),
+  ((0, 2, 0))
+))
+#+END_SRC
+- A *vector* is a tensor with 1 dimension
+#+BEGIN_SRC scala
+((1, 2, 3))
+#+END_SRC
+- A tensor with 0 dimensions is a *scalar*
+  + just a number
+** Introduction to machine learning
+*** Machine learning model
+#+BEGIN_SRC scala
+(limited number of inputs) --> (very many mathematical operations, steered by weights) --> (limited number of outputs)
+#+END_SRC
+Having the /machine/ do the /learning/:
+- Take a large number of examples of correct inputs and outputs, one at a time
+- See how the current weights perform on that input
+- Poke at the weights to make them a little better
+- Rinse and repeat
+
+What direction do we poke at?
+*** Gradient descent
+#+BEGIN_SRC scala
+(limited number of inputs) --> (very many mathematical operations, steered by weights) --> (limited number of outputs) --> (loss)
+#+END_SRC
+- Let's limit the allowed operations to only /differentiable/ ones
+- We combine the actual outputs with the expected outputs into a /loss/ figure
+- Calculate the partial derivative of each weight towards that loss
+- Poke the weights such, that the loss (hopefully) decreases
+*** Optimizing performance
+- Modern models have a lot (1e9)
+** What about human learning?
+*** Consider this python example
+#+BEGIN_SRC python
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model: int, seq_len: int, dropout: float) -> None:
+        super().__init__()
+        self.d_model = d_model
+        self.seq_len = seq_len
+        self.dropout = nn.Dropout(dropout)
+        # Create a matrix of shape (seq_len, d_model)
+        pe = torch.zeros(seq_len, d_model)
+        # Create a vector of shape (seq_len)
+        position = torch.arange(0, seq_len, dtype=torch.float).unsqueeze(1) # (seq_len, 1)
+        # Create a vector of shape (d_model)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)) # (d_model / 2)
+        # Apply sine to even indices
+        pe[:, 0::2] = torch.sin(position * div_term) # sin(position * (10000 ** (2i / d_model))
+        # Apply cosine to odd indices
+        pe[:, 1::2] = torch.cos(position * div_term) # cos(position * (10000 ** (2i / d_model))
+        # Add a batch dimension to the positional encoding
+        pe = pe.unsqueeze(0) # (1, seq_len, d_model, 1)
+        # Register the positional encoding as a buffer
+        self.register_buffer('pe', pe)
+#+END_SRC
+Can you follow along what the tensor dimensions are?
+
+(source: [[https://www.youtube.com/watch?v=ISNdQcPhsts][youtube]] and [[https://github.com/hkproj/pytorch-transformer/blob/main/model.py][github]])
+* Type systems
+** The need for types
+*** Rationale
+- Why do programming languages have, or introduce, types?
+*** Rationale (2)
+- Why do programming languages have, or introduce, types?
+
+#+BEGIN_SRC scala
+def average(number1, number2, number3) = {
+    (number1 + number2 + number3) / 3
+}
+
+average(1, 2, 3)
+average("1", "2", "3")
+average(42, Clock.now(), File.read("/cat.jpg"))
+#+END_SRC
+
+*** Early detection
+
+/Make invalid states unrepresentable/
+
+#+BEGIN_SRC scala
+def average(number1: Int, number2: Int, number3: Int): Int = {
+    (number1 + number2 + number3) / 3
+}
+#+END_SRC
+
+- Not possible to write code that puts something else in there
+- Early detection of potential issues
+** Generics
+*** The case for generics
+- We want to store lists of things, so let's imagine a type =List=
+
+#+BEGIN_SRC scala
+def getFirstElement(items: List): ???
+#+END_SRC
+
+- What should the return type be?
+*** Lists of things
+- Let's give list a /type parameter/, so we can define what's in the list
+#+BEGIN_SRC scala
+val numbers: List[Int] = List(1, 2, 3)
+val cats: List[Cat] = List(Cat.load("/kitten.jpg"))
+
+def getFirstElement(items: List[Int]): Int
+#+END_SRC
+*** Lists of anything
+- Our function doesn't care about what's in the list
+- But still wants to return the right type
+
+#+BEGIN_SRC scala
+def getFirstElement[T](items: List[T]): T
+#+END_SRC
+
+* Types for tensors
+** Pytorch
+*** Introduction
+- Extremely popular due to its easy of use, and (mostly) single API  for both CPU and GPU inference
+- Python api (=pytorch=) on top of a C++ backend (=libtorch=), with various hardware-dependent extensions
+- API for wide variety of tensor operations
+  + General math, matrix operations, cross entropy
+  + Composing frequently used building blocks into modules
+  + Everything is tracked for gradient descent back-propagation
+- Tensors
+  + are /mutable/
+  + have a fixed /dimension/
+  + have a fixed /data type/ (64-bit integer, 32-bit float, etc.)
+  + are stored on a specific /device/ (e.g. CPU, GPU number 2, etc.)
+*** Runtime restrictions
+Not all pytorch operations accept any input (just like python):
+- Data type requirements
+  + [[https://docs.pytorch.org/docs/2.14/generated/torch.nn.Embedding.html][nn.Embedding]] (see "Shape"): Input has to be =IntTensor= or =LongTensor=, output can be anything
+- Dimension requirements
+  + [[https://docs.pytorch.org/docs/2.14/generated/torch.nn.functional.cross_entropy.html][nn.functional.cross_entropy]] (see "Shape"): Very specific input shapes accepted. Output depends on what input shape was passed.
+- Data value requirements
+  + [[https://docs.pytorch.org/docs/2.14/generated/torch.nn.Embedding.html][nn.Embedding]]: Input values have to "fit" the size of the embedding (lookup table)
+** Use on the JVM
+*** "Bytedeco" project
+- Wrappers by Samuel Audet to provide automatic, convenient JNI wrappers for C++ libraries
+- Access to memory management, pointers, even streams
+- Scala project from which this work was inspired: [[https://github.com/bytedeco/storch][storch]]
+  + Scala wrapper around =libtorch=
+
+- Extended into =https://github.com/jypma/s3torch= (originally a fork of =storch=)
+** Type definitions
+*** Data type
+Let's model this as an abstract class.
+#+BEGIN_SRC scala
+abstract class DType(val native: torch.ScalarType)
+
+object DType {
+  abstract class BFloat16 extends DType(torch.ScalarType.BFloat16)
+  val bfloat16 = new BFloat16 {}
+  abstract class Bool extends DType(torch.ScalarType.Bool)
+  val bool = new Bool {}
+  abstract class Int8 extends DType(torch.ScalarType.Char)
+  val int8 = new Int8 {}
+  abstract class Int16 extends DType(torch.ScalarType.Short)
+  val int16 = new Int16 {}
+  // [...]
+#+END_SRC
+An let's have =Tensor= be generic in its data type:
+#+BEGIN_SRC scala
+class Tensor[T <: DType /* , ... */]
+#+END_SRC
+*** Device
+Tensors can generally only interact with tensors on the same device. So, let's make other interactions /unrepresentable/.
+
+We'll define an abstract class representing a =libtorch= device.
+#+BEGIN_SRC scala
+abstract class DeviceType(val native: torch.DeviceType)
+
+abstract class Device(val deviceType: DeviceType, val index: Byte = -1)
+
+case object CPU extends Device(DeviceType.CPU)
+case object CUDA extends Device(DeviceType.CUDA)
+#+END_SRC
+
+And let's have =Tensor= be generic in the device type:
+#+BEGIN_SRC scala
+class Tensor[T <: DType, D <: Device /* , ... */]
+#+END_SRC
+*** Shape
+Any suggestions on how to represent the tensor shape (dimensions)?
+*** Dimension
+Let's first look at what a /dimension/ actually is, from a program's perspective.
+#+BEGIN_SRC scala
+trait Dim extends Ordered[Dim] {
+  def size: Long
+}
+#+END_SRC
+*** Dimension (static)
+Some dimensions are known at compile time.
+#+BEGIN_SRC scala
+abstract class Static[S <: Long](using ValueOf[S]) extends Dim {
+  type Size = S
+  def size = valueOf[S]
+}
+#+END_SRC
+This allows us to name static dimensions:
+#+BEGIN_SRC scala
+case object BatchSize extends Static[32L]
+case object NumberOfHeads extends Static[4L]
+#+END_SRC
+*** Dimension (dynamic)
+Some dimensions depend on data we read in at run-time.
+#+BEGIN_SRC scala
+class Dynamic(_size: Long) extends Dim {
+  override def size = _size
+}
+#+END_SRC
+We can still give them a name:
+#+BEGIN_SRC scala
+case object VocabularySize extends Dynamic(loadedDictionary.size)
+#+END_SRC
+The compiler knows nothing about these... initially.
+*** Revisiting shape
+- A tensor's shape might have any number of dimensions
+- We want to encode each dimension as a type
+- Let's use Scala 3's =Tuple= for this
+#+BEGIN_SRC scala
+type ShapeOfMatrix = (BatchSize, NumberOfHeads) // Tuple2[BatchSize, NumberOfHeads]
+type ShapeOfVector = Tuple1[BatchSize]
+type Scalar = EmptyTuple
+#+END_SRC
+Conveniently, all tuple types in Scala 3 are =<: Tuple=.
+
+Hence, our final tensor type:
+#+BEGIN_SRC scala
+class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor)
+#+END_SRC
+* Selected tensor operations
+** Element-wise operations
+*** Considerations
+Let's investigate element-wise operations
+- =+=, =-=, =*=, =/=, ...
+- Pairwise boolean comparison (=<=, =>=, equal, ...)
+
+For what shapes should we support this?
+- Same shape on both sides
+- Different shapes: =pytorch= [[https://docs.pytorch.org/docs/2.14/notes/broadcasting.html][broadcasting]] rules
+And what data types?
+- Different data types: =pytorch= [[https://docs.pytorch.org/docs/2.14/tensor_attributes.html#type-promotion-doc][promotion]] rules
+*** Promotion example
+#+BEGIN_SRC scala
+      it("can plus an int vector with a float vector") {
+        val v1 = Tensor((1, 2, 3))
+        val v2 = Tensor((1.0, 2.0, 3.0))
+        val res = v1 + v2
+        val resType: Tensor[Tuple1[Static[3L]], Float64, CPU.type] = res
+        assert(res.size == Seq(3L))
+        assert(res.value.toSeq == Seq(2.0, 4.0, 6.0))
+      }
+#+END_SRC
+*** Broadcasting example
+#+BEGIN_SRC scala
+      it("can plus a matrix with a vector") {
+        val m = Tensor((
+          ((1, 2, 3)),
+          ((0, 4, 0))
+        ))
+        val v = Tensor((1, 2, 3))
+        val res = m + v
+        val resType: Tensor[(Static[2L], Static[3L]), Int32, CPU.type] = res
+        assert(res.size == Seq(2L, 3L))
+        assert(res.value.toSeq == Seq(
+          Seq(2, 4, 6),
+          Seq(1, 6, 3)
+        ))
+
+        // Test symmetry
+        assert((v + m).value.toSeq == Seq(
+          Seq(2, 4, 6),
+          Seq(1, 6, 3)
+        ))
+      }
+#+END_SRC
+*** Boolean example
+#+BEGIN_SRC scala
+      it("can compare two tensors of different type") {
+        val a = Tensor((1, 2, 3))
+        val b = Tensor((1.0, 42.0, 3.0))
+        val res = a #== b // Element-wise equality
+        val resType: Tensor[Tuple1[Static[3L]], Bool, CPU.type] = res
+        assert(res.size == Seq(3L))
+        assert(res.value.toSeq == Seq(true, false, true))
+      }
+#+END_SRC
+** Scalar functions (sin, relu, etc.)
+*** Picking syntax
+Same operation on each element
+- output has same shape (and usually same type) as input
+
+*** Alternative A
+*Member function*
+
+#+BEGIN_SRC scala
+val result = myTensor.sin
+val result = myTensor.relu // recified linear unit
+#+END_SRC
+
+- Idiomatic object orientation
+- Nice to "chain" calls
+
+*** Alternative B
+*Function in global scope*
+
+#+BEGIN_SRC scala
+val result = sin(myTensor)
+val result = relu(myTensor)
+#+END_SRC
+
+- Math notation
+- Pytorch choice
+- =s3torch= for familiarity
+
+... but "chained" calls will be back!
+** Comparing tensors
+*** Defining equality
+When are two tensors "equal"?
+
+- Same dimensions? Well, yeah
+- Same value in each position? Yes
+- Same device? [...]
+
+#+BEGIN_SRC scala
+  override def equals(that: Any): Boolean = that match {
+    // Check dtype and device, since pytorch will just crash if they don't match.
+    case other: Tensor[?, ?, ?] if dtype == other.dtype && device == other.device =>
+      native.equal(other.native)
+    case _ =>
+      false
+  }
+#+END_SRC
+
+* Dimension tricks
+** Comparing dimensions statically
+*** Case: pad to given size
+#+BEGIN_SRC scala
+  /** Returns a new tensor with the last dimension padded to [dim]. [dim] must be at least as large as the current last dimension. */
+  def padTo[D <: Dim, V](dim: D, value: V)(using /* ... */) = ???
+#+END_SRC
+We want compile-time proof that
+- the /last/ dimension of =S= (the shape of our tensor)
+- is LESS or equal than =D=
+
+*** The "last" dimension
+Let's define that as a =given= :
+#+BEGIN_SRC scala
+  trait LastDim[S <: Shape] {
+    type D <: Dim
+  }
+  object LastDim {
+    given [A <: Dim]: LastDim[Tuple1[A]] with {
+      type D = A
+    }
+    given [S <: Tuple, A <: Dim](using l: LastDim[S]): LastDim[A *: S] with {
+      type D = l.D
+    }
+  }
+#+END_SRC
+
+*** Knowledge of =A < B=
+Let's define a =given= for that as well.
+#+BEGIN_SRC scala
+  /** Proof that A is less than or equal to B */
+  trait LessOrEqual[A <: Dim, B <: Dim] {}
+  object LessOrEqual {
+    // definitions here for statically-known dimension types
+  }
+  /** Proof that A is less than or equal to B */
+  infix type |<=[A <: Dim, B <: Dim] = LessOrEqual[A, B]
+#+END_SRC
+
+Now, we can revisit =padTo=:
+#+BEGIN_SRC scala
+  def padTo[D <: Dim, V](dim: D, value: V)(using last: LastDim[S], ev: last.D |<= D) =
+#+END_SRC
+
+** Dividing and multiplying dimensions
+
+*** The need for =split=
+Let's define the ability to "split up" one dimension into two new ones.
+- We often want to do this to calculate parts separately, and later "merge" them again
+
+Let's say, we have
+#+BEGIN_SRC scala
+case object DimA extends Static[6L]
+case object DimB extends Static[3L]
+
+val matrix = Tensor.zeros(DimA, DimB)
+#+END_SRC
+and we do something like
+#+BEGIN_SRC scala
+val res = matrix.view.split(DimA).into(Dim.Static(2L))
+#+END_SRC
+
+What do we expect the dimensions of =res= to be?
+
+What would be a reasonable Scala type for that?
+
+When should it be allowed to "split" a dimension =A= into =B= parts?
+
+*** The need for =split= (cont.)
+We want to remember that it was =DimA= that we divided by =2=:
+
+#+BEGIN_SRC scala
+case object DimA extends Static[6L]
+case object DimB extends Static[3L]
+
+val matrix = Tensor.zeros(DimA, DimB)
+
+val res = matrix.view.split(DimA).into(Dim.Static(2L))
+
+val resType: Tensor[(Static[2L], DimA.type / Dim.Static[2L], DimB.type), Float32, CPU.type] = res
+assert(res.size == Seq(2L, 3L, 3L))
+#+END_SRC
+
+We can do this similar to how we modeled the "less than" proof:
+#+BEGIN_SRC scala
+/** Proof that D is divisible by L */
+trait DivisibleBy[+D <: Dim, +L <: Dim] {}
+infix type |/[+D <: Dim, +L <: Dim] = DivisibleBy[D, L]
+
+/** A Dim that is the result of dividing two other Dims */
+trait DividedDim[D <: Dim, L <: Dim] extends Dim {}
+infix type /[D <: Dim, L <: Dim] = DividedDim[D, L]
+#+END_SRC
+
+*** Merging dimensions
+We want to remove a dimension from a tensor, merging it into the one before it:
+
+#+BEGIN_SRC scala
+val matrix = Tensor.zeros(DimA, DimB)
+
+val res = matrix.view.merge(DimB)
+#+END_SRC
+
+What do we expect the dimensions of =res= to be?
+
+What would be a reasonable Scala type for that?
+
+When should it be allowed to "merge" a dimension =A= into the one before it?
+*** Merging dimensions (cont.)
+We want to remember which dimensions we've merged:
+#+BEGIN_SRC scala
+/** A Dim that is the result of multiplying two other Dims */
+trait ProductDim[A <: Dim, B <: Dim] extends Dim
+infix type *[A <: Dim, B <: Dim] = ProductDim[A, B]
+#+END_SRC
+
+We can now use a bit of =given= magic to do "the right thing":
+#+BEGIN_SRC scala
+val matrix = Tensor.zeros(DimA, DimB)
+
+val res = matrix.view.split(DimA).into(Dim.Static(2L))
+val resType: Tensor[(Static[2L], DimA.type / Dim.Static[2L], DimB.type), Float32, CPU.type] = res
+
+val un = res.view.merge[DimA.type / Dim.Static[2L]]
+val unType: Tensor[(DimA.type, DimB.type), Float32, CPU.type] = un
+#+END_SRC
+
+** Safely defining givens for dynamic dimensions
+*** Declaring givens
+Say that we have two dynamic dimensions:
+#+BEGIN_SRC scala
+def myMethod[A <: Dim, B <: Dim](a: A, b: B) = {
+  val vector: Tensor[A] = Tensor.zeros(a)
+  val bigger = vector.padTo(B, 0)
+}
+#+END_SRC
+We now have to "prove" to the compiler that =A= <= =B=. We could do:
+#+BEGIN_SRC scala
+if (a.size <= b.size) {
+  given A |<= B with {}
+  val bigger = vector.padTo(B, 0)
+}
+#+END_SRC
+and that will work, but seems double-up.
+*** Automatic givens
+Instead we can write:
+#+BEGIN_SRC scala
+for {
+  ev <- a |<= b
+} {
+  import ev.given
+  val bigger = vector.padTo(B, 0)
+}
+#+END_SRC
+or even a loop, using a simple helper (extending an example up to a =MaxBlockSize=):
+#+BEGIN_SRC scala
+whileDefined(gen.sizeOf(ExampleSize(_)) |<= MaxBlockSize) { ev =>
+  import ev.given
+  gen = model.extend(gen)
+}
+#+END_SRC
+** Selecting dimensions
+*** Compile-time safety for picking dimensions
+All =Tensor= methods that require referring to a dimension can do this in several ways:
+#+BEGIN_SRC scala
+case class Row extends Dim.Static[2L]
+case class Column extends Dim.Static[4L]
+val t = Tensor.zeros(Row, Column)
+#+END_SRC
+- By dimension value: =t.maxBy(Row)=
+- By dimension type (if a value isn't available): =t.maxBy(dim[Row])=
+- By first or last: =t.maxBy(Select.First)= or =t.maxBy(Select.Last)=
+- By a specific index (must be a compile-time constant) =t.maxBy(Select.Idx(0))=
+
+Of course, all of the above are compile-time verified.
+* Practical examples
+** Example: Embedding
+Show Embedding.scala
+** Example: cross entropy
+Show cross entropy scala
+** Example: Applying a head of self-attention
+
+Initial definition
+#+BEGIN_SRC scala
+def apply[B <: Dim, L <: Dim](x: Tensor[(B, L, DModel), Float32, D]): Tensor[(B, L, DModel), Float32, D]
+#+END_SRC
+
+Adding a limitation on =L= less than the block size (because we use =Take=)
+#+BEGIN_SRC scala
+def apply[B <: Dim, L <: Dim](x: Tensor[(B, L, DModel), Float32, D])(using L |<= MaxBlockSize): Tensor[(B, L, DModel), Float32, D]
+#+END_SRC
+
+Parameterizing batch
+#+BEGIN_SRC scala
+def apply[S <: Tuple, B <: Tuple, L <: Dim](x: Tensor[S, Float32, D])(using b: Batched[B, (L, DModel), S])(using L |<= MaxBlockSize): Tensor[B ++ (L, DModel), Float32, D]
+#+END_SRC
+** Scala opportunities compared to Python
+- No need for =module.Sequential=. Actual chained invocations retain type
+#+BEGIN_SRC scala
+import Tensor.relu
+val linear = addModule("linear", Linear(dModel, dModel))
+
+def apply(Tensor[/* ... */] in) = relu(linear(in))
+#+END_SRC
+However, =Tensor= defines =~>= which allows us to write this as
+#+BEGIN_SRC scala
+in ~> linear.apply ~> relu
+#+END_SRC
+
+Here's a more complete module:
+#+BEGIN_SRC scala
+  class FeedForward(dropoutProb: Double) extends Module {
+    val l1 = addModule("l1", Linear(dModel, dff))
+    val dropout = addModule("dropout", Dropout(dropoutProb))
+    val l2 = addModule("l2", Linear(dff, dModel))
+
+    def apply[B <: Shape, SeqLen <: Dim, S <: Shape](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* DModel] = {
+      import b.given
+      in ~> l1.apply ~> relu ~> dropout.apply ~> l2.apply
+    }
+  }
+#+END_SRC
+** Scala limitations and challenges
+- No way to express "a tuple where all elements =<: X="
+- Match types vs. givens
+- Still the odd [[https://github.com/scala/scala3/issues/25204][compiler bug]] when exploring complex type setups
+** Memory management
+** Anonymous batch dimensions
+- Explain linear layer math
+- Example definition of =Linear.apply=:
+Input must consist of any batch dimensions, and then one dimension =In=
+Output will be those batch dimensions, and then =Out=
+#+BEGIN_SRC scala
+def apply[S <: Tuple, B <: Tuple, T <: DType, Idx <: Int](in: Tensor[S, T, D])(using Batched1[B, In, S]): in.Shaped[B :* Out]
+#+END_SRC
