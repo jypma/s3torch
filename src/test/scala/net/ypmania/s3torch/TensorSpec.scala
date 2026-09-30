@@ -274,7 +274,7 @@ class TensorSpec extends UnitSpec {
       }
 
       describe("when operating on a batched method") {
-        def doIt[B <: Shape, L1 <: Dim, L2 <: Dim, S <: Shape, T <: DType](t: TensorValue[Tuple1[L1], Tensor[S, T, CPU.type]])(using Batched1[B, L2, S]) = {
+        def doIt[B <: Tuple, L1 <: Dim, L2 <: Dim, S <: Tuple, T <: DType](t: TensorValue[Tuple1[L1], Tensor[S, T, CPU.type]])(using Batched1[B, L2, S]) = {
           val r = Tensor.cat(t, Last)
           val rType: Tensor[B :* (L1 * L2), T, CPU.type] = r
           r
@@ -593,7 +593,7 @@ class TensorSpec extends UnitSpec {
     }
 
     describe("1-arg apply, when used on a batched one-dim tensor") {
-      def doIt[B <: Shape, L1 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using Batched1[B, L1, S]): Tensor[B, T, CPU.type] = {
+      def doIt[B <: Tuple, L1 <: Dim, S <: Tuple, T <: DType](t: Tensor[S, T, CPU.type])(using Batched1[B, L1, S]): Tensor[B, T, CPU.type] = {
         val r = t(dim[L1] % Index.Last)
         val rType: Tensor[B, T, CPU.type] = r
         r
@@ -617,7 +617,7 @@ class TensorSpec extends UnitSpec {
     }
 
     describe("1-arg apply, when used on a batched one-dim tensor with extra appended dim") {
-      def doIt[B <: Shape, L1 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using b:Batched1[B, L1, S]): Tensor[B :* Dim.One, T, CPU.type] = {
+      def doIt[B <: Tuple, L1 <: Dim, S <: Tuple, T <: DType](t: Tensor[S, T, CPU.type])(using b:Batched1[B, L1, S]): Tensor[B :* Dim.One, T, CPU.type] = {
         import b.given
 
         val appended = t.unsqueezeAfterEnd
@@ -643,7 +643,7 @@ class TensorSpec extends UnitSpec {
     }
 
     describe("1-arg apply, when used on a batched two-dim tensor") {
-      def doIt[B <: Shape, L1 <: Dim, L2 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using Batched[B, (L1, L2), S]): Tensor[B :* L2, T, CPU.type] = {
+      def doIt[B <: Tuple, L1 <: Dim, L2 <: Dim, S <: Tuple, T <: DType](t: Tensor[S, T, CPU.type])(using Batched[B, (L1, L2), S]): Tensor[B :* L2, T, CPU.type] = {
         val r = t(dim[L1] % Index.Last)
         val rType: Tensor[B :* L2, T, CPU.type] = r
         r
@@ -677,7 +677,7 @@ class TensorSpec extends UnitSpec {
     }
 
     describe("2-arg apply, when used on a batched two-dim tensor") {
-      def doIt[B <: Shape, L1 <: Dim, L2 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using Batched[B, (L1, L2), S]): Tensor[B, T, CPU.type] = {
+      def doIt[B <: Tuple, L1 <: Dim, L2 <: Dim, S <: Tuple, T <: DType](t: Tensor[S, T, CPU.type])(using Batched[B, (L1, L2), S]): Tensor[B, T, CPU.type] = {
         val r = t(
           dim[L1] % Index.Last,
           dim[L2] % Index.First
@@ -1247,7 +1247,7 @@ class TensorSpec extends UnitSpec {
 
       it("can add a known-dim tensor to a valid batch") {
         import Tuple.++
-        def doIt[B <: Shape, L1 <: Dim, S <: Shape, T <: DType](t: Tensor[S, T, CPU.type])(using b:Batched1[B, L1, S]): Tensor[B ++ (L1, Static[1L]), Promoted[T, Float32], CPU.type] = {
+        def doIt[B <: Tuple, L1 <: Dim, S <: Tuple, T <: DType](t: Tensor[S, T, CPU.type])(using b:Batched1[B, L1, S]): Tensor[B ++ (L1, Static[1L]), Promoted[T, Float32], CPU.type] = {
           val appended = t.unsqueezeAfterEnd
           val toAdd = Tensor.ones(1L, 1L)
 
@@ -1274,7 +1274,7 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can add a scalar to a valid batch") {
-        def doIt[B <: Shape, L1 <: Dim, S <: Shape](t: Tensor[S, Float32, CPU.type])(using b:Batched1[B, L1, S]) = {
+        def doIt[B <: Tuple, L1 <: Dim, S <: Tuple](t: Tensor[S, Float32, CPU.type])(using b:Batched1[B, L1, S]) = {
           val appended = t.unsqueezeAfterEnd
 
           appended + 5.0
@@ -1468,7 +1468,7 @@ class TensorSpec extends UnitSpec {
       }
 
       it("can transpose a batched matrix, where the batch is a given and unknown") {
-        def doIt[S <: Shape, B <: Shape](x: Tensor[S, Float32, CPU.type])(using b: Batched[B, (Static[2L], Static[3L]), S]) = {
+        def doIt[S <: Tuple, B <: Tuple](x: Tensor[S, Float32, CPU.type])(using b: Batched[B, (Static[2L], Static[3L]), S]) = {
           x.t
         }
         val m = Tensor.zeros(1L, 2L, 3L)

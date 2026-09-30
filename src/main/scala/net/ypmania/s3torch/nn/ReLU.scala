@@ -4,9 +4,9 @@ import net.ypmania.s3torch._
 import org.bytedeco.pytorch
 
 class ReLU[D <: Device, T <: DType] private (native: pytorch.ReLUImpl) extends AbstractModule[D, T](native) {
-  type This[D <: Device, T <: DType] = ReLU[D, T]
+  override type This[D <: Device, T <: DType] = ReLU[D, T]
 
-  def apply[S <: Shape, T <: DType, D <: Device](in: Tensor[S, T, D]): in.This = new Tensor(native.forward(in.native))
+  def apply[S <: Tuple, T <: DType, D <: Device](in: Tensor[S, T, D]): in.This = new Tensor(native.forward(in.native))
 }
 
 object ReLU {

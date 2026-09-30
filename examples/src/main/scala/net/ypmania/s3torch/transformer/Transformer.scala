@@ -29,14 +29,14 @@ class Transformer[
   (dModel: DModel, dff: Dff, nHeads: NHeads)
   (using Default[T], Default[D], DModel |/ NHeads, RandomSource, DTypeOps.Scalar[T, V]) {
 
-  type Tn[S <: Shape] = Tensor[S, T, D]
-  type MaskTn[M <: Shape] = Tensor[M, Bool, D]
+  type Tn[S <: Tuple] = Tensor[S, T, D]
+  type MaskTn[M <: Tuple] = Tensor[M, Bool, D]
   type Batch[B <: Dim, SeqLen <: Dim] = Tn[(B, SeqLen, DModel)]
 
   class InputEmbeddings[VocabSize <: Dim](vocabSize: VocabSize) extends Module {
     val embedding = addModule("embedding", Embedding(vocabSize, dModel))
 
-    def apply[S <: Shape, T <: Int32](in: Tensor[S, T, D]): Tn[Append[S, DModel]] = embedding(in) * Math.sqrt(dModel.size.toDouble)
+    def apply[S <: Tuple, T <: Int32](in: Tensor[S, T, D]): Tn[Append[S, DModel]] = embedding(in) * Math.sqrt(dModel.size.toDouble)
   }
 
   class PositionalEncoding[SeqLen <: Dim](seqLen: SeqLen, dropoutProb: Double) extends Module {
@@ -71,7 +71,7 @@ class Transformer[
     val dropout = addModule("dropout", Dropout(dropoutProb))
     val l2 = addModule("l2", Linear(dff, dModel))
 
-    def apply[B <: Shape, SeqLen <: Dim, S <: Shape](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* DModel] = {
+    def apply[B <: Tuple, SeqLen <: Dim, S <: Tuple](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* DModel] = {
       import b.given
       in ~> l1.apply ~> relu ~> dropout.apply ~> l2.apply // AK is same, but without dropout.
     }
@@ -104,7 +104,7 @@ class Transformer[
 
     // TODO The mask seems to only ever be a "causal" mask (triangular matrix). Perhaps just make it an enum.
     /** @param mask If given, should be true for values we want to give attention to, and false for values to ignore. */
-    def apply[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim, M <: Shape](
+    def apply[B <: Dim, QSeqLen <: Dim, KVSeqLen <: Dim, M <: Tuple](
       query: Batch[B, QSeqLen], key: Batch[B, KVSeqLen], value: Batch[B, KVSeqLen], mask: Option[MaskTn[M]]
     ) (using
       Broadcastable[AttentionScores[B, QSeqLen, KVSeqLen], M]
@@ -143,7 +143,7 @@ class Transformer[
     addModule("feedForward", feedForward)
     val residual = addModules("residual", Seq.fill(2)(new ResidualConnection(dropoutProb)))
 
-    def apply[B <: Dim, SeqLen <: Dim, M <: Shape](mask: MaskTn[M])(in: Batch[B, SeqLen])(using
+    def apply[B <: Dim, SeqLen <: Dim, M <: Tuple](mask: MaskTn[M])(in: Batch[B, SeqLen])(using
       Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]
     ): Batch[B, SeqLen] = {
       in
@@ -156,7 +156,7 @@ class Transformer[
     addModules("blocks", blocks)
     val norm = addModule("norm", new LayerNormalization)
 
-    def apply[B <: Dim, SeqLen <: Dim, M <: Shape](mask: MaskTn[M])(in: Batch[B, SeqLen])(using
+    def apply[B <: Dim, SeqLen <: Dim, M <: Tuple](mask: MaskTn[M])(in: Batch[B, SeqLen])(using
       Broadcastable[AttentionScores[B, SeqLen, SeqLen], M]
     ): Batch[B, SeqLen] = {
       blocks.foldLeft(in)(_ ~> _(mask)) ~> norm.apply
@@ -174,7 +174,7 @@ class Transformer[
     addModule("feedForward", feedForward)
     val residual = addModules("residual", Seq.fill(3)(new ResidualConnection(dropoutProb)))
 
-    def apply[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EncoderMask <: Shape, DecoderMask <: Shape] (
+    def apply[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EncoderMask <: Tuple, DecoderMask <: Tuple] (
       encoderOutput: Batch[B, SrcLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtLen]
     )(using
       Broadcastable[AttentionScores[B, TgtLen, TgtLen], DecoderMask],
@@ -191,7 +191,7 @@ class Transformer[
     addModules("blocks", blocks)
     val norm = addModule("norm", new LayerNormalization)
 
-    def apply[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EncoderMask <: Shape, DecoderMask <: Shape](
+    def apply[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EncoderMask <: Tuple, DecoderMask <: Tuple](
       encoderOutput: Batch[B, SrcLen], encoderMask: MaskTn[EncoderMask], decoderMask: MaskTn[DecoderMask])(in: Batch[B, TgtLen]
     )(using
       Broadcastable[AttentionScores[B, TgtLen, TgtLen], DecoderMask],
@@ -204,7 +204,7 @@ class Transformer[
   class Projection[VocabSize <: Dim](vocabSize: VocabSize) extends Module {
     val proj = addModule("proj", Linear(dModel, vocabSize))
 
-    def apply[B <: Shape, S <: Shape](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* VocabSize] = {
+    def apply[B <: Tuple, S <: Tuple](in: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* VocabSize] = {
       import b.given
       proj(in).log_softmax(vocabSize)
     }
@@ -235,13 +235,13 @@ class Transformer[
     parameters.flatMap(_.untyped2D).foreach(init.xavier_uniform)
 
     // TODO Why only int32, not also int64 or other ints?
-    def encode[B <: Dim, M <: Shape, T <: Int32, SrcLen <: Dim](src: Tensor[(B, SrcLen), T, D], srcMask: MaskTn[M])(
+    def encode[B <: Dim, M <: Tuple, T <: Int32, SrcLen <: Dim](src: Tensor[(B, SrcLen), T, D], srcMask: MaskTn[M])(
       using Broadcastable[AttentionScores[B, SrcLen, SrcLen], M], SrcLen |<= SrcSeqLen
     ): Batch[B, SrcLen] = {
       src ~> sourceEmb.apply ~> sourcePos.apply ~> encoder(srcMask)
     }
 
-    def decode[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EM <: Shape, DM <: Shape, T <: Int32] (
+    def decode[B <: Dim, SrcLen <: Dim, TgtLen <: Dim, EM <: Tuple, DM <: Tuple, T <: Int32] (
       encoderOutput: Batch[B, SrcLen], encoderMask: MaskTn[EM], decoderMask: MaskTn[DM]
     )(
       tgt: Tensor[(B, TgtLen), T, D]
@@ -253,7 +253,7 @@ class Transformer[
       tgt ~> targetEmb.apply ~> targetPos.apply ~> decoder(encoderOutput, encoderMask, decoderMask)
     }
 
-    def project[B <: Shape, S <: Shape](x: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* TgtVocabSize] = projection(x)
+    def project[B <: Tuple, S <: Tuple](x: Tn[S])(using b:Batched1[B, DModel, S]): Tn[B :* TgtVocabSize] = projection(x)
   }
 }
 

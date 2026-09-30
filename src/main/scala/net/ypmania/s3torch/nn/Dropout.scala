@@ -8,7 +8,7 @@ class Dropout[D <: Device, T <: DType] private (native: pytorch.DropoutImpl)(usi
 
   private val rnd = summon[RandomSource].fork // Fork, so subsequent invocations of apply() have different results, but still reproducable.
 
-  def apply[S <: Shape, T <: DType, D <: Device](in: Tensor[S, T, D]): in.This = rnd(new Tensor(native.forward(in.native)))
+  def apply[S <: Tuple, T <: DType, D <: Device](in: Tensor[S, T, D]): in.This = rnd(new Tensor(native.forward(in.native)))
 }
 
 object Dropout {

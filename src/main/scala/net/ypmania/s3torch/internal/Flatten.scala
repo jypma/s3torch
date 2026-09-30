@@ -2,14 +2,13 @@ package net.ypmania.s3torch.internal
 
 import net.ypmania.s3torch.Dim
 import net.ypmania.s3torch.Dim._
-import net.ypmania.s3torch.Shape
 
-trait Flatten[S <: Shape] {
+trait Flatten[S <: Tuple] {
   type Out <: Dim
 }
 
 trait FlattenLowPrio {
-  given fallback[S <: Shape]: Flatten[S] with { type Out = Dim }
+  given fallback[S <: Tuple]: Flatten[S] with { type Out = Dim }
 }
 
 object Flatten extends FlattenLowPrio {

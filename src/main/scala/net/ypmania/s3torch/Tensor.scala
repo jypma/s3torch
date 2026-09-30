@@ -36,10 +36,10 @@ import Tuple.:*
   * All methods on Tensor guarantee that the types accurately reflect the tensor, so that any incompatibilities always
   * result in compile-time errors, rather than runtime discoveries.
   */
-class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
-  type shape = S
-  type dType = T
-  type IdFn[T] = T => T
+class Tensor[_S <: Tuple, _T <: DType, D <: Device](val native: pytorch.Tensor) {
+  type S = _S
+  type T = _T
+  private type IdFn[T] = T => T
   /** A differently-shaped tensor with the same DType and Device */
   type Shaped[S1 <: Tuple] = Tensor[S1, T, D]
   /** A differently-shaped tensor, with different DType, on the same Device */
@@ -211,16 +211,16 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   // Special variant of ReduceOp that returns a Tuple (MaxResult), rather than a single tensor.
   class MaxReduceOp extends dimOp.Of1 {
-    type Out[B <: Shape, L <: Shape, Idx <: Int] = MaxResult[Concat[B, Remove[L, Idx]]]
-    protected def run[B <: Shape, L <: Shape, Idx <: Int](idx: Int) = {
+    type Out[B <: Tuple, L <: Tuple, Idx <: Int] = MaxResult[Concat[B, Remove[L, Idx]]]
+    protected def run[B <: Tuple, L <: Tuple, Idx <: Int](idx: Int) = {
       val res = torch.max(native, idx, false)
       MaxResult(new Tensor(res.get0()), new Tensor(res.get1()))
     }
 
     /** Variant of this operation that keeps the targeted dimension (reduced to one), rather than removing it. */
     case object keepDim extends dimOp.Of1 {
-      type Out[B <: Shape, L <: Shape, Idx <: Int] = MaxResult[Concat[B, Replace[L, Dim.One, Idx]]]
-      protected def run[B <: Shape, L <: Shape, Idx <: Int](idx: Int) = {
+      type Out[B <: Tuple, L <: Tuple, Idx <: Int] = MaxResult[Concat[B, Replace[L, Dim.One, Idx]]]
+      protected def run[B <: Tuple, L <: Tuple, Idx <: Int](idx: Int) = {
         val res = torch.max(native, idx, true)
         MaxResult(new Tensor(res.get0()), new Tensor(res.get1()))
       }
@@ -249,6 +249,9 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
     Option.when(dim.size - size.last >= 0)(padTo(dim, value, mode)(using last = null, ev = null))
   }
 
+  /** Returns the shape of this Tensor */
+  def shape: Shape[S] = new Shape(size)
+
   /** Casts the shape of this tensor into compatible shape [O] (which must be a Tuple of Dim's, or a single Dim) */
   def shaped[O](using ev:CanShaped[S, O]): Shaped[ev.Out] = new Tensor(native)
 
@@ -260,12 +263,12 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   /** Returns the size of one dimension selected by D, as a Dim.Ref (since we can't create an actual instance of a Dim). */
   def sizeOf = new dimOp.Of1 {
-    type Out[B <: Shape, L <: Shape, Idx <: Int] = Dim.Ref[Elem[L, Idx]]
-    def run[B <: Shape, L <: Shape, Idx <: Int](idx: Int) = Dim.Ref(size(idx))
+    type Out[B <: Tuple, L <: Tuple, Idx <: Int] = Dim.Ref[Elem[L, Idx]]
+    def run[B <: Tuple, L <: Tuple, Idx <: Int](idx: Int) = Dim.Ref(size(idx))
   }
 
   /** Returns the size of one dimension typed D, using [dim] to create the instance of D holding the result. */
-  def sizeOf[D <: Dim, Idx <: Int](dim: Long => D)(using sel: SelectIdx[S,D]): D = dim(size(sel.idx))
+  def sizeOf[D <: Dim, Idx <: Int](dim: Long => D)(using sel: SelectIdx[S, D]): D = dim(size(sel.idx))
 
   /** Removes a dimension of One */
   val squeeze = new dimOp.Of1TensorEv[[L <: Tuple, Idx <: Int] =>> Shape.Elem[L, Idx] =:= Dim.One] {
@@ -341,8 +344,8 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
 
   /** Swaps the given two dimensions. */
   val transpose = new dimOp.Of2Tensor {
-    type Out[L <: Shape, I1 <: Int, I2 <: Int] = Shape.Swap[L, I1, I2]
-    def run[L <: Shape, I1 <: Int, I2 <: Int](i1: Int, i2: Int) = native.transpose(i1, i2)
+    type Out[L <: Tuple, I1 <: Int, I2 <: Int] = Shape.Swap[L, I1, I2]
+    def run[L <: Tuple, I1 <: Int, I2 <: Int](i1: Int, i2: Int) = native.transpose(i1, i2)
   }
 
   /** Swaps the last two dimensions. Tensor must have >= 2 dimensions. Alias for "t". */
@@ -395,10 +398,10 @@ class Tensor[S <: Tuple, T <: DType, D <: Device](val native: pytorch.Tensor) {
   case object view {
     /** Transforms a split version of this tensor, split across dimension D in N parts. */
     val split = new dimOp.Of1 {
-      type Out[B <: Shape, L <: Shape, Idx <: Int] = SplitApply[B, L, Idx, Elem[S, Idx]]
-      def run[B <: Shape, L <: Shape, Idx <: Int](idx: Int) = new SplitApply(idx)
+      type Out[B <: Tuple, L <: Tuple, Idx <: Int] = SplitApply[B, L, Idx, Elem[S, Idx]]
+      def run[B <: Tuple, L <: Tuple, Idx <: Int](idx: Int) = new SplitApply(idx)
     }
-    class SplitApply[B <: Shape, L <: Shape, Idx <: Int, D](private[s3torch] val idx: Int) {
+    class SplitApply[B <: Tuple, L <: Tuple, Idx <: Int, D](private[s3torch] val idx: Int) {
       /** Splits the selected dimension into N parts, i.e. the dimension D gets split into two dimensions (N, D / N) */
       def into[N <: Dim](n: N)(using ev:Split[D, N]): Shaped[Concat[B, Shape.ReplaceWithTuple[L, ev.Out, Idx]]] = {
         val (before, after) = size.splitAt(idx)
@@ -554,7 +557,7 @@ object Tensor {
   }
 
   // ---- Methods on Tensor that require floats
-  extension[S <: Shape, T <: DType.Floaty, Dv <: Device](t: Tensor[S, T, Dv]) {
+  extension[S <: Tuple, T <: DType.Floaty, Dv <: Device](t: Tensor[S, T, Dv]) {
     def stdBy = new t.ReduceOp((idx, keep) => t.native.std(Array(idx), new pytorch.ScalarOptional, keep))
     def stdBy(correction: Double) = new t.ReduceOp((idx, keep) => t.native.std(Array(idx), new pytorch.ScalarOptional(new pytorch.Scalar(correction)), keep))
     def mean: t.Shaped[EmptyTuple] = new Tensor(t.native.mean(0.until(t.size.size).map(_.toLong).toArray, false, new ScalarTypeOptional))

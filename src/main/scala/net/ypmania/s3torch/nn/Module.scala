@@ -3,7 +3,6 @@ package net.ypmania.s3torch.nn
 import net.ypmania.s3torch.DType
 import net.ypmania.s3torch.Default
 import net.ypmania.s3torch.Device
-import net.ypmania.s3torch.Shape
 import net.ypmania.s3torch.Tensor
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.pytorch
@@ -32,13 +31,13 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
   }
 
   /** Registers the given buffer (so its state is loaded/saved together), and returns it. */
-  protected def addBuffer[S <: Shape](name: String, buffer: Tensor[S, T, D]): Tensor[S, T, D] = {
+  protected def addBuffer[S <: Tuple](name: String, buffer: Tensor[S, T, D]): Tensor[S, T, D] = {
     native.register_buffer(name, buffer.native)
     buffer
   }
 
   /** Registers the given parameter (so its state is loaded/saved together), and returns it. */
-  protected def addParameter[S <: Shape](name: String, parameter: Tensor[S, T, D]): Tensor[S, T, D] = {
+  protected def addParameter[S <: Tuple](name: String, parameter: Tensor[S, T, D]): Tensor[S, T, D] = {
     native.register_parameter(name, parameter.native)
     parameter
   }
