@@ -441,6 +441,8 @@ trait DividedDim[D <: Dim, L <: Dim] extends Dim {}
 infix type /[D <: Dim, L <: Dim] = DividedDim[D, L]
 #+END_SRC
 
+- See the python way in "nanoGTP", [[https://github.com/karpathy/nanoGPT/blob/master/model.py#L33][model.py]]
+
 *** Merging dimensions
 We want to remove a dimension from a tensor, merging it into the one before it:
 
