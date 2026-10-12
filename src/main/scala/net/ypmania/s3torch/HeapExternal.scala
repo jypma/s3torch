@@ -4,6 +4,7 @@ import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerScope
 
 import scala.util.Using
+import org.bytedeco.pytorch.DetectAnomalyGuard
 
 trait HeapExternal[T] {
   def toPointer(t: T): Pointer
@@ -36,4 +37,12 @@ object HeapExternal {
     }
     r
   }
+
+  def detectAnomaly[T: HeapExternal](fn: => T) = {
+    scoped {
+      val guard = new DetectAnomalyGuard
+      fn
+    }
+  }
+
 }

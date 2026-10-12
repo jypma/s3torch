@@ -2,6 +2,7 @@ package net.ypmania.s3torch
 
 import scala.compiletime.ops.int.ToLong
 import scala.compiletime.ops.long._
+import net.ypmania.s3torch.internal.Unsplit
 
 /**
   * One of a Tensor's dimensions. Since dimensions are ideally used as unique types as well as values, a Dim subtype should only have one value.
@@ -45,8 +46,18 @@ object Dim extends DimLowPriorityGivens {
     def |/[B <: Dim](that: B): Option[KnownDivisibleBy[D, B]] = Option.when(dim.size <= that.size)(new KnownDivisibleBy[D, B] {})
 
     /** Returns a Dim representing this dim divided by [that], given that this dim is dividable by that. */
-    def /[B <: Dim](that: B)(using D |/ B): D / B = new DividedDim[D, B] {
-      def size = dim.size / that.size
+    def /[B <: Dim](that: B)(using D |/ B)(using div: DivideBy[D, B]): div.Out = div(dim, that)
+
+    /** Returns a Dim representing this dim multiplied by [that]. */
+    def *[B <: Dim](that: B)(using unsplit: Unsplit[D, B]): unsplit.Out = {
+      unsplit(dim, that)
+    }
+
+    /** Returns a Dim representing this dim multiplied by the given literal integer. */
+    def *[I <: Int & Singleton](that: I): D * Dim.Static[ToLong[I]] = new (D * Dim.Static[ToLong[I]]) {
+      override def left = dim
+      override def right = Dim.Static(that)
+      override def size = dim.size * that
     }
   }
 
@@ -91,19 +102,61 @@ object Dim extends DimLowPriorityGivens {
   }
 
   /** A Dim that is the result of multiplying two other Dims */
-  trait ProductDim[A <: Dim, B <: Dim] extends Dim
+  trait ProductDim[A <: Dim, B <: Dim] extends Dim {
+    /** The original left argument of the multiplication */
+    def left: A
+    /** The original right argument of the multiplication */
+    def right: B
+  }
   infix type *[A <: Dim, B <: Dim] = ProductDim[A, B]
+  object ProductDim {
+    def apply[A <: Dim, B <: Dim](a: A, b: B) = new (A * B) {
+      override def left = a
+      override def right = b
+      override def size = a.size * b.size
+    }
+  }
 
   /** Proof that D is divisible by L */
-  trait DivisibleBy[+D <: Dim, +L <: Dim] {}
+  trait DivisibleBy[D <: Dim, L <: Dim]
   object DivisibleBy {
     given [A <: Dim, B <: Dim](using StaticSize[A] % StaticSize[B] =:= 0L): DivisibleBy[A, B] with {}
+    given [A <: Dim, B <: Dim]: DivisibleBy[A * B, A] with {}
+    given [A <: Dim, B <: Dim]: DivisibleBy[A * B, B] with {}
   }
   /** Proof that D is divisible by L */
-  infix type |/[+D <: Dim, +L <: Dim] = DivisibleBy[D, L]
+  infix type |/[D <: Dim, L <: Dim] = DivisibleBy[D, L]
+
+  /** Calculates the return type for D / L */
+  trait DivideBy[D <: Dim, L <: Dim] {
+    type Out <: Dim
+    def apply(a: D, b: L): Out
+  }
+  trait DivideByPrio0 {
+    given div[D <: Dim, L <: Dim]: DivideBy[D, L] with {
+      type Out = D / L
+      override def apply(d: D, l: L) = new (D / L) {
+        override def original = d
+        override def size = d.size / l.size
+      }
+    }
+  }
+  object DivideBy extends DivideByPrio0 {
+    given [A <: Dim, B <: Dim]: DivideBy[A * B, A] with {
+      type Out = B
+      override def apply(in: A * B, a: A): B = in.right
+    }
+    given [A <: Dim, B <: Dim]: DivideBy[A * B, B] with {
+      type Out = A
+      override def apply(in: A * B, b: B): A = in.left
+    }
+  }
 
   /** A Dim that is the result of dividing two other Dims */
-  trait DividedDim[D <: Dim, L <: Dim] extends Dim {}
+  trait DividedDim[D <: Dim, L <: Dim] extends Dim {
+    /** The original dimension being divided */
+    def original: D
+  }
   /** A Dim that is the result of dividing two other Dims */
   infix type /[D <: Dim, L <: Dim] = DividedDim[D, L]
 

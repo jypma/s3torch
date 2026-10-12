@@ -43,7 +43,15 @@ What direction do we poke at?
 - Calculate the partial derivative of each weight towards that loss
 - Poke the weights such, that the loss (hopefully) decreases
 *** Optimizing performance
-- Modern models have a lot (1e9)
+Avenues for parallelization:
+
+- Modern models have a lot of weights
+  + They tend to depend on each other
+
+- We do have a lot of training examples to go through
+  + Those are independent!
+
+Solution: process in /batches/
 ** What about human learning?
 *** Consider this python example
 #+BEGIN_SRC python
@@ -137,7 +145,7 @@ def getFirstElement[T](items: List[T]): T
   + Everything is tracked for gradient descent back-propagation
 - Tensors
   + are /mutable/
-  + have a fixed /dimension/
+  + have a fixed /size/ with a number of /dimensions/
   + have a fixed /data type/ (64-bit integer, 32-bit float, etc.)
   + are stored on a specific /device/ (e.g. CPU, GPU number 2, etc.)
 *** Runtime restrictions
@@ -524,27 +532,120 @@ val t = Tensor.zeros(Row, Column)
 - By a specific index (must be a compile-time constant) =t.maxBy(Select.Idx(0))=
 
 Of course, all of the above are compile-time verified.
-* Practical examples
-** Example: Embedding
-Show Embedding.scala
-** Example: cross entropy
-Show cross entropy scala
-** Example: Applying a head of self-attention
+** Dynamic batch dimensions
+*** Introduction
+Let's say we have written
+#+BEGIN_SRC scala
+def myAwesomeCalculation[D <: Device](in: Tensor[(Row, Col), Float32, D]): Tensor[EmptyTuple, Float32, D] = ???
+#+END_SRC
 
-Initial definition
+We've heard that allowing this to be calculated in batches is good for performance.
+
+How does our signature change?
+*** Add explicit batch dimension
+Let's add an extra dimension to represent our "batch"
+#+BEGIN_SRC scala
+def myAwesomeCalculation[D <: Device, Batch <: Dim](in: Tensor[(Batch, Row, Col), Float32, D]): Tensor[EmptyTuple, Float32, D] = ???
+#+END_SRC
+
+We can now submit calculations with varying batch sizes.
+
+But what about our original example without a batch at all?
+*** Making batch dimension(s) optional
+Many operations in =libtorch= accept (an) optional batch dimension(s).
+- Not all of them
+- Not always documented
+- Sometimes one batch dimension, sometimes several
+
+Let's define a trait that covers:
+- Some unknown batch dimensions =B <: Tuple=, with known dimensionality
+- Some unknown non-batch dimensions =T <: Tuple=, with known dimensionality
+
+#+BEGIN_SRC scala
+/** Proof that shape [S] is in fact the concatenation of (potentially call-site unknown) batch dimensions [B]
+    with actual, known dimensions [T] */
+trait Batched[B <: Tuple, T <: Tuple, S <: Tuple](using b:ValueOf[Size[B]], t:ValueOf[Size[T]])
+#+END_SRC
+
+We'll see examples of how to use =given= parameters with this trait later.
+* Practical examples
+** Example: Modeling cross entropy loss
+*** Simplified description
+
+- We've calculated =B= examples with our model.
+- Each example holds a vector of probabilities for what decision the model deems most likely (next token, dog or brownie, ...).
+- We also have =B= /expected/ outcomes (from our training data)
+
+In pytorch, this is [[https://docs.pytorch.org/docs/2.14/generated/torch.nn.CrossEntropyLoss.html#crossentropyloss][torch.nn.CrossEntropyLoss]]
+*** Scala representation
+Let's model a simplified version in Scala.
+#+BEGIN_SRC scala
+  def crossEntrypyLoss[
+    SI <: Tuple, // Input shape
+    ST <: Tuple, // Target shape
+    D <: Device,
+    TI <: DType, // Input DType
+    TT <: DType.Int64 // Target DType. Undocumented, but pytorch/libtorch only support Int64 here.
+  ] (
+    input: Tensor[SI, TI, D], target: Tensor[ST, TT, D]
+  ) (using
+    ValidShape[SI, ST]
+  ): input.Shaped[Scalar]
+#+END_SRC
+
+Which shapes do we accept?
+#+BEGIN_SRC scala
+  trait ValidShape[I <: Tuple, T <: Tuple]
+  object ValidShape {
+    given s1[C <: Dim]: ValidShape[C *: EmptyTuple, EmptyTuple] with {}
+    given s2[N <: Dim, C <: Dim, Tail <: Tuple]: ValidShape[(N *: C *: Tail), N *: Tail] with {}
+  }
+#+END_SRC
+
+See it in action: [[file:~/workspace/s3torch/src/test/scala/net/ypmania/s3torch/nn/CrossEntropySpec.scala][CrossEntropySpec]]
+** Example: Applying a head of self-attention
+*** Introduction
+(Very) simplistic sketch of a /transformer/ model:
+#+BEGIN_SRC scala
+(input tokens) --> (sequence of DModel-dimensional elements) --> (transformations) --> (output tokens)
+#+END_SRC
+
+- Input tokens, and resulting sequences, typically come from code or text
+- Each /transformation/ converts one sequence of =DModel=-dimensional elements into a new one
+- Final step down-converts the =DModel= dimensions back into tokens.
+
+- Let's look at a single one of these transformations (called a /head/)
+  * Internally, the /head/ has a matrix that of weights
+    + Correlates elements on different positions to each other
+
+*** Initial definition
+#+BEGIN_SRC scala
+type DModel <: Dim // or could be a Dim.Static
+
+def apply[L <: Dim](x: Tensor[(L, DModel), Float32, D]): Tensor[(L, DModel), Float32, D]
+#+END_SRC
+
+*** Adding a batch dimension
+We want to be able to calculate many examples simultaneously.
+
 #+BEGIN_SRC scala
 def apply[B <: Dim, L <: Dim](x: Tensor[(B, L, DModel), Float32, D]): Tensor[(B, L, DModel), Float32, D]
 #+END_SRC
 
+*** Adding dimension limitations
 Adding a limitation on =L= less than the block size (because we use =Take=)
+- The /head/'s internal matrix only has weights for sequence elements up to =MaxBlockSize= length.
+
 #+BEGIN_SRC scala
 def apply[B <: Dim, L <: Dim](x: Tensor[(B, L, DModel), Float32, D])(using L |<= MaxBlockSize): Tensor[(B, L, DModel), Float32, D]
 #+END_SRC
 
-Parameterizing batch
+*** Parameterizing the batch dimension
 #+BEGIN_SRC scala
 def apply[S <: Tuple, B <: Tuple, L <: Dim](x: Tensor[S, Float32, D])(using b: Batched[B, (L, DModel), S])(using L |<= MaxBlockSize): Tensor[B ++ (L, DModel), Float32, D]
 #+END_SRC
+** TODO Example: Embedding ... or use of it?
+Show Embedding.scala
 ** Scala opportunities compared to Python
 - No need for =module.Sequential=. Actual chained invocations retain type
 #+BEGIN_SRC scala

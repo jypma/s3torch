@@ -9,6 +9,11 @@ import Tuple.:*
 class Embedding[D <: Device, OutT <: DType, Num <: Dim, Emb <: Dim] (native: pytorch.EmbeddingImpl) extends AbstractModule[D, OutT](native) {
   type This[D <: Device, T <: DType] = Embedding[D, T, Num, Emb]
 
+  def weight: Tensor[(Num, Emb), OutT, D] = getParameter("weight")
+
+  // TODO reimplement ourselves, allowing the "weight" tensor to be passed in directly.
+  // It seams that, while pytorch allows parameters to be replaced, libtorch does not.
+
   def apply[S <: Tuple, T <: (Int64 | Int32)](in: Tensor[S, T, D]): Tensor[S :* Emb, OutT, D] =
     new Tensor(native.forward(in.native))
 }

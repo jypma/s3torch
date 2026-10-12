@@ -64,7 +64,7 @@ object Index extends IndexPrio0 {
     def toIndex(i: Int) = At(i)
   }
 
-  /** Selects the first element in that dimension */
+  /** Selects the first element in that dimension, and remove the dimension */
   case object First extends Index {
     def toNative = new pytorch.TensorIndex(0)
   }
@@ -73,7 +73,7 @@ object Index extends IndexPrio0 {
     def toIndex(i: First.type) = i
   }
 
-  /** Selects the last element in that dimension */
+  /** Selects the last element in that dimension, and remove the dimension */
   case object Last extends Index {
     def toNative = new pytorch.TensorIndex(-1)
   }
@@ -108,6 +108,20 @@ object Index extends IndexPrio0 {
   given givtake[D <: Dim, O <: Dim](using O |<= D): Valid[D, Take[O]] with {
     type Apply = Tuple1[O]
     def toIndex(i: Take[O]) = i
+  }
+
+  case class TakeLast[D] private (size: Long) extends Index {
+    def toNative = new pytorch.TensorIndex(new pytorch.Slice(toSymInt(Some(-size)), toSymInt(None), toSymInt(None)))
+  }
+  case object TakeLast {
+    /** Selects [D] elements from the end (D must be smaller than or equal than the current dimension in the shape) */
+    def apply[D <: Dim](dim: Dim.Ref[D]): TakeLast[D] = new TakeLast(dim.size)
+    /** Selects [D] elements from the end (D must be smaller than or equal than the current dimension in the shape) */
+    def apply[D <: Dim](dim: D): TakeLast[D] = new TakeLast(dim.size)
+  }
+  given givtakelast[D <: Dim, O <: Dim](using O |<= D): Valid[D, TakeLast[O]] with {
+    type Apply = Tuple1[O]
+    def toIndex(i: TakeLast[O]) = i
   }
 
   /** Selects a subset of a dimension. */

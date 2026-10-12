@@ -42,9 +42,24 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
     parameter
   }
 
+  /** Returns the given named parameter, assuming it is of shape [S]. Must only be called if the underlying module implementation
+    * is known to have registered such a parameter.
+    */
+  protected def getParameter[S <: Tuple](name: String): Tensor[S, T, D] = {
+    new Tensor(native.named_parameters().get(name))
+  }
+
+  protected def setParameter[S <: Tuple](name: String, value: Tensor[S, T, D]): Unit = {
+    var p = native.named_parameters()
+  }
+
   /** Returns all parameters registered by this module or any child module. */
   def parameters: Seq[Tensor[?, T, D]] = {
     native.parameters().get().toVector.map(new Tensor(_))
+  }
+
+  def modules(includeSelf: Boolean = true): Seq[AbstractModule[D, T]] = {
+    native.modules(includeSelf).get().toVector.map(new AbstractModule[D, T](_) {})
   }
 
   /** Returns all named parameters registered by this module or any child module. */
@@ -94,6 +109,9 @@ abstract class AbstractModule[D <: Device, T <: DType](private[AbstractModule] v
   def train(trainingMode: Boolean = true): Unit = {
     native.train(trainingMode)
   }
+
+  /** Returns whether the module currently is in training mode */
+  def isTraining: Boolean = native.is_training()
 
   /** Runs the given function in evaluation mode, switching back to the previous mode afterwards. */
   def eval[T](fn: => T): T = {

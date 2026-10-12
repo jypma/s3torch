@@ -39,5 +39,4 @@ object Batched extends BatchedPrio2 {
   given d30[D1 <: Dim, D2 <: Dim, D3 <: Dim]: Batched[EmptyTuple, (D1, D2, D3), (D1, D2, D3)] with {}
 
   given d40[D1 <: Dim, D2 <: Dim, D3 <: Dim, D4 <: Dim]: Batched[EmptyTuple, (D1, D2, D3, D4), (D1, D2, D3, D4)] with {}
-
 }

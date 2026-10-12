@@ -8,6 +8,7 @@ import Dim.Dynamic
 import scala.reflect.ClassTag
 import DType.*
 import net.ypmania.s3torch.Dim.{*}
+import net.ypmania.s3torch.Dim.|<=
 import net.ypmania.s3torch.Select
 import net.ypmania.s3torch.Select.First
 import net.ypmania.s3torch.Select.Last
@@ -557,6 +558,14 @@ class TensorSpec extends UnitSpec {
         val rType: Tensor[Tuple1[Column], Int32, CPU.type] = r
         assert(r.size == Seq(3L))
         assert(r.value === Seq(1, 2, 3))
+      }
+
+      it("can select the last row from a matrix, retaining the dimension") {
+        given Dim.One |<= Row with {} // Make compiler happy that we have >=1 rows (Row is Dynamic)
+        val r = m(dim[Row] % Index.TakeLast(Dim.One))
+        val rType: Tensor[(Dim.One, Column), Int32, CPU.type] = r
+        assert(r.size == Seq(1L, 3L))
+        assert(r.value === Seq(Seq(0, 2, 0)))
       }
 
       it("can select one row from a matrix") {

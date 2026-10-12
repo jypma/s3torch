@@ -1,16 +1,18 @@
 package net.ypmania.s3torch.internal
 
-import net.ypmania.s3torch.Batched1
 import net.ypmania.s3torch.Dim
-
-import Tuple.:*
 
 trait Multinomial[S <: Tuple] {
   type Out[NumSamples <: Dim] <: Tuple
 }
 
 object Multinomial {
-  given b[S <: Tuple, D <: Dim, B <: Tuple](using b:Batched1[B, D, S]): Multinomial[S] with {
-    type Out[NumSamples <: Dim] = B :* NumSamples
+  // Torch will give a "prob_dist must be 1 or 2 dim" error, which is undocumented: dimension must be 1 or 2
+
+  given d2[D1 <: Dim, D2 <: Dim]: Multinomial[(D1, D2)] with {
+    type Out[NumSamples <: Dim] = (D1, NumSamples)
+  }
+  given d1[D1 <: Dim]: Multinomial[Tuple1[D1]] with {
+    type Out[NumSamples <: Dim] = Tuple1[NumSamples]
   }
 }
