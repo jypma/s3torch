@@ -1,4 +1,15 @@
 * Type-safe tensors for human learning
+** Getting started
+*** About me
+- Jan Ypma
+  * Independent software architect
+  * Java, Scala, Groovy, C++, Rust, Lisp
+  * Contributor to various open source projects
+  * Fan of functional programming and distributed systems
+  * Agile coach and fan of Domain-Driven Design
+  * =jan@ypmania.net=, https://linkedin.com/in/jypma
+
+- This talk: [[https://github.com/jypma/s3torch/tree/master/presentation][https://github.com/jypma/s3torch/tree/master/presentation]]
 ** Introduction to tensors
 *** Tensor
 Wikipedia:
