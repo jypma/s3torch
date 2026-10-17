@@ -567,7 +567,19 @@ Let's define a trait that covers:
 trait Batched[B <: Tuple, T <: Tuple, S <: Tuple](using b:ValueOf[Size[B]], t:ValueOf[Size[T]])
 #+END_SRC
 
-We'll see examples of how to use =given= parameters with this trait later.
+*** Example: =Linear=
+A /linear/ layer in a neural network:
+- Accepts as input tensors that have =In= as a final dimension
+- Has an internal matrix of weights, that transforms that =In= dimension into an =Out= dimension
+
+In other words:
+- Input must consist of any batch dimensions, and then one dimension =In=.
+- Output will be those batch dimensions, and then =Out=
+#+BEGIN_SRC scala
+def apply[S <: Tuple, B <: Tuple, T <: DType, Idx <: Int](in: Tensor[S, T, D])(using Batched[B, Tuple1[In], S]): in.Shaped[B :* Out]
+#+END_SRC
+
+Actual definition: [[file:~/workspace/s3torch/src/main/scala/net/ypmania/s3torch/nn/Linear.scala][Linear.scala]]
 * Practical examples
 ** Example: Modeling cross entropy loss
 *** Simplified description
@@ -644,9 +656,50 @@ def apply[B <: Dim, L <: Dim](x: Tensor[(B, L, DModel), Float32, D])(using L |<=
 #+BEGIN_SRC scala
 def apply[S <: Tuple, B <: Tuple, L <: Dim](x: Tensor[S, Float32, D])(using b: Batched[B, (L, DModel), S])(using L |<= MaxBlockSize): Tensor[B ++ (L, DModel), Float32, D]
 #+END_SRC
-** TODO Example: Embedding ... or use of it?
-Show Embedding.scala
+** Example: Concatenation operations
+*** Concatenate along dimension
+Let's say we have a known number of tensors (=Num=), that we want to concatenate along a dimension (=Row=).
+
+- What's the size of that dimension in the resulting tensor?
+- How can we capture the concept of "=Num= tensors" at compile time?
+*** Concatenate along dimension (=TensorValue=)
+We make a simple wrapper around =Seq=.
+#+BEGIN_SRC scala
+/** A sequence of values with compile-time known shape S. */
+class TensorValue[S <: Tuple, +T](private val contents: Seq[T]) extends Iterable[T] {
+  def map[U: ClassTag](fn: T => U): TensorValue[S, U]  = new TensorValue(contents.map(fn))
+}
+
+object TensorValue {
+  def arangeOf[D <: Dim](dim: D): TensorValue[Tuple1[D], Long] = new TensorValue((0L.until(dim.size)))
+}
+#+END_SRC
+*** Concatenate along dimension (=cat=)
+Now ,we can use =TensorValue= to represent a sequence of same-shaped Tensors of known size.
+#+BEGIN_SRC scala
+  def cat[D <: Dim, S <: Tuple, T <: DType, Dv <: Device, A](
+    tensors: TensorValue[Tuple1[D], Tensor[S, T, Dv]],
+    alongDim: A
+  )(using
+    ...
+  ):
+#+END_SRC
+The full signature =using= clause calculates the resulting shape of =A * D=:
+#+BEGIN_SRC scala
+case object CatDim extends Dim.Static[3L]
+val ts = TensorValue.arangeOf(CatDim).map(_ => Tensor.zeros(4L, 5L, 6L))
+val tsType: TensorValue[Tuple1[CatDim.type], Tensor[(Static[4L], Static[5L], Static[6L]), Float32, CPU.type]] = ts
+
+val r = Tensor.cat(ts, Select.First)
+val rType: Tensor[(CatDim.type * Static[4L], Static[5L], Static[6L]), Float32, CPU.type] = r
+assert(r.size == Seq(CatDim.size * 4L, 5L, 6L))
+#+END_SRC
+
+*** TODO Evaluate a function long a dimension, and potentially flatten
+Explain =mapStack= and =mapCat=.
+
 ** Scala opportunities compared to Python
+*** Chained invocations
 - No need for =module.Sequential=. Actual chained invocations retain type
 #+BEGIN_SRC scala
 import Tensor.relu
@@ -672,16 +725,11 @@ Here's a more complete module:
     }
   }
 #+END_SRC
-** Scala limitations and challenges
+*** Scala limitations and challenges
 - No way to express "a tuple where all elements =<: X="
 - Match types vs. givens
 - Still the odd [[https://github.com/scala/scala3/issues/25204][compiler bug]] when exploring complex type setups
-** Memory management
-** Anonymous batch dimensions
-- Explain linear layer math
-- Example definition of =Linear.apply=:
-Input must consist of any batch dimensions, and then one dimension =In=
-Output will be those batch dimensions, and then =Out=
-#+BEGIN_SRC scala
-def apply[S <: Tuple, B <: Tuple, T <: DType, Idx <: Int](in: Tensor[S, T, D])(using Batched1[B, In, S]): in.Shaped[B :* Out]
-#+END_SRC
+* TODO Memory management
+* Conclusion
+** Wrapping up
+*** So, what have we learned?

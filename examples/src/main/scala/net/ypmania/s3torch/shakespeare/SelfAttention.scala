@@ -32,7 +32,7 @@ class SelfAttention[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: D
     CrossEntropy(predicted, actual)
   }
 
-  def extend[Length <: Dim.Dynamic, T <: Int64](idx: Tensor[Tuple1[Length], T, D]): idx.This = {
+  def extend[Length <: Dim.Dynamic, T <: Int64](idx: Tensor[Tuple1[Length], T, D]) = {
 
     val predicted = logits(idx)(dim[Length] % Last)
     val probs = predicted.softmax(vocabSize)

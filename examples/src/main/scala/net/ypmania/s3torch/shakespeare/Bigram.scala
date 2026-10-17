@@ -25,7 +25,7 @@ class Bigram[VocabSize <: Dim, D <: Device](vocabSize: VocabSize)(using Default[
     CrossEntropy(expected, actual)
   }
 
-  def extend[L <: Dim.Dynamic, T <: Int64](idx: Tensor[Tuple1[L], T, D]): idx.This = {
+  def extend[L <: Dim.Dynamic, T <: Int64](idx: Tensor[Tuple1[L], T, D]) = {
 
     val expected = embedding(idx)(dim[L] % Index.Last)
     val probs = expected.softmax(vocabSize)

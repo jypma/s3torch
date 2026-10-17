@@ -104,7 +104,6 @@ class Tensor[_S <: Tuple, _T <: DType, D <: Device](val native: pytorch.Tensor) 
     s1:SelectIdx[L, S1], v1: Index.Valid[Elem[L, s1.Idx], I1],
     s2in:SelectIdx[L, S2],
     s2:SelectIdx[ReplaceWithTuple[L, v1.Apply, s1.Idx], S2], v2: Index.Valid[Elem[ReplaceWithTuple[L, v1.Apply, s1.Idx], s2.Idx], I2],
-    //s3in:SelectIdx[ReplaceWithTuple[L, v1.Apply, s1.Idx], S3],
     s3in:SelectIdx[L, S3],
     s3:SelectIdx[ReplaceWithTuple[ReplaceWithTuple[L, v1.Apply, s1.Idx], v2.Apply, s2.Idx], S3], v3: Index.Valid[Elem[ReplaceWithTuple[ReplaceWithTuple[L, v1.Apply, s1.Idx], v2.Apply, s2.Idx], s3.Idx], I3]
   ): Shaped[Concat[B, ReplaceWithTuple[ReplaceWithTuple[ReplaceWithTuple[L, v1.Apply, s1.Idx], v2.Apply, s2.Idx], v3.Apply, s3.Idx]]] =
@@ -120,25 +119,19 @@ class Tensor[_S <: Tuple, _T <: DType, D <: Device](val native: pytorch.Tensor) 
     native.index(new pytorch.TensorIndexVector(allIndices.map(_.toNative)*))
   }
 
-  class CatApply[U <: Tuple](that: Shaped[U]) {
-    type Out[L <: Tuple, Idx <: Int, O] = Shape.Replace[L, O, Idx]
-    type Pick[L <: Tuple, LU <: Tuple, Idx <: Int] = Cat.PickDynamic[Tuple.Elem[L, Idx], Tuple.Elem[LU, Idx]]
+  /** Concatenate this tensor with the given other tensor, along [d], */
+  def cat[B <: Tuple, L <: Tuple, U <: Tuple, LU <: Tuple, Dm](that: Shaped[U])(d: Dm)(using
+    tb:Batched[B, L, S],
+    ub:Batched[B, LU, U],
+    sel: SelectIdx[L, Dm],
+    c: Cat[L, LU, sel.Idx]
+  )(using VerifyShape[c.Out]): Shaped[Concat[B, c.Out]] = new Tensor(torch.cat(new pytorch.TensorVector(native, that.native), sel.idx + tb.batchSize.value))
 
-    protected def cat(a: pytorch.Tensor, b: pytorch.Tensor, idx: Int) = torch.cat(new pytorch.TensorVector(native, that.native), idx)
-
-    def apply[B <: Tuple, L <: Tuple, LU <: Tuple, Dm](d: Dm)(using
-      tb:Batched[B, L, S],
-      ub:Batched[B, LU, U],
-      sel: SelectIdx[L, Dm],
-      pick: Pick[L, LU, sel.Idx]
-    )(using VerifyShape[Out[L, sel.Idx, pick.Out]], Cat[L, LU, sel.Idx]): Shaped[Concat[B, Out[L, sel.Idx, pick.Out]]] = new Tensor(cat(native, that.native, sel.idx))
-
-  }
-
-  /** Concatenates two tensors along a given dimension:
-    * val result = t1.cat(t2)(alongDim)
-    */
-  def cat[U <: Tuple](that: Shaped[U]) = new CatApply[U](that)
+  def ++[B <: Tuple, L <: Tuple, U <: Tuple, LU <: Tuple](that: Shaped[U])(using
+    tb:Batched[B, L, S],
+    ub:Batched[B, LU, U],
+    c: Cat[L, LU, 0]
+  )(using VerifyShape[c.Out]): Shaped[Concat[B, c.Out]] = cat(that)(Select.First)
 
   def contiguous: This = new Tensor(native.contiguous())
 
@@ -592,12 +585,6 @@ object Tensor {
 
     /** Adds a single dimension to this scalar, turning it into a vector of size one. */
     def unsqueeze: t.Shaped[Tuple1[Dim.One]] = new Tensor(t.native.unsqueeze(0))
-  }
-
-  // ---- Methods on Tensor with at least 1 dimension
-  extension[T <: DType, D <: Device, D1 <: Dim, DT <: Tuple](t: Tensor[D1 *: DT, T, D]) {
-    def ++[U <: Tuple](that: t.Shaped[U])(using Cat[D1 *: DT, U, 0])(using pick:Cat.PickDynamic[D1, Tuple.Head[U]]): t.Shaped[pick.Out *: DT] =
-      new Tensor(torch.cat(new pytorch.TensorVector(t.native, that.native), 0))
   }
 
   // ---- Methods on Tensor with 1 dimension ---

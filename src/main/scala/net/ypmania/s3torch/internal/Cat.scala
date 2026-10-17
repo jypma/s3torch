@@ -2,30 +2,32 @@ package net.ypmania.s3torch.internal
 
 import net.ypmania.s3torch.Dim
 
-import scala.compiletime.ops.int._
+import net.ypmania.s3torch.Shape.Elem
+import net.ypmania.s3torch.Shape.Replace
 
-trait Cat[S <: Tuple, U <: Tuple, Idx <: Int] {}
+/** Proof that [S] and [U] can be concatenated along dimension [Idx], with [Out] as resulting shape. */
+trait Cat[S <: Tuple, U <: Tuple, Idx <: Int] {
+  type Out <: Tuple
+}
 
-object Cat {
-  given uneq0[D1, D2, T1 <: Tuple, T2 <: Tuple]: Cat[D1 *: T1, D2 *: T2, 0] with {}
-  given uneq[D1, D2, T1 <: Tuple, T2 <: Tuple, Idx <: Int](using Cat[T1, T2, Idx - 1]): Cat[D1 *: T1, D2 *: T2, Idx] with {}
+trait CatPrio0 {
+  // Fallback: Output is Dim.Dynamic (but source shapes must match, except for the target dimension)
+  given dyn[S <: Tuple, U <: Tuple, Idx <: Int](using Cat.Verify[S, U, Idx]): Cat[S, U, Idx] with {
+    type Out = Replace[S, Dim.Dynamic, Idx]
+  }
+}
 
-  trait PickDynamic[D1, D2] {
-    type Out
+trait CatPrio1 {
+  given u_is_dyn[S <: Tuple, U <: Tuple, Idx <: Int](using Elem[U, Idx] <:< Dim.Dynamic, Cat.Verify[S, U, Idx]): Cat[S, U, Idx] with {
+    type Out = U
   }
-  trait PickDynamicPrio0 {
-    given fallback[D1, D2]: PickDynamic[D1, D2] with {
-      type Out = Dim.Dynamic
-    }
-  }
-  trait PickDynamicPrio1 extends PickDynamicPrio0 {
-    given right[D1, D2](using D2 <:< Dim.Dynamic): PickDynamic[D1, D2] with {
-      type Out = D2
-    }
-  }
-  object PickDynamic extends PickDynamicPrio1 {
-    given left[D1, D2](using D1 <:< Dim.Dynamic): PickDynamic[D1, D2] with {
-      type Out = D1
-    }
+}
+
+object Cat extends CatPrio0 {
+  // Given that verifies that S and U are the same shape, except for Idx
+  type Verify[S <: Tuple, U <: Tuple, Idx <: Int] = Replace[S, Dim.Dynamic, Idx] =:= Replace[U, Dim.Dynamic, Idx]
+
+  given s_is_dyn[S <: Tuple, U <: Tuple, Idx <: Int](using Elem[S, Idx] <:< Dim.Dynamic, Cat.Verify[S, U, Idx]): Cat[S, U, Idx] with {
+    type Out = S
   }
 }

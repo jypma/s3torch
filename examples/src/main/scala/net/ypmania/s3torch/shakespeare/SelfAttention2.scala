@@ -77,7 +77,7 @@ class SelfAttention2[VocabSize <: Dim, MaxBlockSize <: Dim, DModel <: Dim, D <: 
   }
 
   // TODO rewrite, this actually extends Length with one, so |<= isn't guaranteed.
-  def extend[Length <: Dim.Dynamic, T <: Int64](idx: Tensor[Tuple1[Length], T, D])(using Length |<= MaxBlockSize): idx.This = {
+  def extend[Length <: Dim.Dynamic, T <: Int64](idx: Tensor[Tuple1[Length], T, D])(using Length |<= MaxBlockSize) = {
 
     val predicted = logits(idx)(dim[Length] % Last)
     val probs = predicted.softmax(vocabSize)

@@ -723,6 +723,12 @@ class TensorSpec extends UnitSpec {
     describe("cat") {
       it("can concatenate two equal matrices along the second dimension") {
         val m = Tensor.zeros(2L, 3L)
+
+        val cat1 = summon[internal.Cat[Tuple1[Static[2L]], Tuple1[Static[2L]], 0]]
+
+        val cat = summon[internal.Cat[(Static[2L], Static[3L]), (Static[2L], Static[3L]), 1]]
+        val catOut: cat.Out = null
+
         val r = m.cat(m)((Select.Idx(1)))
         val rType: Tensor[(Static[2L], Dim.Dynamic), Float32, CPU.type] = r
         assert(r.size == Seq(2L, 6L))
@@ -751,7 +757,8 @@ class TensorSpec extends UnitSpec {
         whileDefined(r.sizeOf(dim[L]) |<= MaxDim) { ev =>
           import ev.given
           val proof = summon[L |<= MaxDim.type]
-          r ++= Tensor.zeros(1L)
+          val next = r ++ Tensor.zeros(1L)
+          r = next
         }
         assert(r.size == Seq(6L))
       }
@@ -770,6 +777,25 @@ class TensorSpec extends UnitSpec {
         val m = Tensor.zeros(2L, 3L).shaped[(Row, Column)]
         val r = m.cat(m)((Select.Idx(1)))
         val rType: Tensor[(Row, Column), Float32, CPU.type] = r
+      }
+
+      it("can't concatenate different-sized dimensions") {
+        val a = Tensor.zeros(1L)
+        val b = Tensor.zeros(1L, 1L)
+        // val r = a.cat(b)(Select.First) // compile error
+      }
+
+      it("can concatenate over a type parameter of a method") {
+        // TODO find out why this yields a compile error (can't find Batched given) if we give
+        // it an explicit return type
+        def doIt[D <: Dim.Dynamic](t: Tensor[Tuple1[D], Float32, CPU.type]) = {
+          t.cat(t)(dim[D])
+        }
+
+        class Row(size:Long) extends Dim.Dynamic(size)
+        val m = Tensor.zeros(new Row(2L))
+        val r = doIt(m)
+        val rType: Tensor[Row *: EmptyTuple, Float32, CPU.type] = r
       }
     }
 
