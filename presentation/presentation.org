@@ -695,9 +695,34 @@ val rType: Tensor[(CatDim.type * Static[4L], Static[5L], Static[6L]), Float32, C
 assert(r.size == Seq(CatDim.size * 4L, 5L, 6L))
 #+END_SRC
 
-*** TODO Evaluate a function long a dimension, and potentially flatten
-Explain =mapStack= and =mapCat=.
+*** Evaluate a function long a dimension
+Imagine we have a tensor with some values:
+#+BEGIN_SRC scala
+case object DimA extends Dim.Static[3L]
+val t = Tensor.zeros(DimA)
+#+END_SRC
 
+Now, we want to execute a function on each element in =t=, calculating a new =Tensor=
+- What should the resulting shape be?
+#+BEGIN_SRC scala
+val m = t.mapStack(v => Tensor.zeros(DimB))
+val mType: Tensor[(DimA.type, DimB.type), Float32, CPU.type] = m
+#+END_SRC
+*** Evaluate a function long a dimension (cont.)
+Imagine we have a tensor with some values:
+#+BEGIN_SRC scala
+case object DimA extends Dim.Static[3L]
+val t = Tensor.zeros(DimA)
+#+END_SRC
+
+Now, we want to execute a function on each element in =t=, calculating a new =Tensor=, and concatenate the results
+- What should the resulting shape be?
+#+BEGIN_SRC scala
+case object DimB extends Dim.Static[2L]
+case object DimC extends Dim.Static[4L]
+val r = m.mapCat(v => Tensor.zeros(DimB, DimC), Last)
+val rType: Tensor[(DimB.type, DimA.type * DimC.type), Float32, CPU.type] = r
+#+END_SRC
 ** Scala opportunities compared to Python
 *** Chained invocations
 - No need for =module.Sequential=. Actual chained invocations retain type
@@ -729,7 +754,64 @@ Here's a more complete module:
 - No way to express "a tuple where all elements =<: X="
 - Match types vs. givens
 - Still the odd [[https://github.com/scala/scala3/issues/25204][compiler bug]] when exploring complex type setups
-* TODO Memory management
+- How do we refrain from implementing a full CAS in Scala's type system?
+* Memory management
+** Runtimes
+*** Python
+- Reference counting
+
+References to (CPU) objects are /immediately/ garbage collected, once no longer referenced:
+#+BEGIN_SRC python
+import torch
+
+for i in range(10):
+    x = torch.randn(10000, 10000).cuda()
+    print(torch.cuda.max_memory_allocated())
+#+END_SRC
+gives:
+#+BEGIN_SRC sh
+400556032
+801112064
+801112064
+801112064
+[...]
+#+END_SRC
+- Cuda will re-use its tensor memory once the CPU object becomes GC'ed.
+*** Java
+- Garbage collector
+  + JVM has a complicated process to decide when memory is released
+  + Usually not immediately when no longer referenced
+  + Usually, a bunch at once
+** Solution
+*** =PointerScope=
+- =javacpp= has a generic solution: =PointerScope=
+  + Thread-l0cal storage to which all allocated pointers are added
+  + All pointers can be released as a single scope
+  + Ideal to wrap in a Scala block
+
+#+BEGIN_SRC scala
+import net.ypmania.s3torch.HeapExternal.scoped
+
+val myResult = scoped {
+  val intermediate = model.performCalculation(input)
+  infer(intermediate)
+}
+#+END_SRC
+- Everything allocated inside =scoped= is immediately freed
+  + /except/ the result
 * Conclusion
 ** Wrapping up
 *** So, what have we learned?
+- Tracing dimensions improves clarity of calculations
+- Subtle bugs now fixable (e.g. two dimensions being equal)
+- Not all type system decisions are optimal
+  + More work ahead
+*** Next steps
+- Type (and range) safe indexing data types
+- Better alignment with =pytorch='s auto-selected data types
+
+- Contact:
+
+[[https://github.com/jypma/s3torch][https://github.com/jypma/s3torch]]
+
+=jan@ypmania.net=

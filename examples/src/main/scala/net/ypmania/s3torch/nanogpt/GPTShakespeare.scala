@@ -32,7 +32,7 @@ object GPTShakespeare {
   type TokT[S <: Tuple] = Tensor[S, Tok.DType, Dv]
 
   case object BatchSize extends Dim.Static[16L]
-  val trainingRounds = 30000
+  val trainingRounds = 100000
   val printLossEvery = 1000
   val learningRate = 0.2e-5
 
