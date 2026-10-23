@@ -5,7 +5,7 @@
   * Independent software architect
   * Java, Scala, Groovy, C++, Rust, Lisp
   * Contributor to various open source projects
-  * Fan of functional programming and distributed systems
+  * Functional programming and distributed systems
   * Agile coach and fan of Domain-Driven Design
   * =jan@ypmania.net=, https://linkedin.com/in/jypma
 
@@ -102,6 +102,14 @@ Can you follow along what the tensor dimensions are?
 def average(number1, number2, number3) = {
     (number1 + number2 + number3) / 3
 }
+#+END_SRC
+*** Rationale (3)
+- Why do programming languages have, or introduce, types?
+
+#+BEGIN_SRC scala
+def average(number1, number2, number3) = {
+    (number1 + number2 + number3) / 3
+}
 
 average(1, 2, 3)
 average("1", "2", "3")
@@ -120,6 +128,7 @@ def average(number1: Int, number2: Int, number3: Int): Int = {
 
 - Not possible to write code that puts something else in there
 - Early detection of potential issues
+  + Cost of fixing defects goes up exponentially with time ([[https://testomat.io/blog/software-bug-cost/][source: testomat/IBM]] and [[https://www.forbes.com/councils/forbestechcouncil/2023/12/26/costly-code-the-price-of-software-errors/][source: forbes]])
 ** Generics
 *** The case for generics
 - We want to store lists of things, so let's imagine a type =List=
@@ -136,6 +145,7 @@ val numbers: List[Int] = List(1, 2, 3)
 val cats: List[Cat] = List(Cat.load("/kitten.jpg"))
 
 def getFirstElement(items: List[Int]): Int
+def getFirstElement(items: List[Cat]): Cat
 #+END_SRC
 *** Lists of anything
 - Our function doesn't care about what's in the list
@@ -144,7 +154,55 @@ def getFirstElement(items: List[Int]): Int
 #+BEGIN_SRC scala
 def getFirstElement[T](items: List[T]): T
 #+END_SRC
+** Tuples
+*** Combining types
+Consider a generic "map" data structure
+#+BEGIN_SRC scala
+trait Map[K, V]
+#+END_SRC
 
+What is a good type for one entry in the map?
+*** Tuple
+A /tuple/ is an ordered, fixed-length sequence of values of known (but potentially distinct) types.
+
+#+BEGIN_SRC scala
+case class Tuple2[A, B](a: A, b: B)
+
+case class Tuple3[A, B, C](a: A, b: B, c: C)
+
+// etc.
+#+END_SRC
+** Implicit arguments
+*** Type classes
+We want to write a sort algorithm:
+#+BEGIN_SRC scala
+def sorted[T](list: List[T]): List[T]
+#+END_SRC
+
+Now we need a way to compare values of =T=.
+- Interface: not an option, we don't want to limit what =T= we can put in
+- Alternative: Helper object ("type class")
+#+BEGIN_SRC scala
+trait Comparator[T] {
+  def compare(a: T, b: T): Int
+}
+def sorted[T](list: List[T], comparator: Comparator[T]): List[T]
+#+END_SRC
+
+But passing this around every time is cumbersome.
+*** Given and using
+We can have Scala pass the argument automatically.
+#+BEGIN_SRC scala
+def sorted[T](list: List[T])(using comparator: Comparator[T]): List[T]
+#+END_SRC
+
+Then, make sure a "given" value is in scope:
+#+BEGIN_SRC scala
+given comparator: Comparator[T] = ???
+
+val myList: List[T] = ???
+val result = sorted(myList)
+#+END_SRC
 * Types for tensors
 ** Pytorch
 *** Introduction
@@ -252,6 +310,9 @@ The compiler knows nothing about these... initially.
 - We want to encode each dimension as a type
 - Let's use Scala 3's =Tuple= for this
 #+BEGIN_SRC scala
+case object BatchSize extends Static[32L]
+case object NumberOfHeads extends Static[4L]
+
 type ShapeOfMatrix = (BatchSize, NumberOfHeads) // Tuple2[BatchSize, NumberOfHeads]
 type ShapeOfVector = Tuple1[BatchSize]
 type Scalar = EmptyTuple
@@ -645,7 +706,7 @@ See it in action: [[file:~/workspace/s3torch/src/test/scala/net/ypmania/s3torch/
 #+BEGIN_SRC scala
 type DModel <: Dim // or could be a Dim.Static
 
-def apply[L <: Dim](x: Tensor[(L, DModel), Float32, D]): Tensor[(L, DModel), Float32, D]
+def performCalculation[L <: Dim](x: Tensor[(L, DModel), Float32, D]): Tensor[(L, DModel), Float32, D]
 #+END_SRC
 
 *** Adding a batch dimension
@@ -813,6 +874,7 @@ val myResult = scoped {
 * Conclusion
 ** Wrapping up
 *** So, what have we learned?
+- Pytorch documentation vs. reality
 - Tracing dimensions improves clarity of calculations
 - Subtle bugs now fixable (e.g. two dimensions being equal)
 - Not all type system decisions are optimal
