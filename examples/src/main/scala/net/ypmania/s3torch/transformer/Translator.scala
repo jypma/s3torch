@@ -167,7 +167,9 @@ class Translator[
               next
             }
             // TODO introduce NotGiven[IsIndex[DType]] to disallow += here
-            decoderInput ++= nextToken
+            // TODO Fix the "Batched" implicit not resolving here when we write decoderInput = decoderInput ++ nextToken
+            val next = decoderInput ++ nextToken
+            decoderInput = next
           }
           // Note: end of greedy_decode
 
