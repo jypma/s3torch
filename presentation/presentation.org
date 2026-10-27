@@ -1,4 +1,10 @@
-* Type-safe tensors for human learning
+#+TITLE: Type-safe tensors for humans
+#+PROPERTY: header-args:plantuml :exports results :var _dpi_="150"
+#+options: H:3
+#+latex_header: \hypersetup{colorlinks=true,linkcolor=blue}
+#+LATEX_CLASS_OPTIONS: [8pt]
+#+BEAMER_THEME: Rochester [height=20pt]
+* Type-safe tensors for humans
 ** Getting started
 *** About me
 - Jan Ypma
@@ -129,6 +135,9 @@ def average(number1: Int, number2: Int, number3: Int): Int = {
 - Not possible to write code that puts something else in there
 - Early detection of potential issues
   + Cost of fixing defects goes up exponentially with time ([[https://testomat.io/blog/software-bug-cost/][source: testomat/IBM]] and [[https://www.forbes.com/councils/forbestechcouncil/2023/12/26/costly-code-the-price-of-software-errors/][source: forbes]])
+
+
+
 ** Generics
 *** The case for generics
 - We want to store lists of things, so let's imagine a type =List=
@@ -428,6 +437,34 @@ When are two tensors "equal"?
 #+END_SRC
 
 * Dimension tricks
+** Selecting dimensions
+*** The need to select dimensions
+- Find the (/maximum/, /mininum/, /average/, ...) across one dimension
+#+BEGIN_SRC scala
+val t = Tensor((
+  ((1.0, 5.0, 3.0)),
+  ((4.0, 2.0, 6.0))
+)).shaped[(Row, Column)]
+
+val r = t.maxBy(dim[Row])
+#+END_SRC
+
+- What would you expect the type of =r= to be?
+
+Source: [[file:~/workspace/s3torch/src/test/scala/net/ypmania/s3torch/TensorSpec.scala::1090][TensorSpec.scala]]
+*** Compile-time safety for picking dimensions
+All =Tensor= methods that require referring to a dimension can do this in several ways:
+#+BEGIN_SRC scala
+case class Row extends Dim.Static[2L]
+case class Column extends Dim.Static[4L]
+val t = Tensor.zeros(Row, Column)
+#+END_SRC
+- By dimension value: =t.maxBy(Row)=
+- By dimension type (if a value isn't available): =t.maxBy(dim[Row])=
+- By first or last: =t.maxBy(Select.First)= or =t.maxBy(Select.Last)=
+- By a specific index (must be a compile-time constant) =t.maxBy(Select.Idx(0))=
+
+Of course, all of the above are compile-time verified.
 ** Comparing dimensions statically
 *** Case: pad to given size
 #+BEGIN_SRC scala
@@ -590,20 +627,6 @@ whileDefined(gen.sizeOf(ExampleSize(_)) |<= MaxBlockSize) { ev =>
   gen = model.extend(gen)
 }
 #+END_SRC
-** Selecting dimensions
-*** Compile-time safety for picking dimensions
-All =Tensor= methods that require referring to a dimension can do this in several ways:
-#+BEGIN_SRC scala
-case class Row extends Dim.Static[2L]
-case class Column extends Dim.Static[4L]
-val t = Tensor.zeros(Row, Column)
-#+END_SRC
-- By dimension value: =t.maxBy(Row)=
-- By dimension type (if a value isn't available): =t.maxBy(dim[Row])=
-- By first or last: =t.maxBy(Select.First)= or =t.maxBy(Select.Last)=
-- By a specific index (must be a compile-time constant) =t.maxBy(Select.Idx(0))=
-
-Of course, all of the above are compile-time verified.
 ** Dynamic batch dimensions
 *** Introduction
 Let's say we have written
@@ -822,11 +845,6 @@ Here's a more complete module:
     }
   }
 #+END_SRC
-*** Scala limitations and challenges
-- No way to express "a tuple where all elements =<: X="
-- Match types vs. givens
-- Still the odd [[https://github.com/scala/scala3/issues/25204][compiler bug]] when exploring complex type setups
-- How do we refrain from implementing a full CAS in Scala's type system?
 * Memory management
 ** Runtimes
 *** Python
@@ -875,16 +893,21 @@ val myResult = scoped {
 ** Wrapping up
 *** So, what have we learned?
 - Pytorch documentation vs. reality
-- Tracing dimensions improves clarity of calculations
-- Subtle bugs now fixable (e.g. two dimensions being equal)
-- Not all type system decisions are optimal
-  + More work ahead
+- Tracing dimensions is fun!
+  + Improves clarity of calculations
+- Subtle bugs now fixable
+  + Two dimensions equal does not mean it's the same dimension
+
+- Scala limitations and challenges
+  + No way to express "a tuple where all elements =<: X="
+  + Match types vs. givens
+  + Still the odd [[https://github.com/scala/scala3/issues/25204][compiler bug]] when exploring complex type setups
+  + How do we refrain from implementing a full CAS in Scala's type system?
 *** Next steps
 - Type (and range) safe indexing data types
 - Better alignment with =pytorch='s auto-selected data types
 
-- Contact:
+- Find out more
 
 [[https://github.com/jypma/s3torch][https://github.com/jypma/s3torch]]
-
 =jan@ypmania.net=
