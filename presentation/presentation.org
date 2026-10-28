@@ -16,6 +16,9 @@
   * =jan@ypmania.net=, https://linkedin.com/in/jypma
 
 - This talk: [[https://github.com/jypma/s3torch/tree/master/presentation][https://github.com/jypma/s3torch/tree/master/presentation]]
+
+- We will selectively skip parts.
+
 ** Introduction to tensors
 *** Tensor
 Wikipedia:
@@ -216,11 +219,14 @@ val result = sorted(myList)
 ** Pytorch
 *** Introduction
 - Extremely popular due to its easy of use, and (mostly) single API  for both CPU and GPU inference
+
 - Python api (=pytorch=) on top of a C++ backend (=libtorch=), with various hardware-dependent extensions
+
 - API for wide variety of tensor operations
   + General math, matrix operations, cross entropy
   + Composing frequently used building blocks into modules
   + Everything is tracked for gradient descent back-propagation
+
 - Tensors
   + are /mutable/
   + have a fixed /size/ with a number of /dimensions/
@@ -228,10 +234,13 @@ val result = sorted(myList)
   + are stored on a specific /device/ (e.g. CPU, GPU number 2, etc.)
 *** Runtime restrictions
 Not all pytorch operations accept any input (just like python):
+
 - Data type requirements
   + [[https://docs.pytorch.org/docs/2.14/generated/torch.nn.Embedding.html][nn.Embedding]] (see "Shape"): Input has to be =IntTensor= or =LongTensor=, output can be anything
+
 - Dimension requirements
   + [[https://docs.pytorch.org/docs/2.14/generated/torch.nn.functional.cross_entropy.html][nn.functional.cross_entropy]] (see "Shape"): Very specific input shapes accepted. Output depends on what input shape was passed.
+
 - Data value requirements
   + [[https://docs.pytorch.org/docs/2.14/generated/torch.nn.Embedding.html][nn.Embedding]]: Input values have to "fit" the size of the embedding (lookup table)
 ** Use on the JVM
@@ -342,6 +351,7 @@ Let's investigate element-wise operations
 For what shapes should we support this?
 - Same shape on both sides
 - Different shapes: =pytorch= [[https://docs.pytorch.org/docs/2.14/notes/broadcasting.html][broadcasting]] rules
+
 And what data types?
 - Different data types: =pytorch= [[https://docs.pytorch.org/docs/2.14/tensor_attributes.html#type-promotion-doc][promotion]] rules
 *** Promotion example
@@ -355,6 +365,8 @@ And what data types?
         assert(res.value.toSeq == Seq(2.0, 4.0, 6.0))
       }
 #+END_SRC
+
+source: [[file:~/workspace/s3torch/src/test/scala/net/ypmania/s3torch/TensorSpec.scala::436][TensorSpec.scala]]
 *** Broadcasting example
 #+BEGIN_SRC scala
       it("can plus a matrix with a vector") {
@@ -378,6 +390,8 @@ And what data types?
         ))
       }
 #+END_SRC
+
+source: [[file:~/workspace/s3torch/src/test/scala/net/ypmania/s3torch/TensorSpec.scala::415][TensorSpec.scala]]
 *** Boolean example
 #+BEGIN_SRC scala
       it("can compare two tensors of different type") {
@@ -389,6 +403,8 @@ And what data types?
         assert(res.value.toSeq == Seq(true, false, true))
       }
 #+END_SRC
+
+source: [[file:~/workspace/s3torch/src/test/scala/net/ypmania/s3torch/TensorSpec.scala::374][TensorSpec.scala]]
 ** Scalar functions (sin, relu, etc.)
 *** Picking syntax
 Same operation on each element
@@ -461,8 +477,8 @@ val t = Tensor.zeros(Row, Column)
 #+END_SRC
 - By dimension value: =t.maxBy(Row)=
 - By dimension type (if a value isn't available): =t.maxBy(dim[Row])=
-- By first or last: =t.maxBy(Select.First)= or =t.maxBy(Select.Last)=
-- By a specific index (must be a compile-time constant) =t.maxBy(Select.Idx(0))=
+- By first or last: =t.maxBy(First)= or =t.maxBy(Last)=
+- By a specific index (must be a compile-time constant) =t.maxBy(Idx(0))=
 
 Of course, all of the above are compile-time verified.
 ** Comparing dimensions statically
@@ -893,8 +909,10 @@ val myResult = scoped {
 ** Wrapping up
 *** So, what have we learned?
 - Pytorch documentation vs. reality
+
 - Tracing dimensions is fun!
   + Improves clarity of calculations
+
 - Subtle bugs now fixable
   + Two dimensions equal does not mean it's the same dimension
 
